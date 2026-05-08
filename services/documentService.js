@@ -26,6 +26,7 @@ import { uploadDocToCloudinary } from "../utils/cloudinaryHelper.js";
 import { TEMPLATE_DOCUMENT_TYPES } from "../constants/documentConstants.js";
 import { slugify } from "../utils/documentHelper.js";
 import { sendEmail } from "../utils/sendEmail.js";
+import { logAuditAction } from "../utils/logger.js";
 
 // ---------------------------------------------------------------------- //
 // -------------------- PERSONAL DOCUMENTS SERVICES --------------------- //
@@ -234,6 +235,7 @@ export const uploadAdminDocumentService = async ({
   title,
   documentTypeId,
   uploadedBy,
+  ip,
 }) => {
   if (!file) {
     throw new AppError(
@@ -288,6 +290,17 @@ export const uploadAdminDocumentService = async ({
     fileHash,
   });
 
+  // Create the audit log for this action
+  await logAuditAction({
+    adminId: uploadedBy,
+    action: "UPLOAD_ADMIN_DOCUMENT",
+    targetType: "Document",
+    targetId: document._id,
+    targetName: document.title,
+    details: document,
+    ipAddress: ip,
+  });
+
   return {
     status: "Success",
     code: 201,
@@ -297,7 +310,11 @@ export const uploadAdminDocumentService = async ({
 };
 
 // Delete an administrative document service
-export const deleteAdminDocumentService = async ({ documentId }) => {
+export const deleteAdminDocumentService = async ({
+  documentId,
+  currentUser,
+  ip,
+}) => {
   const document = await Document.findById(documentId);
   if (!document)
     throw new AppError(
@@ -308,6 +325,17 @@ export const deleteAdminDocumentService = async ({ documentId }) => {
     );
 
   await deleteDocumentCore(document);
+
+  // Create the audit log for this action
+  await logAuditAction({
+    adminId: currentUser.id,
+    action: "DELETE_ADMIN_DOCUMENT",
+    targetType: "Document",
+    targetId: document._id,
+    targetName: document.title,
+    details: document,
+    ipAddress: ip,
+  });
 
   return {
     status: "Success",
@@ -343,13 +371,16 @@ export const generateDocumentService = async ({
   templateName,
   data,
   uploadedBy,
+  ip,
 }) => {
   // Generate the PDF template buffer (buffer = the file in memory before uploading it to Cloudinary)
   const pdfBuffer = await generateDocumentCore(templateName, data);
 
   // Create the personnalised filename
-  const safeName = slugify(data.full_name? data.full_name: "");
-  const timestamp = new Date(Date.now()).toLocaleDateString('fr-FR').replace(/\//g, '-');
+  const safeName = slugify(data.full_name ? data.full_name : "");
+  const timestamp = new Date(Date.now())
+    .toLocaleDateString("fr-FR")
+    .replace(/\//g, "-");
   const fileName = `${templateName}-${safeName}-${timestamp}.pdf`;
 
   // Create the virtual file object: Transform the buffer into a multer file-like object that can be processed by the uploadDocumentCore function
@@ -371,6 +402,7 @@ export const generateDocumentService = async ({
     );
   }
 
+  // Get the document type object based on the template name
   const type = await DocumentType.findOne({ name: documentTypeName });
   if (!type) {
     throw new AppError(
@@ -426,6 +458,17 @@ export const generateDocumentService = async ({
     isConfidential: true,
   });
 
+  // Create the audit log for this action
+  await logAuditAction({
+    adminId: uploadedBy,
+    action: "GENERATE_DOCUMENT",
+    targetType: "Document",
+    targetId: document._id,
+    targetName: document.title,
+    details: document,
+    ipAddress: ip,
+  });
+
   return {
     status: "Success",
     code: 201,
@@ -435,9 +478,7 @@ export const generateDocumentService = async ({
 };
 
 // Send the generated document by email to user
-export const sendGeneratedDocumentByEmailService = async ({
-  documentId,
-}) => {
+export const sendGeneratedDocumentByEmailService = async ({ documentId, currentUser, ip }) => {
   // Check the document existence
   const document = await Document.findById(documentId);
   if (!document) {
@@ -477,6 +518,21 @@ export const sendGeneratedDocumentByEmailService = async ({
         contentType: mimeType,
       },
     ],
+  });
+
+  // Create the audit log for this action
+  await logAuditAction({
+    adminId: currentUser.id,
+    action: "SEND_GENERATED_DOCUMENT_BY_EMAIL",
+    targetType: "Document",
+    targetId: document._id,
+    targetName: document.title,
+    details: {
+      documentId: document._id,
+      templateName: document.templateName,
+      userEmail: user.email,
+    },
+    ipAddress: ip,
   });
 
   return {

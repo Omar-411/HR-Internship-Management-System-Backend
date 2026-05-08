@@ -112,6 +112,7 @@ export const uploadAdminDocument = async (req, res, next) => {
       title: req.body.title,
       documentTypeId: req.body.documentType_id,
       uploadedBy: req.user.id,
+      ip: req.ip,
     });
 
     res.status(result.code).json(result);
@@ -150,6 +151,8 @@ export const deleteAdminDocument = async (req, res, next) => {
   try {
     const result = await documentService.deleteAdminDocumentService({
       documentId: req.params.id,
+      currentUser: req.user,
+      ip: req.ip,
     });
 
     res.status(result.code).json(result);
@@ -168,6 +171,7 @@ export const generateDocument = async (req, res, next) => {
       templateName,
       data: req.body,
       uploadedBy: req.user.id,
+      ip: req.ip,
     });
 
     res.status(result.code).json(result);
@@ -183,6 +187,8 @@ export const sendGeneratedDocumentByEmail = async (req, res, next) => {
 
     const result = await documentService.sendGeneratedDocumentByEmailService({
       documentId,
+      currentUser: req.user,
+      ip: req.ip,
     });
 
     res.status(result.code).json(result);

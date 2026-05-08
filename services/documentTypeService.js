@@ -57,7 +57,7 @@ export const getDocumentTypeByIdService = getOne(
 export const updateDocumentTypeService = async (id, { name, description }) => {
   const trimmedName = (name || "").trim();
   const trimmedDescription = description ? description.trim() : "";
-  
+
   // Check the name field
   if (isEmpty(name)) {
     throw new AppError(
@@ -92,7 +92,7 @@ export const updateDocumentTypeService = async (id, { name, description }) => {
       errors.DOCUMENT_TYPE_ALREADY_EXISTS.suggestion,
     );
   }
-    
+
   // Update the document type
   const updatedDocumentType = await updateOne(DocumentType)(id, {
     name: trimmedName,

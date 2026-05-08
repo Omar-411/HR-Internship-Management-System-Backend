@@ -52,6 +52,12 @@ const auditLogSchema = mongoose.Schema(
         "CREATE_PAYROLL_CONFIG",
         "TOGGLE_PAYROLL_CONFIG_ACTIVATION",
         "CREATE_NEW_PAYROLL_CONFIG_VERSION",
+        "UPLOAD_ADMIN_DOCUMENT",
+        "DELETE_ADMIN_DOCUMENT",
+        "GENERATE_DOCUMENT",
+        "SEND_GENERATED_DOCUMENT_BY_EMAIL",
+        "CREATE_DOCUMENT_TYPE",
+        "UPDATE_DOCUMENT_TYPE",
       ],
     },
     target_type: {
@@ -71,6 +77,7 @@ const auditLogSchema = mongoose.Schema(
         "AllowanceType",
         "BonusType",
         "PayrollConfig",
+        "Document",
       ],
     },
     target_id: {
