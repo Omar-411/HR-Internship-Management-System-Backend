@@ -111,7 +111,7 @@ const userSchema = mongoose.Schema(
       // Employment contract details
       contractType: {
         type: String,
-        enum: ["CDI", "INTERNSHIP"],
+        enum: ["CDI", "CDD", "INTERNSHIP"],
         required: true,
       },
       contractJoinDate: {

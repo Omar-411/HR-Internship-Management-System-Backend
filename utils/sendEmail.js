@@ -5,6 +5,7 @@ import {
   getUpdateUserContent,
   getResendOTPContent,
   getForgetPasswordValidationContent,
+  getDocumentEmailContent,
 } from "./emailContent.js";
 
 export const sendEmail = async ({
@@ -16,6 +17,8 @@ export const sendEmail = async ({
   code,
   resetLink,
   newRole,
+  documentTitle,
+  attachments = [],
 }) => {
   let bodyHtml;
 
@@ -35,6 +38,12 @@ export const sendEmail = async ({
 
     case "forgetPasswordRequest":
       bodyHtml = getForgetPasswordValidationContent({ name, resetLink });
+      break;
+    case "document":
+      bodyHtml = getDocumentEmailContent({
+        name,
+        documentTitle,
+      });
       break;
 
     default:
@@ -58,6 +67,7 @@ export const sendEmail = async ({
       to,
       subject,
       html: htmlContent,
+      attachments,
     });
 
     console.log("Onboarding email sent to:", to);

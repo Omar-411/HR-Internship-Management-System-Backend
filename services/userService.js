@@ -482,7 +482,7 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
         subject: "HRcoM! - Congratulations! Your Role Has Been Updated",
         type: "updateUser",
         name: user.name,
-        newRole: newRoleName,
+        newRole: user.position,
       });
 
       console.log(`[UPDATE-USER-DEBUG] Email sent successfully.`);

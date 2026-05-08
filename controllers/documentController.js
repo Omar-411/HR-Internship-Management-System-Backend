@@ -159,6 +159,38 @@ export const deleteAdminDocument = async (req, res, next) => {
   }
 };
 
+// Generate an administratif document
+export const generateDocument = async (req, res, next) => {
+  try {
+    const { templateName } = req.params;
+
+    const result = await documentService.generateDocumentService({
+      templateName,
+      data: req.body,
+      uploadedBy: req.user.id,
+    });
+
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Send a generated document by email
+export const sendGeneratedDocumentByEmail = async (req, res, next) => {
+  try {
+    const { documentId } = req.params;
+
+    const result = await documentService.sendGeneratedDocumentByEmailService({
+      documentId,
+    });
+
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ------------------------------------------------------------------------------- //
 // ----------------------- DOCUMENT REQUEST CONTROLLERS -------------------------- //
 // ------------------------------------------------------------------------------- //

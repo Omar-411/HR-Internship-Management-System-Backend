@@ -1,0 +1,358 @@
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Internship Completion Certificate</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&amp;family=Noto+Serif:wght@400;700&amp;family=Work+Sans:wght@500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-tertiary": "#ffffff",
+              error: "#ba1a1a",
+              "on-surface-variant": "#4b444d",
+              "on-secondary-fixed-variant": "#673d00",
+              "inverse-surface": "#263143",
+              "surface-bright": "#f9f9ff",
+              "on-primary-fixed-variant": "#593a6d",
+              "outline-variant": "#cec3ce",
+              "on-primary": "#ffffff",
+              "on-surface": "#111c2d",
+              "on-secondary-fixed": "#2b1700",
+              "on-primary-fixed": "#2b0c3e",
+              "tertiary-fixed": "#dde3eb",
+              "on-secondary-container": "#683d00",
+              "on-secondary": "#ffffff",
+              "inverse-primary": "#e0b8f4",
+              "inverse-on-surface": "#ecf1ff",
+              "surface-container-lowest": "#ffffff",
+              outline: "#7d747e",
+              "on-tertiary-fixed-variant": "#41474e",
+              "on-tertiary-container": "#9da3ab",
+              primary: "#341547",
+              background: "#f9f9ff",
+              "on-error-container": "#93000a",
+              secondary: "#885200",
+              "secondary-fixed-dim": "#ffb869",
+              "surface-container-high": "#dee8ff",
+              "surface-tint": "#735186",
+              "surface-container-low": "#f0f3ff",
+              "tertiary-fixed-dim": "#c1c7cf",
+              "on-tertiary-fixed": "#161c22",
+              "primary-fixed-dim": "#e0b8f4",
+              "on-primary-container": "#bb95cf",
+              "tertiary-container": "#333a40",
+              "on-error": "#ffffff",
+              surface: "#f9f9ff",
+              "secondary-fixed": "#ffdcbb",
+              "on-background": "#111c2d",
+              "surface-container": "#e7eeff",
+              "secondary-container": "#ffa11e",
+              tertiary: "#1e242a",
+              "primary-container": "#4b2c5e",
+              "surface-variant": "#d8e3fb",
+              "surface-dim": "#cfdaf2",
+              "primary-fixed": "#f4d9ff",
+              "surface-container-highest": "#d8e3fb",
+              "error-container": "#ffdad6",
+            },
+            borderRadius: {
+              DEFAULT: "0.25rem",
+              lg: "0.5rem",
+              xl: "0.75rem",
+              full: "9999px",
+            },
+            spacing: {
+              "section-gap": "40px",
+              "dot-pattern-size": "8px",
+              "signature-width": "200px",
+              "margin-page": "48px",
+              "gutter-grid": "24px",
+            },
+            fontFamily: {
+              "meta-label": ["Work Sans"],
+              "document-title": ["Cormorant Garamond", "serif"],
+              "sub-title": ["Work Sans"],
+              "body-text": ["Inter"],
+              "recipient-name": ["Noto Serif"],
+            },
+            fontSize: {
+              "meta-label": ["10px", { lineHeight: "14px", fontWeight: "600" }],
+              "document-title": [
+                "48px",
+                {
+                  lineHeight: "56px",
+                  letterSpacing: "0.12em",
+                  fontWeight: "700",
+                },
+              ],
+              "sub-title": [
+                "28px",
+                {
+                  lineHeight: "36px",
+                  letterSpacing: "0.2em",
+                  fontWeight: "500",
+                },
+              ],
+              "body-text": ["12px", { lineHeight: "20px", fontWeight: "400" }],
+              "recipient-name": [
+                "48px",
+                { lineHeight: "56px", fontWeight: "400" },
+              ],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      /* A4 Landscape Dimensions */
+      .a4-landscape {
+        width: 297mm;
+        height: 210mm;
+      }
+
+      /* Dot Pattern Background */
+      .bg-dots {
+        background-image: radial-gradient(
+          var(--tw-colors-secondary-container) 1px,
+          transparent 1px
+        );
+        background-size: var(--tw-spacing-dot-pattern-size)
+          var(--tw-spacing-dot-pattern-size);
+      }
+
+      @page {
+        size: A4 landscape;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body
+    class="font-body-text text-on-surface bg-white"
+  >
+    <!-- Document Frame (A4 Landscape Container) -->
+    <div
+      class="a4-landscape bg-surface relative flex overflow-hidden"
+    >
+      <!-- Left Vertical Panel (Asymmetry) -->
+      <div
+        class="w-1/5 h-full bg-primary-container flex flex-col items-center justify-between py-12 px-6 relative overflow-hidden z-10"
+      >
+        <!-- Subtle geometric overlay in panel -->
+        <div class="absolute top-0 right-0 w-full h-full opacity-10">
+          <div
+            class="absolute top-0 right-0 w-32 h-32 bg-white transform rotate-45 translate-x-16 -translate-y-16"
+          ></div>
+          <div
+            class="absolute bottom-1/4 right-0 w-24 h-24 bg-white transform rotate-45 translate-x-12"
+          ></div>
+        </div>
+        <div class="relative z-20 w-full flex flex-col items-center">
+          <!-- Company Logo Placeholder -->
+          <div
+            class="w-32 h-32 mb-8 bg-surface rounded-full flex items-center justify-center shadow-lg border-4 border-secondary-container/20 overflow-hidden"
+          >
+            <img
+              alt="Company Logo"
+              class="w-full h-full object-cover"
+              src="https://i.ibb.co/rRF2dcSy/dotjcom-logo-only.png"
+            />
+          </div>
+          <div
+            class="text-on-primary font-sub-title text-sub-title text-center leading-tight"
+          >
+            DOTJCOM LTD<br />
+          </div>
+        </div>
+        <div class="relative z-20 w-full text-center">
+          <div class="w-12 h-[2px] bg-secondary-container mx-auto mb-6"></div>
+          <p class="text-on-primary/70 font-meta-label text-meta-label">
+            128 City Road, London, United Kingdom, EClV 2NX
+          </p>
+        </div>
+      </div>
+      <!-- Main Content Area -->
+      <div
+        class="w-4/5 h-full relative p-margin-page flex flex-col justify-between bg-surface z-0"
+      >
+        <!-- Thin inner border system -->
+        <div
+          class="absolute top-8 bottom-8 right-8 left-0 border-y border-r border-outline-variant/50 pointer-events-none"
+        ></div>
+        <div
+          class="absolute top-10 bottom-10 right-10 left-2 border-y border-r border-secondary-container/30 pointer-events-none"
+        ></div>
+        <!-- Geometric Accents -->
+        <div
+          class="absolute top-12 right-12 w-24 h-24 bg-dots opacity-40 pointer-events-none"
+        ></div>
+        <div
+          class="absolute bottom-12 right-12 w-0 h-0 border-l-[60px] border-l-transparent border-b-[60px] border-b-secondary-container opacity-20 pointer-events-none"
+        ></div>
+        <!-- Header Section -->
+        <header class="text-left relative z-10 pl-8 pt-4">
+          <h1
+            class="font-document-title text-document-title text-on-surface max-w-2xl uppercase"
+          >
+            CERTIFICATE OF INTERNSHIP COMPLETION
+          </h1>
+        </header>
+        <!-- Recipient Section -->
+        <main
+          class="flex-grow flex flex-col justify-center text-left relative z-10 pl-8"
+        >
+          <div class="mb-section-gap">
+            <p
+              class="font-meta-label text-meta-label text-on-surface-variant uppercase tracking-wider mb-8"
+            >
+              This is to certify that
+            </p>
+            <h2
+              class="font-recipient-name text-recipient-name text-primary-container border-b-[1px] border-outline-variant inline-block pb-2 min-w-[400px]"
+            >
+              {{full_name}}
+            </h2>
+          </div>
+          <div class="max-w-xl">
+            <p
+              class="font-body-text text-body-text text-on-surface-variant leading-relaxed"
+            >
+              Born on <strong>{{date_of_birth}}</strong> in
+              <strong>{{place_of_birth}}</strong>, holder of National Identity
+              Card (CIN) No. <strong>{{cin_number}}</strong>, issued on
+              <strong>{{cin_issue_date}}</strong> in
+              <strong>{{cin_issue_place}}</strong>, at residing at
+              <strong>{{address}}</strong>, has completed a remote internship
+              within our company <strong>DOTJCOM LTD</strong>, whose registered
+              office is located at 128 City Road, London, from
+              <strong>{{contract_start_date}}</strong> to
+              <strong>{{contract_end_date}}</strong>.
+            </p>
+            <p
+              class="font-body-text text-body-text text-on-surface-variant leading-relaxed mt-4"
+            >
+              During this period, the intern carried out assignments in IT and
+              web development, working full-time in a remote environment under
+              the supervision of our technical team.
+            </p>
+            <p
+              class="font-body-text text-body-text text-on-surface-variant leading-relaxed mt-4"
+            >
+              The intern demonstrated professionalism, autonomy, availability,
+              and a strong ability to adapt to a fully digital and remote work
+              environment.
+            </p>
+            <p
+              class="font-body-text text-body-text text-on-surface-variant leading-relaxed mt-4"
+            >
+              This certificate is issued to the interested party for all lawful
+              and official purposes.
+            </p>
+          </div>
+        </main>
+        <!-- Footer / Signatures -->
+        <footer
+          class="w-full flex justify-between items-end relative z-10 pl-8 pb-4"
+        >
+          <!-- Meta Info -->
+          <div class="flex flex-col space-y-4">
+            <!-- Seal Placeholder -->
+            <div
+              class="w-20 h-20 rounded-full border-2 border-secondary-container flex items-center justify-center bg-surface-variant/30 text-secondary-container mb-2 relative"
+            >
+              <span class="material-symbols-outlined text-4xl opacity-80"
+                >workspace_premium</span
+              >
+              <!-- Minimal outer ring -->
+              <div
+                class="absolute -inset-1 border border-secondary-container/50 rounded-full border-dashed"
+              ></div>
+            </div>
+          </div>
+          <!-- Signatures -->
+          <div class="flex space-x-12 pr-12">
+            <div class="flex flex-col items-center">
+              <div
+                class="w-signature-width h-16 flex items-end justify-center mb-2"
+              >
+                <!-- Signature visual representation (could be an image in real use) -->
+                <span
+                  class="font-meta-label text-meta-label text-outline uppercase block"
+                  >Issue Date</span
+                >
+              </div>
+              <div class="w-full h-px bg-outline-variant relative">
+                <div
+                  class="absolute -left-1 -top-[3px] w-1.5 h-1.5 rounded-full bg-outline-variant"
+                ></div>
+                <div
+                  class="absolute -right-1 -top-[3px] w-1.5 h-1.5 rounded-full bg-outline-variant"
+                ></div>
+              </div>
+              <span
+                class="font-body-text text-body-text font-medium text-on-surface"
+                >{{issue_date}}</span
+              >
+            </div>
+            <div class="flex flex-col items-center">
+              <div
+                class="w-signature-width h-16 flex items-end justify-center mb-2"
+              >
+                <span
+                  class="font-recipient-name text-xl text-primary-container/80"
+                  >Yassine Jenhani</span
+                >
+              </div>
+              <div class="w-full h-px bg-secondary-container mb-2 relative">
+                <!-- Distinctive endcaps for executive line -->
+                <div
+                  class="absolute -left-1 -top-[3px] w-1.5 h-1.5 bg-secondary-container"
+                ></div>
+                <div
+                  class="absolute -right-1 -top-[3px] w-1.5 h-1.5 bg-secondary-container"
+                ></div>
+              </div>
+              <span
+                class="font-meta-label text-meta-label text-on-surface uppercase tracking-wider"
+                >CEO DOTJCOM LTD</span
+              >
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+  </body>
+</html>

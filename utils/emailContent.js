@@ -103,3 +103,29 @@ export const getForgetPasswordValidationContent = ({ name, resetLink }) => {
     <p>If you did not request this, please ignore this email!</p>
   `;
 };
+
+// Email of sending the generated document to the user
+export const getDocumentEmailContent = ({ name, documentTitle }) => {
+  return `
+    <h2 style="color: #232ED1;">
+      Official Document Notification
+    </h2>
+
+    <p>Dear ${name},</p>
+
+    <p>
+      We are pleased to inform you that your document,
+      <strong>${documentTitle}</strong>,
+      has been successfully generated and is now available.
+    </p>
+
+    <p>
+      Please find the document attached to this email for your records and use.
+    </p>
+
+    <p>
+      Should you require any additional information or assistance regarding this document,
+      please do not hesitate to contact us.
+    </p>
+  `;
+};

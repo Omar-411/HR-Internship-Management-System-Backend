@@ -47,4 +47,10 @@ export const errors = {
     errorCode: "UNAUTHORIZED_TO_DELETE_DOCUMENT",
     suggestion: "You are not allowed to delete this document.",
   },
+  UNKNOWN_TEMPLATE_TYPE: {
+    message: "Unknown template type",
+    code: 400,
+    errorCode: "UNKNOWN_TEMPLATE_TYPE",
+    suggestion: "Please provide a valid template type.",
+  },
 };

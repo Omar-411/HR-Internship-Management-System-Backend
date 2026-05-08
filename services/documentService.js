@@ -7,20 +7,25 @@ import { errors } from "../errors/documentErrors.js";
 import { errors as commonErrors } from "../errors/commonErrors.js";
 import { errors as documentTypeErrors } from "../errors/documentTypeErrors.js";
 import crypto from "crypto";
-import { 
-  uploadDocumentCore, 
-  deleteDocumentCore, 
-  downloadDocumentCore, 
-  consultDocumentCore, 
-  getDocumentsCore 
+import {
+  uploadDocumentCore,
+  deleteDocumentCore,
+  downloadDocumentCore,
+  consultDocumentCore,
+  getDocumentsCore,
+  generateDocumentCore,
 } from "./documentCoreService.js";
 import { validatePersonalDocument } from "../validators/documentValidators.js";
-import { 
-  getPersonalType, 
-  getValidPersonalDocument, 
-  getValidAdminDocument 
+import {
+  getPersonalType,
+  getValidPersonalDocument,
+  getValidAdminDocument,
 } from "../utils/documentHelper.js";
 import { getIO } from "../socket.js";
+import { uploadDocToCloudinary } from "../utils/cloudinaryHelper.js";
+import { TEMPLATE_DOCUMENT_TYPES } from "../constants/documentConstants.js";
+import { slugify } from "../utils/documentHelper.js";
+import { sendEmail } from "../utils/sendEmail.js";
 
 // ---------------------------------------------------------------------- //
 // -------------------- PERSONAL DOCUMENTS SERVICES --------------------- //
@@ -136,7 +141,7 @@ export const consultPersonalDocumentService = async ({ documentId }) => {
 export const getPersonalDocumentsService = async ({
   userId,
   queryParams,
-  requester // To check if we allow seeing the confidential documents or not
+  requester, // To check if we allow seeing the confidential documents or not
 }) => {
   const personalType = await getPersonalType();
 
@@ -160,7 +165,7 @@ export const getPersonalDocumentsService = async ({
     user_id: userId,
     documentType_id: personalType._id,
     limit: 5,
-    sort: "-createdAt", 
+    sort: "-createdAt",
   };
 
   return getDocumentsCore(finalQuery);
@@ -255,7 +260,7 @@ export const uploadAdminDocumentService = async ({
     .update(file.buffer)
     .digest("hex");
 
-  // Check for duplicate file 
+  // Check for duplicate file
   const existingDoc = await Document.findOne({ fileHash });
   if (existingDoc) {
     throw new AppError(
@@ -269,7 +274,7 @@ export const uploadAdminDocumentService = async ({
   const fileData = await uploadDocumentCore(
     file,
     "hrcom/admin_docs/images",
-    "hrcom/admin_docs/docs"
+    "hrcom/admin_docs/docs",
   );
 
   const document = await Document.create({
@@ -279,7 +284,7 @@ export const uploadAdminDocumentService = async ({
     uploadedBy,
     user_id: null,
     projectId: null,
-    isConfidential: false, 
+    isConfidential: false,
     fileHash,
   });
 
@@ -294,12 +299,13 @@ export const uploadAdminDocumentService = async ({
 // Delete an administrative document service
 export const deleteAdminDocumentService = async ({ documentId }) => {
   const document = await Document.findById(documentId);
-  if (!document) throw new AppError(
-    commonErrors.DOCUMENT_NOT_FOUND.message,
-    commonErrors.DOCUMENT_NOT_FOUND.code,
-    commonErrors.DOCUMENT_NOT_FOUND.errorCode,
-    commonErrors.DOCUMENT_NOT_FOUND.suggestion,
-  );
+  if (!document)
+    throw new AppError(
+      commonErrors.DOCUMENT_NOT_FOUND.message,
+      commonErrors.DOCUMENT_NOT_FOUND.code,
+      commonErrors.DOCUMENT_NOT_FOUND.errorCode,
+      commonErrors.DOCUMENT_NOT_FOUND.suggestion,
+    );
 
   await deleteDocumentCore(document);
 
@@ -332,6 +338,158 @@ export const consultAdminDocumentService = async ({ documentId }) => {
   return await consultDocumentCore(document);
 };
 
+// Generate an administrative document from a template service
+export const generateDocumentService = async ({
+  templateName,
+  data,
+  uploadedBy,
+}) => {
+  // Generate the PDF template buffer (buffer = the file in memory before uploading it to Cloudinary)
+  const pdfBuffer = await generateDocumentCore(templateName, data);
+
+  // Create the personnalised filename
+  const safeName = slugify(data.full_name? data.full_name: "");
+  const timestamp = new Date(Date.now()).toLocaleDateString('fr-FR').replace(/\//g, '-');
+  const fileName = `${templateName}-${safeName}-${timestamp}.pdf`;
+
+  // Create the virtual file object: Transform the buffer into a multer file-like object that can be processed by the uploadDocumentCore function
+  const virtualFile = {
+    buffer: pdfBuffer,
+    originalname: fileName,
+    mimetype: "application/pdf",
+    size: pdfBuffer.length,
+  };
+
+  // Validate the document type existence
+  const documentTypeName = TEMPLATE_DOCUMENT_TYPES[templateName];
+  if (!documentTypeName) {
+    throw new AppError(
+      errors.UNKNOWN_TEMPLATE_TYPE.message,
+      errors.UNKNOWN_TEMPLATE_TYPE.code,
+      errors.UNKNOWN_TEMPLATE_TYPE.errorCode,
+      errors.UNKNOWN_TEMPLATE_TYPE.suggestion,
+    );
+  }
+
+  const type = await DocumentType.findOne({ name: documentTypeName });
+  if (!type) {
+    throw new AppError(
+      documentTypeErrors.DOCUMENT_TYPE_NOT_FOUND.message,
+      documentTypeErrors.DOCUMENT_TYPE_NOT_FOUND.code,
+      documentTypeErrors.DOCUMENT_TYPE_NOT_FOUND.errorCode,
+      documentTypeErrors.DOCUMENT_TYPE_NOT_FOUND.suggestion,
+    );
+  }
+
+  // Check the user existence
+  if (!data.userId) {
+    throw new AppError(
+      commonErrors.USER_NOT_FOUND.message,
+      commonErrors.USER_NOT_FOUND.code,
+      commonErrors.USER_NOT_FOUND.errorCode,
+      commonErrors.USER_NOT_FOUND.suggestion,
+    );
+  }
+
+  const user = await User.findById(data.userId);
+  if (!user) {
+    throw new AppError(
+      commonErrors.USER_NOT_FOUND.message,
+      commonErrors.USER_NOT_FOUND.code,
+      commonErrors.USER_NOT_FOUND.errorCode,
+      commonErrors.USER_NOT_FOUND.suggestion,
+    );
+  }
+
+  const folderName =
+    documentTypeName === "Report" ? "payslips" : "generated_docs";
+
+  // Generate the file hash for duplicate detection
+  const fileHash = crypto.createHash("sha256").update(pdfBuffer).digest("hex");
+
+  // Upload the file to Cloudinary
+  const fileData = await uploadDocumentCore(
+    virtualFile,
+    `hrcom/${folderName}/images`,
+    `hrcom/${folderName}/docs`,
+  );
+
+  // Save document
+  const document = await Document.create({
+    title: fileName,
+    ...fileData,
+    fileHash,
+    documentType_id: type._id,
+    uploadedBy,
+    user_id: data.userId,
+    projectId: null,
+    isConfidential: true,
+  });
+
+  return {
+    status: "Success",
+    code: 201,
+    message: "Document generated successfully!",
+    data: document,
+  };
+};
+
+// Send the generated document by email to user
+export const sendGeneratedDocumentByEmailService = async ({
+  documentId,
+}) => {
+  // Check the document existence
+  const document = await Document.findById(documentId);
+  if (!document) {
+    throw new AppError(
+      commonErrors.DOCUMENT_NOT_FOUND.message,
+      commonErrors.DOCUMENT_NOT_FOUND.code,
+      commonErrors.DOCUMENT_NOT_FOUND.errorCode,
+      commonErrors.DOCUMENT_NOT_FOUND.suggestion,
+    );
+  }
+
+  // Get the user object to retrieve the email
+  const user = await User.findById(document.user_id);
+  if (!user) {
+    throw new AppError(
+      commonErrors.USER_NOT_FOUND.message,
+      commonErrors.USER_NOT_FOUND.code,
+      commonErrors.USER_NOT_FOUND.errorCode,
+      commonErrors.USER_NOT_FOUND.suggestion,
+    );
+  }
+
+  // Download file as buffer
+  const { buffer, fileName, mimeType } = await downloadDocumentCore(document);
+
+  // Send email with attachment
+  await sendEmail({
+    to: user.email,
+    subject: `Your generated document: ${document.title}`,
+    type: "document",
+    name: `${user.name}`,
+    documentTitle: document.title,
+    attachments: [
+      {
+        filename: fileName,
+        content: buffer,
+        contentType: mimeType,
+      },
+    ],
+  });
+
+  return {
+    status: "Success",
+    code: 200,
+    message: "Document sent successfully by email!",
+    data: {
+      documentId: document._id,
+      userEmail: user.email,
+    },
+  };
+};
+
 // ---------------------------------------------------------------------- //
 // -------------------- DOCUMENT REQUESTS SERVICES ---------------------- //
 // ---------------------------------------------------------------------- //
@@ -352,14 +510,14 @@ export const fulfillDocumentRequestService = async (id, file, userId) => {
   if (id && id.match(/^[0-9a-fA-F]{24}$/)) {
     docRequest = await DocumentRequest.findById(id);
   } else {
-    docRequest = await DocumentRequest.findOne({ 
-      $or: [{ docId: id }, { requestId: id }] 
+    docRequest = await DocumentRequest.findOne({
+      $or: [{ docId: id }, { requestId: id }],
     });
   }
 
   // If we still can't find it and the frontend passed a local ID, we shouldn't crash the backend.
   // We'll proceed to upload and return the file URL.
-  
+
   const fileData = await uploadDocumentCore(
     file,
     "hrcom/project_docs/images",
@@ -372,8 +530,10 @@ export const fulfillDocumentRequestService = async (id, file, userId) => {
     docRequest.public_id = fileData.filePublicId; // Fix: uploadDocumentCore returns filePublicId
     docRequest.status = "in_review";
     docRequest.fulfilledBy = userId;
-    
-    console.log(`[DocumentService] Fulfilling request ${id}. Setting fulfilledBy to: ${userId}`);
+
+    console.log(
+      `[DocumentService] Fulfilling request ${id}. Setting fulfilledBy to: ${userId}`,
+    );
     await docRequest.save();
 
     // Populate for real-time frontend display
@@ -381,10 +541,13 @@ export const fulfillDocumentRequestService = async (id, file, userId) => {
       { path: "requestedBy", select: "name email" },
       { path: "fulfilledBy", select: "name email" },
       { path: "sprintId", select: "name" },
-      { path: "taskId", select: "title" }
+      { path: "taskId", select: "title" },
     ]);
-    
-    console.log(`[DocumentService] Populated docRequest fulfilledBy:`, docRequest.fulfilledBy);
+
+    console.log(
+      `[DocumentService] Populated docRequest fulfilledBy:`,
+      docRequest.fulfilledBy,
+    );
 
     // Emit socket event for real-time update
     try {
@@ -393,19 +556,27 @@ export const fulfillDocumentRequestService = async (id, file, userId) => {
         const projectRoom = `project:${docRequest.projectId}`;
         io.to(projectRoom).emit("documentRequestUpdated", {
           projectId: String(docRequest.projectId),
-          document: docRequest
+          document: docRequest,
         });
       }
     } catch (socketErr) {
-      console.error("[Socket] Failed to emit documentRequestUpdated:", socketErr);
+      console.error(
+        "[Socket] Failed to emit documentRequestUpdated:",
+        socketErr,
+      );
     }
   }
 
   return {
     status: "Success",
     code: 200,
-    message: docRequest ? "Document request fulfilled successfully!" : "File uploaded to Cloudinary",
-    data: docRequest || { fileURL: fileData.fileURL, fileName: file.originalname, public_id: fileData.filePublicId },
+    message: docRequest
+      ? "Document request fulfilled successfully!"
+      : "File uploaded to Cloudinary",
+    data: docRequest || {
+      fileURL: fileData.fileURL,
+      fileName: file.originalname,
+      public_id: fileData.filePublicId,
+    },
   };
 };
-

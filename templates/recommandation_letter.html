@@ -1,0 +1,302 @@
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Letter of Recommendation</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;700&amp;family=Work+Sans:wght@500;600;700&amp;family=Inter:wght@400&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-tint": "#735186",
+              primary: "#341547",
+              error: "#ba1a1a",
+              "primary-fixed": "#f4d9ff",
+              "surface-container-high": "#dee8ff",
+              "secondary-fixed-dim": "#ffb869",
+              "on-surface": "#111c2d",
+              "on-primary": "#ffffff",
+              "tertiary-fixed": "#dde3eb",
+              "on-error": "#ffffff",
+              "tertiary-container": "#333a40",
+              "inverse-on-surface": "#ecf1ff",
+              "primary-fixed-dim": "#e0b8f4",
+              "on-tertiary-container": "#9da3ab",
+              outline: "#7d747e",
+              "inverse-primary": "#e0b8f4",
+              "on-tertiary-fixed-variant": "#41474e",
+              "surface-bright": "#f9f9ff",
+              "on-primary-fixed": "#2b0c3e",
+              secondary: "#885200",
+              "on-secondary-fixed": "#2b1700",
+              "surface-container-highest": "#d8e3fb",
+              "on-surface-variant": "#4b444d",
+              background: "#f9f9ff",
+              "secondary-fixed": "#ffdcbb",
+              "on-background": "#111c2d",
+              "surface-variant": "#d8e3fb",
+              "on-secondary-fixed-variant": "#673d00",
+              "secondary-container": "#ffa11e",
+              "error-container": "#ffdad6",
+              "surface-dim": "#cfdaf2",
+              "tertiary-fixed-dim": "#c1c7cf",
+              "outline-variant": "#cec3ce",
+              "on-secondary": "#ffffff",
+              tertiary: "#1e242a",
+              "surface-container": "#e7eeff",
+              "on-error-container": "#93000a",
+              "surface-container-low": "#f0f3ff",
+              "on-tertiary-fixed": "#161c22",
+              "on-primary-container": "#bb95cf",
+              "on-secondary-container": "#683d00",
+              "inverse-surface": "#263143",
+              "on-primary-fixed-variant": "#593a6d",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary": "#ffffff",
+              surface: "#f9f9ff",
+              "primary-container": "#4b2c5e",
+            },
+            borderRadius: {
+              DEFAULT: "0.25rem",
+              lg: "0.5rem",
+              xl: "0.75rem",
+              full: "9999px",
+            },
+            spacing: {
+              "gutter-grid": "24px",
+              "dot-pattern-size": "8px",
+              "margin-page": "48px",
+              "signature-width": "200px",
+              "section-gap": "40px",
+            },
+            fontFamily: {
+              "recipient-name": ["Noto Serif"],
+              "meta-label": ["Work Sans"],
+              "document-title": ["Work Sans"],
+              "sub-title": ["Work Sans"],
+              "body-text": ["Inter"],
+            },
+            fontSize: {
+              "recipient-name": [
+                "48px",
+                { lineHeight: "56px", fontWeight: "400" },
+              ],
+              "meta-label": ["10px", { lineHeight: "14px", fontWeight: "600" }],
+              "document-title": [
+                "64px",
+                {
+                  lineHeight: "72px",
+                  letterSpacing: "0.05em",
+                  fontWeight: "700",
+                },
+              ],
+              "sub-title": [
+                "28px",
+                {
+                  lineHeight: "36px",
+                  letterSpacing: "0.2em",
+                  fontWeight: "500",
+                },
+              ],
+              "body-text": ["12px", { lineHeight: "20px", fontWeight: "400" }],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      .material-symbols-outlined {
+        font-variation-settings: "FILL" 1;
+      }
+      /* Geometric Pattern Mixins */
+      .geo-triangle {
+        clip-path: polygon(100% 0, 0 100%, 100% 100%);
+      }
+      .geo-dots {
+        background-image: radial-gradient(
+          var(--tw-gradient-stops) 2px,
+          transparent 2px
+        );
+        background-size: 8px 8px;
+      }
+    </style>
+  </head>
+  <body class="bg-white text-on-surface">
+    <!-- A4 Container (Simulated Print Area) -->
+    <main
+      class="bg-white w-[210mm] h-[297mm] relative overflow-hidden flex flex-col justify-between"
+      style="padding: 48px"
+    >
+      <!-- Geometric Corner Patterns (Top Right) -->
+      <div class="absolute top-0 right-0 w-64 h-64 pointer-events-none">
+        <div class="absolute inset-0 bg-primary/10 geo-triangle"></div>
+        <div
+          class="absolute top-8 right-8 w-48 h-48 bg-primary/20 geo-triangle"
+        ></div>
+        <div
+          class="absolute top-16 right-16 w-32 h-32 bg-primary geo-triangle"
+        ></div>
+        <div
+          class="absolute top-4 right-4 w-16 h-16 geo-dots from-secondary/50 to-secondary/50"
+        ></div>
+      </div>
+      <!-- Geometric Corner Patterns (Bottom Left) -->
+      <div
+        class="absolute bottom-0 left-0 w-64 h-64 pointer-events-none rotate-180"
+      >
+        <div class="absolute inset-0 bg-secondary/10 geo-triangle"></div>
+        <div
+          class="absolute top-8 right-8 w-48 h-48 bg-secondary/20 geo-triangle"
+        ></div>
+      </div>
+      <!-- Header Section -->
+      <header class="flex flex-col items-center mb-16 relative z-10">
+        <div class="w-24 h-24 mb-6 flex items-center justify-center">
+          <img
+            alt="Company Logo"
+            class="w-full h-full object-contain"
+            src="https://i.ibb.co/rRF2dcSy/dotjcom-logo-only.png"
+          />
+        </div>
+        <div class="text-center">
+          <h1 class="font-sub-title text-sub-title text-primary uppercase mb-2">
+            DotjCoM
+          </h1>
+          <p
+            class="font-meta-label text-meta-label text-on-surface-variant uppercase tracking-widest"
+          >
+            128 City Road, London
+          </p>
+        </div>
+        <div class="w-24 h-0.5 bg-secondary mt-8 mb-4"></div>
+        <h2
+          class="font-sub-title text-sub-title text-primary tracking-widest uppercase"
+          style="font-size: 32px; line-height: 40px"
+        >
+          Letter of Recommendation
+        </h2>
+      </header>
+      <!-- Body Section -->
+      <section
+        class="flex-grow flex flex-col justify-start relative z-10 max-w-[80%] mx-auto w-full"
+      >
+        <div class="mb-8">
+          <p
+            class="font-meta-label text-meta-label text-on-surface-variant uppercase mb-1"
+          >
+            128 City Road, London
+          </p>
+          <p class="font-body-text text-body-text text-on-surface">
+            {{current_date}}
+          </p>
+        </div>
+        <div class="mb-8">
+          <p
+            class="font-recipient-name text-recipient-name text-primary"
+            style="font-size: 24px; line-height: 32px"
+          >
+            To Whom It May Concern,
+          </p>
+        </div>
+        <div
+          class="font-body-text text-body-text text-on-surface space-y-3 text-justify leading-relaxed"
+          style="font-size: 14px; line-height: 24px"
+        >
+          <p class="mb-4">
+            It is with great pleasure that I recommend
+            <span class="font-bold text-[16px] text-primary">{{full_name}}</span
+            >.
+          </p>
+          <p>
+            During their time with our organization, they consistently
+            demonstrated professionalism, dedication, and a strong ability to
+            adapt to new challenges. Their commitment to delivering high-quality
+            work and collaborating effectively with team members made them a
+            valued contributor to our company.
+          </p>
+          <p>
+            Throughout their experience, they showed excellent analytical and
+            problem-solving skills, along with a proactive attitude and a
+            willingness to learn. They were able to manage responsibilities
+            efficiently and maintain a high level of performance even under
+            pressure.
+          </p>
+          <p>
+            I am confident that <strong>{{full_name}}</strong> will continue to demonstrate the
+            same level of integrity, motivation, and professionalism in any
+            future academic or professional endeavor. I strongly recommend them
+            and believe they will be an asset to any institution or
+            organization.
+          </p>
+          <p>
+            Should you require any additional information, please do not
+            hesitate to contact me.
+          </p>
+          <p>Sincerely,</p>
+        </div>
+      </section>
+      <!-- Footer / Signature Section -->
+      <footer
+        class="mt-8 flex justify-between items-end relative z-10 w-full pl-12 pr-12"
+      >
+        <!-- Company Seal placeholder -->
+        <div
+          class="w-32 h-32 rounded-full border-4 border-secondary/20 flex items-center justify-center relative"
+        >
+          <div
+            class="absolute inset-2 rounded-full border border-secondary/40 border-dashed"
+          ></div>
+          <span class="material-symbols-outlined text-4xl text-secondary/40"
+            >verified</span
+          >
+        </div>
+        <!-- Signature Block -->
+        <div class="flex flex-col items-center w-signature-width">
+          <!-- Signature Space -->
+          <div class="h-16 w-full flex items-end justify-center pb-2">
+            <!-- Stylized signature placeholder -->
+            <span
+              class="font-recipient-name text-primary opacity-80"
+              style="font-size: clamp(16px, 2vw, 25px)"
+              >{{supervisor_name}}</span
+            >
+          </div>
+          <!-- Signature Line -->
+          <div class="w-full h-[1px] bg-secondary mb-2"></div>
+          <!-- Meta Info -->
+          <p
+            class="font-body-text text-body-text text-on-surface-variant text-[10px] mt-1"
+          >
+            {{supervisor_title}}
+          </p>
+        </div>
+      </footer>
+      <!-- Subtle Bottom Frame -->
+      <div class="absolute bottom-0 left-0 w-full h-2 bg-primary"></div>
+    </main>
+  </body>
+</html>
