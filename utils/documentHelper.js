@@ -1,5 +1,6 @@
 import Document from "../models/Document.js";
 import DocumentType from "../models/DocumentType.js";
+import DocumentRequest from "../models/DocumentRequest.js";
 import AppError from "../utils/AppError.js";
 import { errors as commonErrors } from "../errors/commonErrors.js";
 import { errors } from "../errors/documentErrors.js";
@@ -85,4 +86,19 @@ export const slugify = (text) => {
     .toLowerCase()
     .replace(/\s+/g, "-") // Replace spaces with -
     .replace(/[^\w-]/g, ""); // Remove all non-word chars except -. Ex: "my-document-title!" becomes "my-document-title"
+};
+
+// Resolve a document request to get the document URL for viewing
+export const resolveDocumentRequest = async (id) => {
+  if (!id) return null;
+
+  // Check if the provided ID is a valid MongoDB ObjectId
+  const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+  if (isObjectId) {
+    return await DocumentRequest.findById(id);
+  }
+
+  return await DocumentRequest.findOne({
+    $or: [{ docId: id }, { requestId: id }],
+  });
 };

@@ -20,6 +20,7 @@ import {
   getPersonalType,
   getValidPersonalDocument,
   getValidAdminDocument,
+  resolveDocumentRequest,
 } from "../utils/documentHelper.js";
 import { getIO } from "../socket.js";
 import { uploadDocToCloudinary } from "../utils/cloudinaryHelper.js";
@@ -27,6 +28,7 @@ import { TEMPLATE_DOCUMENT_TYPES } from "../constants/documentConstants.js";
 import { slugify } from "../utils/documentHelper.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { logAuditAction } from "../utils/logger.js";
+import { errors as documentRequestErrors } from "../errors/documentRequestErrors.js";
 
 // ---------------------------------------------------------------------- //
 // -------------------- PERSONAL DOCUMENTS SERVICES --------------------- //
@@ -561,19 +563,20 @@ export const fulfillDocumentRequestService = async (id, file, userId) => {
     );
   }
 
-  // Handle frontend string IDs vs MongoDB ObjectIds
-  let docRequest;
-  if (id && id.match(/^[0-9a-fA-F]{24}$/)) {
-    docRequest = await DocumentRequest.findById(id);
-  } else {
-    docRequest = await DocumentRequest.findOne({
-      $or: [{ docId: id }, { requestId: id }],
-    });
+  // Validate the document request existence and get its details
+  const docRequest = await resolveDocumentRequest(id);
+
+  // Check if the request is already fulfilled
+  if (docRequest.status === "Fulfilled") {
+    throw new AppError(
+      documentRequestErrors.DOCUMENT_REQUEST_ALREADY_FULFILLED.message,
+      documentRequestErrors.DOCUMENT_REQUEST_ALREADY_FULFILLED.code,
+      documentRequestErrors.DOCUMENT_REQUEST_ALREADY_FULFILLED.errorCode,
+      documentRequestErrors.DOCUMENT_REQUEST_ALREADY_FULFILLED.suggestion,
+    );
   }
-
-  // If we still can't find it and the frontend passed a local ID, we shouldn't crash the backend.
-  // We'll proceed to upload and return the file URL.
-
+  
+  // Upload the document to Cloudinary
   const fileData = await uploadDocumentCore(
     file,
     "hrcom/project_docs/images",
@@ -583,16 +586,17 @@ export const fulfillDocumentRequestService = async (id, file, userId) => {
   if (docRequest) {
     docRequest.fileURL = fileData.fileURL;
     docRequest.fileName = file.originalname;
-    docRequest.public_id = fileData.filePublicId; // Fix: uploadDocumentCore returns filePublicId
+    docRequest.public_id = fileData.filePublicId;
     docRequest.status = "in_review";
     docRequest.fulfilledBy = userId;
+    docRequest.rejectionComment = null;
 
     console.log(
       `[DocumentService] Fulfilling request ${id}. Setting fulfilledBy to: ${userId}`,
     );
     await docRequest.save();
 
-    // Populate for real-time frontend display
+    // Populate for frontend display
     await docRequest.populate([
       { path: "requestedBy", select: "name email" },
       { path: "fulfilledBy", select: "name email" },

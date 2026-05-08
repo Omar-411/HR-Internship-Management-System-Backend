@@ -74,4 +74,10 @@ export const errors = {
     errorCode: "INVALID_DOCUMENT_REQUEST_SCOPE",
     suggestion: "Scope must be one of 'Sprint', 'Backlog', or 'Project'.",
   },
+  DOCUMENT_REQUEST_ALREADY_FULFILLED: {
+    message: "This document request has already been fulfilled.",
+    code: 400,
+    errorCode: "DOCUMENT_REQUEST_ALREADY_FULFILLED",
+    suggestion: "This document request is already fulfilled. No further action is needed.",
+  },
 };
