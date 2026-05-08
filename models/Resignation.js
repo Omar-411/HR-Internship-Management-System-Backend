@@ -93,6 +93,32 @@ const resignationSchema = new mongoose.Schema(
         default: null,
       },
     },
+    payrollImpact: {
+      // If the resignation has an impact on payroll (e.g. employee is leaving in the middle of the month), we can track the affected period for payroll calculations
+      from: {
+        type: Date,
+      },
+      to: {
+        type: Date,
+      },
+    },
+    finalSettlement: {
+      finalSalary: {
+        // Final salary after prorated payroll computation
+        type: Number,
+        default: 0,
+      },
+      remainingLeaveBalance: {
+        // Remaining leave days at the time of resignation
+        type: Number,
+        default: 0,
+      },
+      pendingTasks: {
+        // Number of pending tasks at the time of resignation
+        type: Number,
+        default: 0,
+      },
+    },
   },
   { timestamps: true },
 );

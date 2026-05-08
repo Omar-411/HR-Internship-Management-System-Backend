@@ -154,7 +154,11 @@ const calculateWeeklyOvertime = (weeks, baseSalary, config, hourlyRate) => {
 };
 
 // Calculate the total deduction for late arrivals in a given month
-const calculateLateHours = (checkInTime, expectedStartTime, gracePeriod = 5) => {
+const calculateLateHours = (
+  checkInTime,
+  expectedStartTime,
+  gracePeriod = 5,
+) => {
   if (!checkInTime || !expectedStartTime) return 0;
 
   const inT = normalizeTime(checkInTime);
@@ -240,19 +244,25 @@ export const calculateProratedSalary = async (
   const resignation = await Resignation.findOne({
     employeeId,
     status: { $in: ["approved", "scheduled_exit", "inactive"] },
+    "payrollImpact.to": {
+      $gte: monthStart,
+      $lte: monthEnd,
+    },
   });
 
   // The start date for payroll calculation is the month start or the employee's contract join date (If mid-month joiner)
   const startDate = new Date(
-    Math.max(monthStart, user.employment.contractJoinDate),
+    Math.max(
+      monthStart,
+      user.employment.contractJoinDate
+        ? user.employment.contractJoinDate
+        : monthStart,
+    ),
   );
 
   // The end date for payroll calculation is the month end, the resignation last working date (if there is one), or the contract end date
   const endDate = new Date(
-    Math.min(
-      monthEnd,
-      resignation?.lastWorkingDate || monthEnd,
-    ),
+    Math.min(monthEnd, resignation?.payrollImpact?.to || monthEnd),
   );
 
   // If the start date is after the end date, it means the employee did not work at all during the month, so the prorated salary is 0
@@ -287,10 +297,7 @@ export const buildAllowancesSnapshot = async (userId, month, year) => {
     userId,
     isActive: true,
     effectiveFrom: { $lte: payrollDate },
-    $or: [
-      { effectiveTo: null },
-      { effectiveTo: { $gte: payrollDate } },
-    ],
+    $or: [{ effectiveTo: null }, { effectiveTo: { $gte: payrollDate } }],
   }).populate("allowanceTypeId");
 
   let snapshot = [];
@@ -329,10 +336,7 @@ export const buildBonusesSnapshot = async (userId, month, year) => {
     userId,
     isActive: true,
     effectiveFrom: { $lte: payrollDate },
-    $or: [
-      { effectiveTo: null },
-      { effectiveTo: { $gte: payrollDate } },
-    ],
+    $or: [{ effectiveTo: null }, { effectiveTo: { $gte: payrollDate } }],
   }).populate("bonusTypeId");
 
   let snapshot = [];
@@ -611,7 +615,11 @@ export const canAccessPayroll = (user, employeeId) => {
 };
 
 // Mark payroll as dirty for recalculation when there are changes that affect the payroll (e.g., attendance changes)
-export const markPayrollDirty = async (employeeId, date = new Date(), message = "Changes require payroll recalculation") => {
+export const markPayrollDirty = async (
+  employeeId,
+  date = new Date(),
+  message = "Changes require payroll recalculation",
+) => {
   const month = date.getMonth() + 1;
   const year = date.getFullYear();
 
@@ -622,7 +630,7 @@ export const markPayrollDirty = async (employeeId, date = new Date(), message = 
         recalculationRequired: true,
         recalculationMessage: message,
       },
-    }
+    },
   );
 };
 
@@ -631,7 +639,7 @@ export const computePayroll = async (user, month, year, config) => {
   // Calculate the prorated salary and get the number of worked days in the month
   const { proratedSalary: baseSalary, workedDays } =
     await calculateProratedSalary(user._id, month, year, user);
-  
+
   console.log("baseSalary:", baseSalary);
 
   if (workedDays <= 0) {
@@ -655,7 +663,7 @@ export const computePayroll = async (user, month, year, config) => {
   // Calculate the hourly rate
   const hourlyRate = getHourlyRate(
     baseSalary,
-    config.payroll.standardMonthlyHours
+    config.payroll.standardMonthlyHours,
   );
 
   console.log("hourlyRate:", hourlyRate);
@@ -672,7 +680,7 @@ export const computePayroll = async (user, month, year, config) => {
 
   const { snapshot: bonusesSnapshot, total: totalBonuses } =
     await buildBonusesSnapshot(user._id, month, year);
-  
+
   console.log("totalBonuses:", totalBonuses);
 
   // Calculate overtime compensation based on attendances and timetables
@@ -683,7 +691,7 @@ export const computePayroll = async (user, month, year, config) => {
       year,
       baseSalary,
       config,
-      hourlyRate
+      hourlyRate,
     );
   console.log("overtimeAmount:", overtimeAmount);
   console.log("overtimeHours:", overtimeHours);
@@ -695,7 +703,7 @@ export const computePayroll = async (user, month, year, config) => {
     year,
     baseSalary,
     config,
-    hourlyRate
+    hourlyRate,
   );
 
   console.log("absences:", absences);
@@ -706,7 +714,7 @@ export const computePayroll = async (user, month, year, config) => {
     year,
     baseSalary,
     config,
-    hourlyRate
+    hourlyRate,
   );
   console.log("lateArrivals:", lateArrivals);
 
@@ -716,14 +724,14 @@ export const computePayroll = async (user, month, year, config) => {
     year,
     baseSalary,
     config,
-    hourlyRate
+    hourlyRate,
   );
 
   console.log("unpaidLeave:", unpaidLeave);
 
   // Calculate the gross salary
   const grossSalary = round(
-    baseSalary + totalBonuses + overtimeAmount + taxableAllowances
+    baseSalary + totalBonuses + overtimeAmount + taxableAllowances,
   );
 
   console.log("grossSalary:", grossSalary);
@@ -745,17 +753,10 @@ export const computePayroll = async (user, month, year, config) => {
 
   // Calculate the total deductions
   const totalDeductions =
-    cnss +
-    irpp.monthlyTax +
-    css +
-    absences +
-    lateArrivals +
-    unpaidLeave;
+    cnss + irpp.monthlyTax + css + absences + lateArrivals + unpaidLeave;
 
   // Calculate the net salary
-  const netSalary = round(
-    grossSalary - totalDeductions + nonTaxableAllowances
-  );
+  const netSalary = round(grossSalary - totalDeductions + nonTaxableAllowances);
 
   return {
     baseSalary,
@@ -774,8 +775,7 @@ export const computePayroll = async (user, month, year, config) => {
         taxableAllowances,
         nonTaxableAllowances,
       },
-      total:
-        totalBonuses + taxableAllowances + overtimeAmount,
+      total: totalBonuses + taxableAllowances + overtimeAmount,
     },
 
     family: irpp.family,

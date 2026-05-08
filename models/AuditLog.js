@@ -34,6 +34,7 @@ const auditLogSchema = mongoose.Schema(
         "UPDATE_DOCUMENT_TYPE",
         "REQUEST_CLARIFICATION",
         "APPROVE_RESIGNATION",
+        "PROCESS_FINAL_SETTLEMENT",
         "VALIDATE_PAYROLL",
         "MARK_PAYROLL_AS_PAID",
         "RECOMPUTE_PAYROLL",

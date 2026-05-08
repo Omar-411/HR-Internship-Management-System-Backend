@@ -137,3 +137,21 @@ export const approveResignation = async (req, res, next) => {
     next(err);
   }
 };
+
+// Process the final settlement for a resignation (Admin Only)
+export const processFinalSettlement = async (req, res, next) => {
+  try {
+    const resignationId = req.params.id;
+    const adminId = req.user.id;
+
+    const result = await resignationService.processFinalSettlementService(
+      resignationId,
+      adminId,
+      req.ip,
+    );
+
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};

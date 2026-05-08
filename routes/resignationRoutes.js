@@ -9,6 +9,7 @@ import {
   requestClarification,
   respondToClarification,
   approveResignation,
+  processFinalSettlement,
 } from "../controllers/resignationController.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
@@ -74,6 +75,14 @@ router.patch(
   authenticate,
   authorize(["Admin"]),
   approveResignation,
+);
+
+// Process the final settlement for a resignation (Admin only)
+router.patch(
+  "/resignations/:id/process-final-settlement",
+  authenticate,
+  authorize(["Admin"]),
+  processFinalSettlement,
 );
 
 export default router;

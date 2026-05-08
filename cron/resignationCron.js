@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import Resignation from "../models/Resignation.js";
 import User from "../models/User.js";
+import Task from "../models/Task.js";
 
 // Runs every day at midnight
 cron.schedule("0 0 * * *", async () => {
@@ -38,6 +39,29 @@ cron.schedule("0 0 * * *", async () => {
       await User.findByIdAndUpdate(resignation.employeeId, {
         status: "Inactive",
       });
+
+      // Unassign unfinished tasks of the employee
+      await Task.updateMany(
+        {
+          assignedTo: resignation.employeeId,
+          status: { $ne: "Done" },
+        },
+        {
+          $set: {
+            assignedTo: null,
+          },
+        },
+      );
+
+      // Remove supervisor reference from all employees supervised by this user (In case: Supervisor)
+      await User.updateMany(
+        { supervisor_id: resignation.employeeId },
+        {
+          $set: {
+            supervisor_id: null,
+          },
+        },
+      );
     }
 
     console.log(`Moved to inactive: ${toDeactivate.length}`);

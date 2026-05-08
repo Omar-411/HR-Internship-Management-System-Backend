@@ -144,6 +144,9 @@ const formatAuditLog = (log) => {
     case "SEND_GENERATED_DOCUMENT_BY_EMAIL":
       description = `Sent Generated Document ${log.target_name || ""} by Email`;
       break;
+    case "PROCESS_FINAL_SETTLEMENT":
+      description = `Processed Final Settlement for ${log.target_name || ""}`;
+      break;
     default:
       description = `Performed ${log.action} on ${log.target_type || "Target"}`;
   }
