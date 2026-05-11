@@ -14,6 +14,7 @@ import {
   fulfillDocumentRequest,
   generateDocument,
   sendGeneratedDocumentByEmail,
+  getAdminDocumentsKPIsService,
 } from "../controllers/documentController.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
@@ -524,6 +525,14 @@ router.delete(
   authenticate,
   authorize(["Admin"]),
   deleteAdminDocument,
+);
+
+// Route to get the administrative documents KPIs (Admin only)
+router.get(
+  "/documents/administrative-docs/kpis",
+  authenticate,
+  authorize(["Admin"]),
+  getAdminDocumentsKPIsService,
 );
 
 // -------------------------------------------------------------- //

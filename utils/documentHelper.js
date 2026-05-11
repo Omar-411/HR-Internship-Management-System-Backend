@@ -102,3 +102,10 @@ export const resolveDocumentRequest = async (id) => {
     $or: [{ docId: id }, { requestId: id }],
   });
 };
+
+// Helper function to find a document type by name
+export const findType = (documentTypes, name) => {
+  return documentTypes.find(
+    (type) => type.name.trim().toLowerCase() === name.trim().toLowerCase(),
+  );
+};

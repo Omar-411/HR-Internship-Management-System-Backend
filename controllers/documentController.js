@@ -1,4 +1,5 @@
 import * as documentService from "../services/documentService.js";
+import * as documentStatsService from "../services/analytics/documentStatsService.js";
 
 // ------------------------------------------------------------------------------- //
 // ------------------------ PERSONAL DOCUMENTS CONTROLLERS ----------------------- //
@@ -156,9 +157,8 @@ export const deleteAdminDocument = async (req, res, next) => {
     });
 
     res.status(result.code).json(result);
-  }
-  catch (err) {
-    next(err);  
+  } catch (err) {
+    next(err);
   }
 };
 
@@ -197,6 +197,17 @@ export const sendGeneratedDocumentByEmail = async (req, res, next) => {
   }
 };
 
+// Get the document KPIs
+export const getAdminDocumentsKPIsService = async (req, res, next) => {
+  try {
+    const result = await documentStatsService.getAdminDocumentsKPIsService();
+
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ------------------------------------------------------------------------------- //
 // ----------------------- DOCUMENT REQUEST CONTROLLERS -------------------------- //
 // ------------------------------------------------------------------------------- //
@@ -207,7 +218,11 @@ export const fulfillDocumentRequest = async (req, res) => {
     const file = req.file;
     if (!file) return res.status(400).json({ message: "No file provided" });
 
-    const result = await documentService.fulfillDocumentRequestService(id, file, req.user._id);
+    const result = await documentService.fulfillDocumentRequestService(
+      id,
+      file,
+      req.user._id,
+    );
     res.status(200).json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
