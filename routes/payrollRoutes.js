@@ -7,11 +7,20 @@ import {
   validatePayroll,
   markPayrollAsPaid,
   recomputePayroll,
+  getPayrollKPIs,
 } from "../controllers/payrollController.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
 
 const router = express.Router();
+
+// Route to get payroll KPIs for the current month and year
+router.get(
+  "/payroll/kpis",
+  authenticate,
+  authorize(["Admin"]),
+  getPayrollKPIs,
+);
 
 // Route to calculate payroll for an employee for a given month and year
 router.post(

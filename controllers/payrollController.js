@@ -1,4 +1,5 @@
 import * as payrollService from "../services/payrollService.js";
+import * as payrollStatsService from "../services/analytics/payrollStatsService.js";
 
 // Calculate payroll for an employee for a given month and year
 export const calculatePayroll = async (req, res, next) => {
@@ -86,8 +87,22 @@ export const recomputePayroll = async (req, res, next) => {
     const { payrollId } = req.params;
     const user = req.user;
 
-    const result = await payrollService.recomputePayroll(payrollId, user, req.ip);
+    const result = await payrollService.recomputePayroll(
+      payrollId,
+      user,
+      req.ip,
+    );
 
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Get payroll KPIs for the current month and year
+export const getPayrollKPIs = async (req, res, next) => {
+  try {
+    const result = await payrollStatsService.getPayrollKPIs();
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
