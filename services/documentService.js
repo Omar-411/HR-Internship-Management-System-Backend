@@ -421,7 +421,7 @@ export const generateDocumentService = async ({
   const pdfBuffer = await generateDocumentCore(templateName, data);
 
   // Create the personnalised filename
-  const safeName = slugify(data.full_name ? data.full_name : "");
+  const safeName = slugify(data.full_name? data.full_name : data.employee.name? `${data.employee.name} ${data.employee.lastName}` : "");
   const timestamp = new Date(Date.now())
     .toLocaleDateString("fr-FR")
     .replace(/\//g, "-");

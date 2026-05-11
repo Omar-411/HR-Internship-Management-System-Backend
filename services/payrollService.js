@@ -22,9 +22,11 @@ import {
   canAccessPayroll,
   computePayroll,
   generatePayrollExcel,
+  buildPayslipData,
 } from "../utils/payrollHelpers.js";
 import { getOne, getAll } from "./handlersFactory.js";
 import { logAuditAction } from "../utils/logger.js";
+import { generateDocumentService } from "./documentService.js";
 
 // Payroll calculation for an employee for a given month and year
 export const calculatePayroll = async (employeeId, month, year) => {
@@ -81,7 +83,7 @@ export const calculatePayroll = async (employeeId, month, year) => {
       irpp: configDoc.irpp,
       payroll: {
         standardMonthlyHours: configDoc.payroll.standardMonthlyHours,
-      }
+      },
     },
 
     status: "draft",
@@ -176,10 +178,28 @@ export const validatePayroll = async (payrollId, user, ip) => {
     // Get the employee details for the audit log
     await payroll.populate({
       path: "employeeId",
-      select: "name lastName",
+      select: "name lastName email position department_id employment joinDate",
+      populate: {
+        path: "department_id",
+        select: "name",
+      },
     });
 
     const employee = payroll.employeeId;
+
+    // Prepare the data for the payslip generation
+    const payslipData = buildPayslipData(payroll, employee);
+
+    // Generate the pdf payslip automatically
+    await generateDocumentService({
+      templateName: "monthly_payslip",
+      data: {
+        userId: employee._id,
+        ...payslipData,
+      },
+      uploadedBy: user.id,
+      ip,
+    });
 
     // Create the audit log for this action
     await logAuditAction({
@@ -199,7 +219,10 @@ export const validatePayroll = async (payrollId, user, ip) => {
       data: payroll,
     };
   } catch (err) {
-    await session.abortTransaction();
+    try {
+      await session.abortTransaction();
+    } catch (_) {}
+
     session.endSession();
     throw err;
   }
@@ -320,7 +343,8 @@ export const recomputePayroll = async (payrollId, user, ip) => {
 
   // Reset flags after recompute
   payroll.recalculationRequired = false;
-  payroll.recalculationReason = payroll.recalculationReason || "Manual recompute";
+  payroll.recalculationReason =
+    payroll.recalculationReason || "Manual recompute";
   payroll.recomputedAt = new Date();
   payroll.recomputedBy = user.id;
 

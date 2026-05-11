@@ -753,8 +753,9 @@ export const computePayroll = async (user, month, year, config) => {
   const css = round(calculateCSS(netTaxableIncome, config));
 
   // Calculate the total deductions
-  const totalDeductions =
-    cnss + irpp.monthlyTax + css + absences + lateArrivals + unpaidLeave;
+  const totalDeductions = round(
+    cnss + irpp.monthlyTax + css + absences + lateArrivals + unpaidLeave,
+  );
 
   // Calculate the net salary
   const netSalary = round(grossSalary - totalDeductions + nonTaxableAllowances);
@@ -982,4 +983,66 @@ export const generatePayrollExcel = async (payroll) => {
   addBorders();
 
   return await workbook.xlsx.writeBuffer();
+};
+
+// Build the data structure for the payslip generation based on the payroll record and employee information
+export const buildPayslipData = (payroll, employee) => {
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  return {
+    employee: {
+      name: employee.name,
+      lastName: employee.lastName,
+      email: employee.email,
+      position: employee.position,
+      department: employee.department_id?.name || "N/A",
+      employment: {
+        contractType: employee.employment?.contractType || "N/A",
+      },
+      joinDate: employee.joinDate
+        ? new Date(employee.joinDate).toLocaleDateString("en-GB")
+        : "N/A",
+    },
+
+    monthName: monthNames[payroll.month - 1],
+    year: payroll.year,
+
+    workedDays: payroll.workedDays,
+    hourlyRate: payroll.hourlyRate,
+    status: payroll.status,
+    validatedAt: payroll.validatedAt
+      ? new Date(payroll.validatedAt).toLocaleDateString("en-GB")
+      : "N/A",
+
+    baseSalary: payroll.baseSalary,
+    grossSalary: payroll.grossSalary,
+    netSalary: payroll.netSalary,
+    currency: payroll.currency,
+
+    earnings: payroll.earnings,
+
+    allowancesTaxable: payroll.earnings?.totals?.allowancesTaxable || 0,
+
+    allowancesNonTaxable: payroll.earnings?.totals?.allowancesNonTaxable || 0,
+
+    family: payroll.family,
+
+    deductions: payroll.deductions,
+
+    taxableIncome: payroll.taxableIncome,
+    netTaxableIncome: payroll.netTaxableIncome,
+  };
 };

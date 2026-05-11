@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Payslip</title>
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        color: #222;
+        margin: 30px;
+      }
+
+      h1 {
+        text-align: center;
+        font-size: 22px;
+        margin-bottom: 5px;
+      }
+
+      .period {
+        text-align: center;
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 15px;
+      }
+
+      .section {
+        margin-bottom: 20px;
+      }
+
+      .title {
+        background: #f2f2f2;
+        padding: 8px;
+        font-weight: bold;
+        border: 1px solid #ddd;
+        margin-bottom: 10px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      td,
+      th {
+        padding: 6px 8px;
+        border: 1px solid #ddd;
+      }
+
+      th {
+        background: #f8f8f8;
+        text-align: left;
+      }
+
+      .right {
+        text-align: right;
+      }
+
+      .net {
+        margin-top: 20px;
+        padding: 15px;
+        font-size: 18px;
+        font-weight: bold;
+        text-align: center;
+        border: 2px solid #000;
+        background: #fafafa;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- HEADER -->
+    <h1>Payslip</h1>
+    <div class="period">{{monthName}} {{year}}</div>
+
+    <!-- EMPLOYEE INFO -->
+    <div class="section">
+      <div class="title">Employee Information</div>
+      <table>
+        <tr>
+          <td><b>Full Name</b></td>
+          <td>{{employee.name}} {{employee.lastName}}</td>
+          <td><b>Email</b></td>
+          <td>{{employee.email}}</td>
+        </tr>
+        <tr>
+          <td><b>Position</b></td>
+          <td>{{employee.position}}</td>
+          <td><b>Department</b></td>
+          <td>{{employee.department}}</td>
+        </tr>
+        <tr>
+          <td><b>Contract Type</b></td>
+          <td>{{employee.employment.contractType}}</td>
+          <td><b>Join Date</b></td>
+          <td>{{employee.joinDate}}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- WORK SUMMARY -->
+    <div class="section">
+      <div class="title">Work Summary</div>
+      <table>
+        <tr>
+          <td><b>Worked Days</b></td>
+          <td>{{workedDays}}</td>
+          <td><b>Hourly Rate</b></td>
+          <td>{{hourlyRate}} {{currency}}</td>
+        </tr>
+        <tr>
+          <td><b>Payroll Status</b></td>
+          <td>{{status}}</td>
+          <td><b>Validated At</b></td>
+          <td>{{validatedAt}}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- EARNINGS -->
+    <div class="section">
+      <div class="title">Earnings</div>
+      <table>
+        <tr>
+          <th>Description</th>
+          <th class="right">Amount</th>
+        </tr>
+
+        <tr>
+          <td>Base Salary</td>
+          <td class="right">{{baseSalary}}</td>
+        </tr>
+
+        <tr>
+          <td>Overtime</td>
+          <td class="right">{{earnings.overtime.amount}}</td>
+        </tr>
+
+        <tr>
+          <td>Bonuses</td>
+          <td class="right">{{earnings.totals.bonuses}}</td>
+        </tr>
+
+        <tr>
+          <td>Taxable Allowances</td>
+          <td class="right">{{allowancesTaxable}}</td>
+        </tr>
+
+        <tr>
+          <td>Non-Taxable Allowances</td>
+          <td class="right">{{allowancesNonTaxable}}</td>
+        </tr>
+
+        <tr>
+          <td>Family Benefits</td>
+          <td class="right">{{family.total}}</td>
+        </tr>
+
+        <tr>
+          <th>Total Earnings</th>
+          <th class="right">{{earnings.total}}</th>
+        </tr>
+      </table>
+    </div>
+
+    <!-- DEDUCTIONS -->
+    <div class="section">
+      <div class="title">Deductions</div>
+      <table>
+        <tr>
+          <th>Description</th>
+          <th class="right">Amount</th>
+        </tr>
+
+        <tr>
+          <td>CNSS</td>
+          <td class="right">{{deductions.cnss}}</td>
+        </tr>
+
+        <tr>
+          <td>CSS</td>
+          <td class="right">{{deductions.css}}</td>
+        </tr>
+
+        <tr>
+          <td>IRPP</td>
+          <td class="right">{{deductions.irpp}}</td>
+        </tr>
+
+        <tr>
+          <td>Absences</td>
+          <td class="right">{{deductions.absences}}</td>
+        </tr>
+
+        <tr>
+          <td>Late Arrivals</td>
+          <td class="right">{{deductions.lateArrivals}}</td>
+        </tr>
+
+        <tr>
+          <td>Unpaid Leave</td>
+          <td class="right">{{deductions.unpaidLeave}}</td>
+        </tr>
+
+        <tr>
+          <th>Total Deductions</th>
+          <th class="right">{{deductions.total}}</th>
+        </tr>
+      </table>
+    </div>
+
+    <!-- FINAL SALARY -->
+    <div class="section">
+      <div class="title">Salary Summary</div>
+      <table>
+        <tr>
+          <td><b>Gross Salary</b></td>
+          <td class="right">{{grossSalary}}</td>
+        </tr>
+        <tr>
+          <td><b>Taxable Income</b></td>
+          <td class="right">{{taxableIncome}}</td>
+        </tr>
+        <tr>
+          <td><b>Net Taxable Income</b></td>
+          <td class="right">{{netTaxableIncome}}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- NET -->
+    <div class="net">Net Salary: {{netSalary}} {{currency}}</div>
+  </body>
+</html>

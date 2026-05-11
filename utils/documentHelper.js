@@ -71,14 +71,28 @@ export const getValidAdminDocument = async (DocumentId) => {
 };
 
 // Fill a html template with data
-export const fillTemplate = (html, data) => {
-  return Object.keys(data).reduce((result, key) => {
-    const value = data[key] ?? "";
+// export const fillTemplate = (html, data) => {
+//   return Object.keys(data).reduce((result, key) => {
+//     const value = data[key] ?? "";
 
-    // Replace all occurrences of {{key}} in the template with the corresponding value from the data object
-    return result.replaceAll(`{{${key}}}`, value);
-  }, html);
+//     // Replace all occurrences of {{key}} in the template with the corresponding value from the data object
+//     return result.replaceAll(`{{${key}}}`, value);
+//   }, html);
+// };
+
+export const fillTemplate = (html, data) => {
+  const getValue = (obj, path) => {
+    return path.split(".").reduce((acc, key) => {
+      return acc ? acc[key] : "";
+    }, obj);
+  };
+
+  return html.replace(/{{\s*([^}]+)\s*}}/g, (_, key) => {
+    const value = getValue(data, key.trim());
+    return value ?? "";
+  });
 };
+
 
 // A slugify function to generate URL-friendly strings from document titles (slugify = convert "My Document Title" to "my-document-title")
 export const slugify = (text) => {
