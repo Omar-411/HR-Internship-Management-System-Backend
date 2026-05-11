@@ -3,6 +3,7 @@ import Timetable from "../models/Timetable.js";
 import AppError from "../utils/AppError.js";
 import mongoose from "mongoose";
 import { io } from "../server.js";
+import { resolveId } from "../utils/idResolver.js";
 
 // -------------------------------------------------------------------- //
 // --------------------- TIMETABLE SHIFT RULES ------------------------ //
@@ -47,8 +48,10 @@ export const addTimetableEntry = async (req, res, next) => {
     }
 
     // Check the user existence
-    const user = await User.findById(userId);
+    const user = await User.findOne(resolveId(userId));
     if (!user) throw new AppError("User not found!", 404);
+
+    const actualUserId = user._id;
 
     // Normalize the date to UTC to ensure consistency
     const normalizedDate = new Date(date);
@@ -58,7 +61,7 @@ export const addTimetableEntry = async (req, res, next) => {
 
     // Check a timetable entry existence for the same user and date
     const existingEntry = await Timetable.findOne({
-      userId,
+      userId: actualUserId,
       date: dateStr,
     });
     if (existingEntry) {
@@ -66,14 +69,14 @@ export const addTimetableEntry = async (req, res, next) => {
     }
 
     // Prepare the common shift data
-    let shiftData = { userId, type, date: dateStr, color };
+    let shiftData = { userId: actualUserId, type, date: dateStr, color };
 
     // Handle the "Day Off" Adding case
     if (type === "Day Off") {
       const shift = await Timetable.create(shiftData);
       console.log("[ADD-TIMETABLE-ENTRY] Day Off created!");
 
-      io.emit("timetableUpdated", { userId });
+      io.emit("timetableUpdated", { userId: actualUserId });
 
       return res.status(201).json({
         status: "Success",
@@ -114,9 +117,9 @@ export const addTimetableEntry = async (req, res, next) => {
     const shift = await Timetable.create(shiftData);
     console.log(`[ADD-TIMETABLE-ENTRY] ${type} created!`);
 
-    io.emit("timetableUpdated", { userId });
+    io.emit("timetableUpdated", { userId: actualUserId });
 
-    await markPayrollDirty(userId, new Date(), "Timetable entry created");
+    await markPayrollDirty(actualUserId, new Date(), "Timetable entry created");
 
     res.status(201).json({
       status: "Success",
@@ -152,17 +155,18 @@ export const updateTimetableEntry = async (req, res, next) => {
     }
 
     // Check the user existance
-    const user = await User.findById(userId);
+    const user = await User.findOne(resolveId(userId));
     if (!user) {
       throw new AppError("User not found", 404);
     }
+    const actualUserId = user._id;
 
     // Normalize date to midnight to ensure consistent indexing
     const normalizedDate = new Date(date);
     normalizedDate.setUTCHours(0, 0, 0, 0);
 
     const shift = await Timetable.findOneAndUpdate(
-      { userId, date: normalizedDate },
+      { userId: actualUserId, date: normalizedDate },
       {
         type,
         location,
@@ -175,9 +179,9 @@ export const updateTimetableEntry = async (req, res, next) => {
       { new: true, upsert: true, runValidators: true },
     );
 
-    io.emit("timetableUpdated", { userId });
+    io.emit("timetableUpdated", { userId: actualUserId });
 
-    await markPayrollDirty(userId, new Date(), "Timetable entry updated");
+    await markPayrollDirty(actualUserId, new Date(), "Timetable entry updated");
 
     res.status(200).json({
       status: "Success",
@@ -197,15 +201,16 @@ export const getTimetableByUser = async (req, res, next) => {
     const { month, year } = req.query; // Month and year filtering (Pagination)
 
     // Check the user existance
-    const user = await User.findById(userId);
+    const user = await User.findOne(resolveId(userId));
     if (!user) {
       throw new AppError("User not found", 404);
     }
+    const actualUserId = user._id;
 
     // Check if the id (if supervisor) is the user's supervisor id
     // BUT allow users to see their own timetable regardless of role
     if (
-      req.user.id !== userId &&
+      req.user.id !== actualUserId.toString() &&
       req.user.role === "Supervisor" &&
       user.supervisor_id &&
       !user.supervisor_id.equals(new mongoose.Types.ObjectId(req.user.id))
@@ -226,7 +231,7 @@ export const getTimetableByUser = async (req, res, next) => {
 
     // Find all shifts for the user within the specified month
     const shifts = await Timetable.find({
-      userId,
+      userId: actualUserId,
       date: { $gte: startDate, $lte: endDate },
     }).sort({ date: 1 });
 
@@ -313,10 +318,11 @@ export const bulkUpdateTimetableEntries = async (req, res, next) => {
     }
 
     // Check the user existence
-    const user = await User.findById(userId);
+    const user = await User.findOne(resolveId(userId));
     if (!user) {
       throw new AppError("User not found", 404);
     }
+    const actualUserId = user._id;
 
     const updatedShifts = [];
 
@@ -338,7 +344,7 @@ export const bulkUpdateTimetableEntries = async (req, res, next) => {
       // Handle the "Day Off" case
       if (type === "Day Off") {
         const shift = await Timetable.findOneAndUpdate(
-          { userId, date: dateStr },
+          { userId: actualUserId, date: dateStr },
           shiftData,
           { returnDocument: "after", upsert: true, runValidators: true },
         );
@@ -385,7 +391,7 @@ export const bulkUpdateTimetableEntries = async (req, res, next) => {
         }
 
         const shift = await Timetable.findOneAndUpdate(
-          { userId, date: dateStr, type },
+          { userId: actualUserId, date: dateStr, type },
           shiftData,
           { returnDocument: "after", upsert: true, runValidators: true },
         );
@@ -395,9 +401,9 @@ export const bulkUpdateTimetableEntries = async (req, res, next) => {
     }
 
     // Notify user of schedule change
-    io.emit("timetableUpdated", { userId });
+    io.emit("timetableUpdated", { userId: actualUserId });
 
-    await markPayrollDirty(userId, new Date(), "Bulk timetable update");
+    await markPayrollDirty(actualUserId, new Date(), "Bulk timetable update");
 
     res.status(200).json({
       status: "Success",
@@ -420,17 +426,18 @@ export const deleteTimetableEntry = async (req, res, next) => {
     }
 
     // Check the user existance
-    const user = await User.findById(userId);
+    const user = await User.findOne(resolveId(userId));
     if (!user) {
       throw new AppError("User not found", 404);
     }
+    const actualUserId = user._id;
 
     const normalizedDate = new Date(date);
     normalizedDate.setUTCHours(0, 0, 0, 0);
 
     // Check the timetable entry existance
     const existingEntry = await Timetable.findOne({
-      userId,
+      userId: actualUserId,
       date: normalizedDate,
       type,
     });
@@ -441,12 +448,12 @@ export const deleteTimetableEntry = async (req, res, next) => {
       );
     }
 
-    await Timetable.findOneAndDelete({ userId, date: normalizedDate, type });
+    await Timetable.findOneAndDelete({ userId: actualUserId, date: normalizedDate, type });
 
     // Notify user of schedule change
-    io.emit("timetableUpdated", { userId });
+    io.emit("timetableUpdated", { userId: actualUserId });
 
-    await markPayrollDirty(userId, new Date(), "Timetable entry deleted");
+    await markPayrollDirty(actualUserId, new Date(), "Timetable entry deleted");
 
     res.status(200).json({
       status: "Success",
@@ -478,10 +485,11 @@ export const clearMonthTimetable = async (req, res, next) => {
     }
 
     // Check the user existence
-    const user = await User.findById(userId);
+    const user = await User.findOne(resolveId(userId));
     if (!user) {
       throw new AppError("User not found", 404);
     }
+    const actualUserId = user._id;
 
     // Compute first and last day of the month
     const startDate = new Date(year, month, 1);
@@ -489,14 +497,14 @@ export const clearMonthTimetable = async (req, res, next) => {
 
     // Delete all timetable entries for the user within the specified month
     const result = await Timetable.deleteMany({
-      userId,
+      userId: actualUserId,
       date: { $gte: startDate, $lte: endDate },
     });
 
     // Notify user of schedule change
-    io.emit("timetableUpdated", { userId });
+    io.emit("timetableUpdated", { userId: actualUserId });
 
-    await markPayrollDirty(userId, new Date(), "Monthly timetable cleared");
+    await markPayrollDirty(actualUserId, new Date(), "Monthly timetable cleared");
 
     res.status(200).json({
       status: "Success",

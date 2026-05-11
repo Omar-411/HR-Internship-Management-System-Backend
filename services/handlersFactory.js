@@ -1,10 +1,11 @@
 import AppError from "../utils/AppError.js";
 import { errors } from "../errors/commonErrors.js";
 import { buildQuery } from "../utils/queryBuilder.js";
+import { resolveId } from "../utils/idResolver.js";
 
 // Get a single document by Id
 export const getOne = (Model, errorMessage = errors.RESOURCE_NOT_FOUND, populateOptions = null, selectFields = null) => async (id) => {
-  let query = Model.findById(id);
+  let query = Model.findOne(resolveId(id));
 
   if (populateOptions) {
     query = query.populate(populateOptions);
@@ -87,7 +88,7 @@ export const createOne = (Model) => async (data) => {
 
 // Update a document
 export const updateOne = (Model, errorMessage = errors.RESOURCE_NOT_FOUND) => async (id, data) => {
-  const doc = await Model.findByIdAndUpdate(id, data, {
+  const doc = await Model.findOneAndUpdate(resolveId(id), data, {
     returnDocument: 'after',
     runValidators: true
   });
@@ -111,7 +112,7 @@ export const updateOne = (Model, errorMessage = errors.RESOURCE_NOT_FOUND) => as
 
 // Delete a document
 export const deleteOne = (Model, errorMessage = errors.RESOURCE_NOT_FOUND) => async (id) => {
-  const doc = await Model.findByIdAndDelete(id);
+  const doc = await Model.findOneAndDelete(resolveId(id));
 
   if (!doc) {
     throw new AppError(

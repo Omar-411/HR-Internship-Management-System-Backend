@@ -6,6 +6,8 @@ import AppError from "../utils/AppError.js";
 import { errors } from "../errors/meetingErrors.js";
 import { errors as projectErrors } from "../errors/projectErrors.js";
 import { getOne, getAll } from "./handlersFactory.js";
+import { resolveId } from "../utils/idResolver.js";
+import mongoose from "mongoose";
 
 // Get all meetings by project
 export const getAllMeetingsOfProject = async (
@@ -14,7 +16,8 @@ export const getAllMeetingsOfProject = async (
   queryParams
 ) => {
   // Check project existence
-  const project = await Project.findById(projectId);
+  const projectMatch = resolveId(projectId);
+  const project = await Project.findOne(projectMatch);
   if (!project) {
     throw new AppError(
       projectErrors.PROJECT_NOT_FOUND.message,
@@ -25,7 +28,7 @@ export const getAllMeetingsOfProject = async (
   }
 
   // Build the base filter
-  let filter = { projectId };
+  let filter = { projectId: project._id };
 
   // If NOT the Product Owner, restrict displaying the meetings to the attendees only
   if (project.productOwnerId?.toString() !== currentUser.id) {
@@ -52,7 +55,8 @@ export const getAllMeetingsOfProject = async (
 // Get a meeting by Id
 export const getMeetingById = async (meetingId, currentUser) => {
   // Check the meeting existence
-  const meeting = await Meeting.findById(meetingId);
+  const meetingMatch = resolveId(meetingId);
+  const meeting = await Meeting.findOne(meetingMatch);
   if (!meeting) {
     throw new AppError(
       errors.MEETING_NOT_FOUND.message,
@@ -98,7 +102,7 @@ export const getMeetingById = async (meetingId, currentUser) => {
       { path: "projectId", select: "name" },
       { path: "attendees.userId", select: "name email" },
     ]
-  )(meetingId);
+  )(meeting._id);
 };
 
 // Plan a new meeting (Product owner only)
@@ -119,7 +123,8 @@ export const createMeeting = async (data, currentUser) => {
   } = data;
 
   // Check project existence
-  const project = await Project.findById(projectId);
+  const projectMatch = resolveId(projectId);
+  const project = await Project.findOne(projectMatch);
   if (!project) {
     throw new AppError(
       projectErrors.PROJECT_NOT_FOUND.message,
@@ -180,7 +185,7 @@ export const createMeeting = async (data, currentUser) => {
   }
 
   // Check the team existence
-  const team = await Team.findOne({ projectId });
+  const team = await Team.findOne({ projectId: project._id });
   if (!team) {
     throw new AppError(
       projectErrors.TEAM_NOT_FOUND.message,
@@ -223,7 +228,7 @@ export const createMeeting = async (data, currentUser) => {
   const meeting = await Meeting.create({
     title,
     description,
-    projectId,
+    projectId: project._id,
     date,
     startTime,
     endTime,
@@ -250,7 +255,8 @@ export const createMeeting = async (data, currentUser) => {
 // update a meeting (Product owner only)
 export const updateMeeting = async (meetingId, data, currentUser) => {
   // Check the meeting existence
-  const meeting = await Meeting.findById(meetingId);
+  const meetingMatch = resolveId(meetingId);
+  const meeting = await Meeting.findOne(meetingMatch);
   if (!meeting) {
     throw new AppError(
       errors.MEETING_NOT_FOUND.message,
@@ -448,7 +454,8 @@ export const updateMeeting = async (meetingId, data, currentUser) => {
 // Cancel a meeting
 export const cancelMeeting = async (meetingId, currentUser) => {
   // Check meeting existence
-  const meeting = await Meeting.findById(meetingId);
+  const meetingMatch = resolveId(meetingId);
+  const meeting = await Meeting.findOne(meetingMatch);
   if (!meeting) {
     throw new AppError(
       errors.MEETING_NOT_FOUND.message,
@@ -546,8 +553,9 @@ export const respondToMeeting = async (
   }
 
   // Check the meeting existence + attendee existence
+  const meetingMatch = resolveId(meetingId);
   const meeting = await Meeting.findOne({
-    _id: meetingId,
+    ...meetingMatch,
     "attendees.userId": currentUser.id,
   });
   if (!meeting) {
@@ -591,7 +599,7 @@ export const respondToMeeting = async (
   // Update the attendee response
   const updatedMeeting = await Meeting.findOneAndUpdate(
     {
-      _id: meetingId,
+      ...meetingMatch,
       "attendees.userId": currentUser.id,
     },
     {

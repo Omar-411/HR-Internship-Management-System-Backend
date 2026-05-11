@@ -1,6 +1,7 @@
 import User from "../models/User.js";
 import { errors } from "../errors/middlewareTokenErrors.js";
 import AppError from "../utils/AppError.js";
+import { resolveId } from "../utils/idResolver.js";
 
 // Middleware to authorize users based on role, self-access, or supervisor access
 const authorize = (roles = [], options = {}) => {
@@ -22,6 +23,8 @@ const authorize = (roles = [], options = {}) => {
       const targetId = req.targetUserId || req.params.id || req.params.userId;
 
       // Check if the user himself has self access
+      let targetUser = null;
+
       if (options.allowSelf) {
         const tokenUserId = (user.id || user._id || "").toString();
         
@@ -33,11 +36,20 @@ const authorize = (roles = [], options = {}) => {
         if (finalTargetId === "current" || tokenUserId === finalTargetId) {
           return next();
         }
+
+        if (finalTargetId && finalTargetId !== "current") {
+          targetUser = await User.findOne(resolveId(finalTargetId));
+          if (targetUser && tokenUserId === targetUser._id.toString()) {
+            return next();
+          }
+        }
       }
 
       // Check if the supervisor has access
       if (options.allowSupervisor) {
-        const targetUser = await User.findById(targetId);
+        if (!targetUser && targetId && targetId !== "current") {
+          targetUser = await User.findOne(resolveId(targetId));
+        }
 
         if (targetUser && user.id === targetUser.supervisor_id?.toString()) {
           return next();

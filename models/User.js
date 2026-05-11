@@ -1,8 +1,16 @@
 import mongoose from "mongoose";
+import { nanoid } from "nanoid";
 import { countries } from "../constants/countries.js";
+import { generateUniqueSlug } from "../utils/slugify.js";
 
 const userSchema = mongoose.Schema(
   {
+    publicId: {
+      type: String,
+      required: true,
+      unique: true,
+      default: () => nanoid(10),
+    },
     name: {
       type: String,
       required: true,
@@ -10,6 +18,10 @@ const userSchema = mongoose.Schema(
     lastName: {
       type: String,
       required: true,
+    },
+    slug: {
+      type: String,
+      unique: true,
     },
     gender: {
       type: String,
@@ -240,5 +252,14 @@ userSchema.index(
   { "idNumber.number": 1, "idNumber.countryCode": 1 },
   { unique: true, sparse: true },
 );
+
+userSchema.pre("save", async function () {
+  if (this.isModified("name") || this.isModified("lastName") || !this.slug) {
+    this.slug = await generateUniqueSlug(
+      this.constructor,
+      `${this.name}-${this.lastName}`
+    );
+  }
+});
 
 export default mongoose.model("User", userSchema);

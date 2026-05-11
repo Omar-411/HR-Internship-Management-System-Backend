@@ -1,10 +1,22 @@
 import mongoose from "mongoose";
+import { nanoid } from "nanoid";
+import { generateUniqueSlug } from "../utils/slugify.js";
 
 const projectSchema = mongoose.Schema(
   {
+    publicId: {
+      type: String,
+      required: true,
+      unique: true,
+      default: () => nanoid(10),
+    },
     name: {
       type: String,
       required: true,
+    },
+    slug: {
+      type: String,
+      unique: true,
     },
     sector: {
       type: String,
@@ -62,5 +74,11 @@ const projectSchema = mongoose.Schema(
     timestamps: true,
   },
 );
+
+projectSchema.pre("save", async function () {
+  if (this.isModified("name") || !this.slug) {
+    this.slug = await generateUniqueSlug(this.constructor, this.name);
+  }
+});
 
 export default mongoose.model("Project", projectSchema);

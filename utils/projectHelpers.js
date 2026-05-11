@@ -12,6 +12,7 @@ import {
   incrementUsersProjectCount,
   decrementUsersProjectCount,
 } from "./projectCountHelper.js";
+import { resolveId } from "./idResolver.js";
 
 // Check if the user is a team member, product owner of the project or admins to allow access to the project resources
 export const isTeamMemberOrProductOwnerOrAdmin = async (
@@ -111,12 +112,10 @@ export const buildProjectMatchFilter = async ({
 
 // Build the match filter for accessing a specific project by ID
 export const buildProjectAccessMatch = async (projectId, userId, role) => {
-  if (!mongoose.Types.ObjectId.isValid(projectId)) {
-    throw new AppError(commonErrors.INVALID_ID.message, commonErrors.INVALID_ID.code);
+  const match = resolveId(projectId);
+  if (match._id) {
+    match._id = new mongoose.Types.ObjectId(match._id);
   }
-  const match = {
-    _id: new mongoose.Types.ObjectId(projectId),
-  };
 
   if (role === "Supervisor") {
     if (!mongoose.Types.ObjectId.isValid(userId)) {

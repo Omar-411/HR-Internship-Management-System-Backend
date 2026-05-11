@@ -73,7 +73,7 @@ router.patch(
 router.patch(
   "/resignations/:id/respond-clarification",
   authenticate,
-  authorize(["Employee"]),
+  authorize(["Employee", "Supervisor"]),
   respondToClarification,
 );
 

@@ -12,6 +12,7 @@ import { getAll } from "./handlersFactory.js";
 import { isTeamMemberOrProductOwnerOrAdmin } from "../utils/projectHelpers.js";
 import { isUserAvailable } from "../validators/userValidators.js";
 import { getUserTaskStats } from "./analytics/taskStatsService.js";
+import { resolveId } from "../utils/idResolver.js";
 
 // Get the list of team roles
 export const getTeamRoles = async () => {
@@ -29,32 +30,26 @@ export const getTeamRoles = async () => {
 export const getProjectTeamMembers = async (queryParams, teamId, user) => {
   console.log("TEAM FETCH TRACE - ID RECEIVED:", teamId);
   
-  // Safety check for ObjectId
-  if (!mongoose.Types.ObjectId.isValid(teamId)) {
-     console.log("TEAM FETCH TRACE - INVALID ID");
-     throw new AppError("Invalid Project ID format", 400);
+  // Resolve projectId (teamId here is the projectId from the route)
+  const projectMatch = resolveId(teamId);
+  const Project = mongoose.model("Project");
+  const projectExists = await Project.findOne(projectMatch);
+  console.log("TEAM FETCH TRACE - PROJECT EXISTS:", projectExists ? "YES" : "NO");
+
+  if (!projectExists) {
+    throw new AppError(
+      projectErrors.PROJECT_NOT_FOUND.message,
+      projectErrors.PROJECT_NOT_FOUND.code,
+      projectErrors.PROJECT_NOT_FOUND.errorCode,
+      projectErrors.PROJECT_NOT_FOUND.suggestion,
+    );
   }
 
-  const projObjectId = new mongoose.Types.ObjectId(teamId);
-  
-  // Check the team existence by projectId (teamId here is the projectId from the route)
-  let team = await Team.findOne({ projectId: projObjectId }).populate("projectId");
-  console.log("TEAM FETCH TRACE - TEAM FOUND:", team ? "YES" : "NO");
-  
-  if (!team) {
-    // Check if the project exists before creating a team for it
-    const Project = mongoose.model("Project");
-    const projectExists = await Project.findById(projObjectId);
-    console.log("TEAM FETCH TRACE - PROJECT EXISTS:", projectExists ? "YES" : "NO");
+  // Check the team existence by the found project's ObjectId
+  let team = await Team.findOne({ projectId: projectExists._id }).populate("projectId");
 
-    if (!projectExists) {
-      throw new AppError(
-        projectErrors.PROJECT_NOT_FOUND.message,
-        projectErrors.PROJECT_NOT_FOUND.code,
-        projectErrors.PROJECT_NOT_FOUND.errorCode,
-        projectErrors.PROJECT_NOT_FOUND.suggestion,
-      );
-    }
+  if (!team) {
+    const projObjectId = projectExists._id;
 
     // Auto-create team if missing to ensure UI continuity
     console.log(`⚠️ TEAM FETCH TRACE - Auto-creating team for ${teamId}`);
@@ -150,7 +145,8 @@ export const getSupervisorTeamMembers = async (
   queryParams,
 ) => {
   // Check user existence
-  const supervisor = await User.findById(supervisorId);
+  const supervisorMatch = resolveId(supervisorId);
+  const supervisor = await User.findOne(supervisorMatch);
   if (!supervisor) {
     throw new AppError(
       commonErrors.USER_NOT_FOUND.message,
@@ -163,7 +159,7 @@ export const getSupervisorTeamMembers = async (
   // Authorization: Only the supervisor himself and the Admin can access the list of his team members
   if (
     currentUser.role !== "Admin" &&
-    currentUser.id.toString() !== supervisorId.toString()
+    currentUser.id.toString() !== supervisor._id.toString()
   ) {
     throw new AppError(
       tokenErrors.UNAUTHORIZED.message,
@@ -184,7 +180,7 @@ export const getSupervisorTeamMembers = async (
   // Inject the filter by the supervisor into the queryParams
   const enrichedQueryParams = {
     ...filters,
-    supervisor_id: supervisorId,
+    supervisor_id: supervisor._id,
   };
 
   return await getAll(
@@ -203,28 +199,30 @@ export const addTeamMember = async (teamId, userId, role, currentUser) => {
   console.log("TEAM QUERY:", { projectId: teamId });
 
   // Check the team existence by projectId since frontend passes projectId as the teamId param
-  let team = await Team.findOne({ projectId: new mongoose.Types.ObjectId(teamId) }).populate("projectId");
+  const projectMatch = resolveId(teamId);
+  const Project = mongoose.model("Project");
+  const projectExists = await Project.findOne(projectMatch);
+
+  if (!projectExists) {
+    throw new AppError(
+      projectErrors.PROJECT_NOT_FOUND.message,
+      projectErrors.PROJECT_NOT_FOUND.code,
+      projectErrors.PROJECT_NOT_FOUND.errorCode,
+      projectErrors.PROJECT_NOT_FOUND.suggestion,
+    );
+  }
+
+  let team = await Team.findOne({ projectId: projectExists._id }).populate("projectId");
   console.log("TEAM FOUND:", team);
 
   if (!team) {
-    // Verify project exists
-    const Project = mongoose.model("Project");
-    const projectExists = await Project.findById(teamId);
-    if (!projectExists) {
-      throw new AppError(
-        projectErrors.PROJECT_NOT_FOUND.message,
-        projectErrors.PROJECT_NOT_FOUND.code,
-        projectErrors.PROJECT_NOT_FOUND.errorCode,
-        projectErrors.PROJECT_NOT_FOUND.suggestion,
-      );
-    }
 
     console.log("⚠️ No team found, creating one...");
-    team = await Team.create({ name: `${projectExists.name} Team`, projectId: teamId });
+    team = await Team.create({ name: `${projectExists.name} Team`, projectId: projectExists._id });
     
     // CRITICAL: Link the new team back to the project
-    console.log(`⚠️ LINKING NEW TEAM ${team._id} TO PROJECT ${teamId}`);
-    await Project.findByIdAndUpdate(teamId, { team_id: team._id });
+    console.log(`⚠️ LINKING NEW TEAM ${team._id} TO PROJECT ${projectExists._id}`);
+    await Project.findByIdAndUpdate(projectExists._id, { team_id: team._id });
 
     // Populate it for the downstream authorization check
     team = await Team.findById(team._id).populate("projectId");
@@ -241,7 +239,8 @@ export const addTeamMember = async (teamId, userId, role, currentUser) => {
   }
 
   // Check if the new team member has as supervisor (supervisor_id) = the project product owner
-  const teamMember = await User.findById(userId);
+  const userMatch = resolveId(userId);
+  const teamMember = await User.findOne(userMatch);
   if (
     !teamMember ||
     teamMember.supervisor_id.toString() !==
@@ -256,7 +255,7 @@ export const addTeamMember = async (teamId, userId, role, currentUser) => {
   }
 
   // Check if the user is already a member of the team
-  const existingMember = await TeamMember.findOne({ teamId: team._id, userId });
+  const existingMember = await TeamMember.findOne({ teamId: team._id, userId: teamMember._id });
   if (existingMember) {
     throw new AppError(
       projectErrors.DUPLICATE_USERS.message,
@@ -306,7 +305,7 @@ export const addTeamMember = async (teamId, userId, role, currentUser) => {
   // Create the new team member
   const newMember = await TeamMember.create({
     teamId: team._id,
-    userId,
+    userId: teamMember._id,
     role,
   });
 
@@ -314,7 +313,7 @@ export const addTeamMember = async (teamId, userId, role, currentUser) => {
   if (team.projectId.status === "Active") {
     const updated = await User.findOneAndUpdate(
       {
-        _id: userId,
+        _id: teamMember._id,
         projectsCount: { $lt: 2 },
       },
       {
@@ -568,7 +567,8 @@ export const replaceTeamMember = async (
   }
 
   // Check if the new user exists and has as a supervisor (supervisor_id) = the project product owner
-  const newUser = await User.findById(newUserId);
+  const newUserMatch = resolveId(newUserId);
+  const newUser = await User.findOne(newUserMatch);
   if (
     !newUser ||
     newUser.supervisor_id?.toString() !== project.productOwnerId.toString()
@@ -584,7 +584,7 @@ export const replaceTeamMember = async (
   // Check if the new user is already a member of the team
   const existingMember = await TeamMember.findOne({
     teamId: oldMember.teamId._id,
-    userId: newUserId,
+    userId: newUser._id,
   });
   if (existingMember) {
     throw new AppError(
@@ -608,7 +608,7 @@ export const replaceTeamMember = async (
   // Create new member
   const newMember = await TeamMember.create({
     teamId: oldMember.teamId._id,
-    userId: newUserId,
+    userId: newUser._id,
     role: oldMember.role,
   });
 
@@ -616,7 +616,7 @@ export const replaceTeamMember = async (
   if (project.status === "Active") {
     // increment the new user's projectsCount
     const updated = await User.findOneAndUpdate(
-      { _id: newUserId, projectsCount: { $lt: 2 } },
+      { _id: newUser._id, projectsCount: { $lt: 2 } },
       { $inc: { projectsCount: 1 } },
     );
     if (!updated) {
@@ -638,7 +638,7 @@ export const replaceTeamMember = async (
   // Transfer the tasks
   await Task.updateMany(
     { assignedTo: oldMember.userId, projectId: project._id },
-    { $set: { assignedTo: newUserId } },
+    { $set: { assignedTo: newUser._id } },
   );
 
   // Deactivate the old team member

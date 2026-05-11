@@ -2,6 +2,9 @@ import mongoose from "mongoose";
 import User from "../models/User.js";
 import Project from "../models/Project.js";
 import Task from "../models/Task.js";
+import Attendance from "../models/Attendance.js";
+import Timetable from "../models/Timetable.js";
+import UserRole from "../models/UserRole.js";
 
 // Get Dashboard data for supervisors
 export const getSupervisorDashboard = async (user) => {
@@ -9,7 +12,7 @@ export const getSupervisorDashboard = async (user) => {
   const supervisorId = new mongoose.Types.ObjectId(userId);
 
   // 1. Get Team Members
-  const teamMembers = await User.find({ supervisor_id: supervisorId }).select("name _id");
+  const teamMembers = await User.find({ supervisor_id: supervisorId }).select("name _id publicId");
   const teamMemberIds = teamMembers.map(m => m._id);
 
   // 2. Get Supervisor's Projects
@@ -57,7 +60,7 @@ export const getSupervisorDashboard = async (user) => {
   const completionByUser = teamMembers.map(member => {
     const completedCount = tasks.filter(t => String(t.assignedTo) === String(member._id) && t.status === "Done").length;
     return {
-      userId: member._id,
+      userId: member.publicId || member._id,
       name: member.name,
       initials: member.name.split(" ").map(n => n[0]).join("").toUpperCase(),
       completed: completedCount
@@ -89,21 +92,144 @@ export const getSupervisorDashboard = async (user) => {
 
 // Get Dashboard data for Admins
 export const getAdminDashboard = async (user) => {
-  // Admin still gets global stats for now
-  const totalProjects = await Project.countDocuments();
-  const completedProjects = await Project.countDocuments({ status: "Completed" });
-  
+  // 1. User Roles lookup
+  const employeeRole = await UserRole.findOne({ name: { $regex: /^employee$/i } });
+  const internRole = await UserRole.findOne({ name: { $regex: /^intern$/i } });
+
+  // 2. Counts
+  const [
+    totalEmployees,
+    totalInterns,
+    activeUsers,
+    inactiveUsers,
+    ongoingProjects
+  ] = await Promise.all([
+    User.countDocuments({ role_id: employeeRole?._id }),
+    User.countDocuments({ role_id: internRole?._id }),
+    User.countDocuments({ status: "Active" }),
+    User.countDocuments({ status: { $ne: "Active" } }),
+    Project.countDocuments({ status: { $in: ["Active", "Planning"] } })
+  ]);
+
+  // 3. Attendance Trends (Last 6 Months)
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+  sixMonthsAgo.setDate(1);
+  sixMonthsAgo.setHours(0, 0, 0, 0);
+
+  const [attendanceStats, timetableStats] = await Promise.all([
+    Attendance.aggregate([
+      { $match: { date: { $gte: sixMonthsAgo } } },
+      {
+        $group: {
+          _id: { month: { $month: "$date" }, year: { $year: "$date" } },
+          present: { $sum: { $cond: [{ $in: ["$status", ["present", "late"]] }, 1, 0] } }
+        }
+      }
+    ]),
+    Timetable.aggregate([
+      { $match: { date: { $gte: sixMonthsAgo }, type: { $ne: "Day Off" } } },
+      {
+        $group: {
+          _id: { month: { $month: "$date" }, year: { $year: "$date" } },
+          expected: { $sum: 1 }
+        }
+      }
+    ])
+  ]);
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const statsMap = new Map();
+
+  // Initialize with last 6 months to ensure continuity
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const m = d.getMonth() + 1;
+    const y = d.getFullYear();
+    const key = `${y}-${m}`;
+    statsMap.set(key, { month: m, year: y, present: 0, expected: 0 });
+  }
+
+  attendanceStats.forEach(s => {
+    const key = `${s._id.year}-${s._id.month}`;
+    if (statsMap.has(key)) statsMap.get(key).present = s.present;
+  });
+  timetableStats.forEach(s => {
+    const key = `${s._id.year}-${s._id.month}`;
+    if (statsMap.has(key)) statsMap.get(key).expected = s.expected;
+  });
+
+  const attendanceTrends = Array.from(statsMap.values())
+    .sort((a, b) => a.year - b.year || a.month - b.month)
+    .map(s => {
+      // Use Timetable 'expected' as baseline; fallback to Attendance 'present' count if no schedule exists
+      const totalBaseline = s.expected > 0 ? s.expected : s.present;
+      return {
+        month: monthNames[s.month - 1],
+        attendance: totalBaseline === 0 ? 0 : Math.round((s.present / totalBaseline) * 100),
+        target: 95
+      };
+    });
+
+  // Overall Avg Attendance Rate (Weighted)
+  const totalPresentAll = Array.from(statsMap.values()).reduce((acc, s) => acc + s.present, 0);
+  const totalExpectedAll = Array.from(statsMap.values()).reduce((acc, s) => acc + (s.expected > 0 ? s.expected : s.present), 0);
+  const avgAttendanceRate = totalExpectedAll === 0 ? 0 : parseFloat(((totalPresentAll / totalExpectedAll) * 100).toFixed(1));
+
+  // 4. Today's Attendance Distribution
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date(startOfToday);
+  endOfToday.setDate(endOfToday.getDate() + 1);
+
+  const [dailyAttendance, dailyTimetable] = await Promise.all([
+    Attendance.find({ date: { $gte: startOfToday, $lt: endOfToday } }).select("userId status workLocation"),
+    Timetable.find({ date: { $gte: startOfToday, $lt: endOfToday }, type: { $ne: "Day Off" } }).select("userId")
+  ]);
+
+  const distributionMap = { Present: 0, Remote: 0, Absent: 0, "On Leave": 0 };
+  const checkedInUserIds = new Set();
+
+  dailyAttendance.forEach(a => {
+    checkedInUserIds.add(a.userId.toString());
+    const status = a.status;
+    const loc = a.workLocation;
+
+    if (status === "present" || status === "late") {
+      if (loc === "Remote") distributionMap["Remote"] += 1;
+      else distributionMap["Present"] += 1;
+    } else if (status === "absent") {
+      distributionMap["Absent"] += 1;
+    } else if (status === "leave") {
+      distributionMap["On Leave"] += 1;
+    }
+  });
+
+  // Count users who are scheduled but haven't checked in (and have no attendance record yet)
+  dailyTimetable.forEach(t => {
+    if (!checkedInUserIds.has(t.userId.toString())) {
+      distributionMap["Absent"] += 1;
+    }
+  });
+
+  const attendanceDistribution = Object.entries(distributionMap).map(([name, value]) => ({ name, value }));
+
   return {
     status: "Success",
     code: 200,
     message: "Admin dashboard retrieved successfully",
     data: {
-      globalProjectStats: {
-        totalProjects,
-        completedProjects,
-        activeProjects: await Project.countDocuments({ status: "Active" }),
-        completionRate: totalProjects === 0 ? 0 : Math.round((completedProjects / totalProjects) * 100)
+      kpis: {
+        totalEmployees,
+        totalInterns,
+        activeUsers,
+        inactiveUsers,
+        ongoingProjects,
+        avgAttendanceRate,
       },
+      attendanceTrends,
+      attendanceDistribution,
     },
   };
 };

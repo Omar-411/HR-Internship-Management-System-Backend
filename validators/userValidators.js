@@ -201,36 +201,38 @@ export const validateUserData = (data) => {
 
   // Validate the date of birth (should be a valid date, not in the future, and the age should be between 18 and 60)
   const today = new Date();
-  if (!dateOfBirth)
-    throw new AppError(
-      errors.INVALID_DATE_OF_BIRTH.message,
-      errors.INVALID_DATE_OF_BIRTH.code,
-      errors.INVALID_DATE_OF_BIRTH.errorCode,
-      "The Date of Birth is required and must be a valid date.",
-    );
-  else {
-    // Get the date of birth from the input and check its existence
-    const dob = new Date(dateOfBirth);
-    if (isNaN(dob.getTime())) {
+  if (dateOfBirth !== undefined) {
+    if (!dateOfBirth)
       throw new AppError(
         errors.INVALID_DATE_OF_BIRTH.message,
         errors.INVALID_DATE_OF_BIRTH.code,
         errors.INVALID_DATE_OF_BIRTH.errorCode,
         "The Date of Birth is required and must be a valid date.",
       );
-    }
+    else {
+      // Get the date of birth from the input and check its existence
+      const dob = new Date(dateOfBirth);
+      if (isNaN(dob.getTime())) {
+        throw new AppError(
+          errors.INVALID_DATE_OF_BIRTH.message,
+          errors.INVALID_DATE_OF_BIRTH.code,
+          errors.INVALID_DATE_OF_BIRTH.errorCode,
+          "The Date of Birth is required and must be a valid date.",
+        );
+      }
 
-    // Calculate the age based on the date of birth
-    const age = today.getFullYear() - dob.getFullYear();
+      // Calculate the age based on the date of birth
+      const age = today.getFullYear() - dob.getFullYear();
 
-    // Check if the date of birth is valid, not in the future, and the age is between 18 and 60
-    if (dob >= today || age < 18 || age > 60) {
-      throw new AppError(
-        errors.INVALID_DATE_OF_BIRTH.message,
-        errors.INVALID_DATE_OF_BIRTH.code,
-        errors.INVALID_DATE_OF_BIRTH.errorCode,
-        "The Person must be at least 18 years old and not older than 60 years. Please provide a valid date of birth.",
-      );
+      // Check if the date of birth is valid, not in the future, and the age is between 18 and 60
+      if (dob >= today || age < 18 || age > 60) {
+        throw new AppError(
+          errors.INVALID_DATE_OF_BIRTH.message,
+          errors.INVALID_DATE_OF_BIRTH.code,
+          errors.INVALID_DATE_OF_BIRTH.errorCode,
+          "The Person must be at least 18 years old and not older than 60 years. Please provide a valid date of birth.",
+        );
+      }
     }
   }
 
@@ -244,60 +246,62 @@ export const validateUserData = (data) => {
     );
 
   // Validate the contract dates (join date should not be in the future, end date should be after join date)
-  if (!contractJoinDate)
-    throw new AppError(
-      errors.CONTRACT_JOIN_DATE_REQUIRED.message,
-      errors.CONTRACT_JOIN_DATE_REQUIRED.code,
-      errors.CONTRACT_JOIN_DATE_REQUIRED.errorCode,
-      errors.CONTRACT_JOIN_DATE_REQUIRED.suggestion,
-    );
-  else {
-    const joinDate = new Date(contractJoinDate);
-
-    if (isNaN(joinDate.getTime())) {
+  if (contractJoinDate !== undefined || contractEndDate !== undefined) {
+    if (!contractJoinDate)
       throw new AppError(
-        "Invalid Contract Join Date",
-        errors.INVALID_CONTRACT_DATE.code,
-        errors.INVALID_CONTRACT_DATE.errorCode,
-        "Contract join date is required and must be a valid date.",
+        errors.CONTRACT_JOIN_DATE_REQUIRED.message,
+        errors.CONTRACT_JOIN_DATE_REQUIRED.code,
+        errors.CONTRACT_JOIN_DATE_REQUIRED.errorCode,
+        errors.CONTRACT_JOIN_DATE_REQUIRED.suggestion,
       );
-    }
-
-    if (joinDate > today) {
-      throw new AppError(
-        "Invalid Contract Join Date",
-        errors.INVALID_CONTRACT_DATE.code,
-        errors.INVALID_CONTRACT_DATE.errorCode,
-        "Contract join date cannot be in the future. Please provide a valid contract join date.",
-      );
-    }
-
-    if (!contractEndDate) {
-      throw new AppError(
-        "Invalid Contract End Date",
-        errors.INVALID_CONTRACT_DATE.code,
-        errors.INVALID_CONTRACT_DATE.errorCode,
-        "Contract end date is required. Please provide a valid contract end date.",
-      );
-    }
     else {
-      const endDate = new Date(contractEndDate);
-      if (isNaN(endDate.getTime())) {
+      const joinDate = new Date(contractJoinDate);
+
+      if (isNaN(joinDate.getTime())) {
         throw new AppError(
-          "Invalid Contract End Date",
+          "Invalid Contract Join Date",
           errors.INVALID_CONTRACT_DATE.code,
           errors.INVALID_CONTRACT_DATE.errorCode,
-          "Contract end date is required and must be a valid date.",
+          "Contract join date is required and must be a valid date.",
         );
       }
 
-      if (endDate <= joinDate) {
+      if (joinDate > today) {
+        throw new AppError(
+          "Invalid Contract Join Date",
+          errors.INVALID_CONTRACT_DATE.code,
+          errors.INVALID_CONTRACT_DATE.errorCode,
+          "Contract join date cannot be in the future. Please provide a valid contract join date.",
+        );
+      }
+
+      if (!contractEndDate) {
         throw new AppError(
           "Invalid Contract End Date",
           errors.INVALID_CONTRACT_DATE.code,
           errors.INVALID_CONTRACT_DATE.errorCode,
-          "Contract end date must be after the join date. Please provide a valid contract end date.",
+          "Contract end date is required. Please provide a valid contract end date.",
         );
+      }
+      else {
+        const endDate = new Date(contractEndDate);
+        if (isNaN(endDate.getTime())) {
+          throw new AppError(
+            "Invalid Contract End Date",
+            errors.INVALID_CONTRACT_DATE.code,
+            errors.INVALID_CONTRACT_DATE.errorCode,
+            "Contract end date is required and must be a valid date.",
+          );
+        }
+
+        if (endDate <= joinDate) {
+          throw new AppError(
+            "Invalid Contract End Date",
+            errors.INVALID_CONTRACT_DATE.code,
+            errors.INVALID_CONTRACT_DATE.errorCode,
+            "Contract end date must be after the join date. Please provide a valid contract end date.",
+          );
+        }
       }
     }
   }

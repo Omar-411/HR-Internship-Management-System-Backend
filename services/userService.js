@@ -29,6 +29,7 @@ import {
 import { sendEmail } from "../utils/sendEmail.js";
 import { logAuditAction } from "../utils/logger.js";
 import { buildQuery } from "../utils/queryBuilder.js";
+import { resolveId } from "../utils/idResolver.js";
 
 // Sensitive fields that must never leave the backend
 const SENSITIVE_FIELDS = "-password -verificationCode -verificationCodeExpires -resetPasswordToken -resetPasswordExpires -loginAttempts -resendCount -resendDate -mustResetPassword";
@@ -41,16 +42,53 @@ export const getUser = getOne(User, commonErrors.USER_NOT_FOUND, [
 ], SENSITIVE_FIELDS);
 
 // Get all users
-export const getUsers = getAll(
-  User,
-  [
+export const getUsers = async (queryParams) => {
+  const { _searchCondition, ...otherParams } = queryParams;
+
+  // Build the basic query using the generic builder
+  let query = buildQuery(User, otherParams);
+
+  // Apply the custom search condition if present (avoids JSON stringification issues)
+  if (_searchCondition) {
+    query = query.find({ $or: _searchCondition });
+  }
+
+  // Populate relations
+  query = query.populate([
     { path: "role_id", select: "name" },
     { path: "department_id", select: "name" },
     { path: "supervisor_id", select: "name lastName email" },
-  ],
-  `-faceDescriptors ${SENSITIVE_FIELDS}`,
-  ["name", "lastName", "email"],
-);
+  ]);
+
+  // Select fields (exclude sensitive data)
+  query = query.select(`-faceDescriptors ${SENSITIVE_FIELDS}`);
+
+  // Pagination logic
+  const page = parseInt(queryParams.page) || 1;
+  const limit = parseInt(queryParams.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  // Get total count based on the current filters for accurate pagination
+  const filter = query.getQuery();
+  const totalCount = await User.countDocuments(filter);
+
+  // Execute final query with pagination
+  query = query.skip(skip).limit(limit);
+  const users = await query;
+
+  return {
+    status: "Success",
+    code: 200,
+    message: "List of users retrieved successfully!",
+    data: users,
+    pagination: {
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+      limitPerPage: limit,
+      totalCount,
+    },
+  };
+};
 
 // Create a new user
 export const addUserService = async (data, currentUser, ip) => {
@@ -283,7 +321,7 @@ export const addUserService = async (data, currentUser, ip) => {
 // Update an existing user
 export const updateUserService = async (id, updateData, currentUser, ip) => {
   // Check the user existence
-  const existingUser = await User.findById(id);
+  const existingUser = await User.findOne(resolveId(id));
   if (!existingUser)
     throw new AppError(
       commonErrors.USER_NOT_FOUND.message,
@@ -291,6 +329,8 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
       commonErrors.USER_NOT_FOUND.errorCode,
       commonErrors.USER_NOT_FOUND.suggestion,
     );
+
+  const actualId = existingUser._id.toString();
 
   // Check the email validity and the user existence
   if (updateData.email) {
@@ -307,7 +347,7 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
 
     // Check if another user with the same email already exists
     const existingEmailUser = await User.findOne({ email: trimmedEmail });
-    if (existingEmailUser && existingEmailUser._id.toString() !== id) {
+    if (existingEmailUser && existingEmailUser._id.toString() !== actualId) {
       throw new AppError(
         errors.EMAIL_UNAVAILABLE.message,
         errors.EMAIL_UNAVAILABLE.code,
@@ -334,8 +374,8 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     gender: updateData.gender,
     dateOfBirth: updateData.dateOfBirth,
     placeOfBirth: updateData.placeOfBirth,
-    contractJoinDate: updateData.employment.contractJoinDate,
-    contractEndDate: updateData.employment.contractEndDate,
+    contractJoinDate: updateData.employment?.contractJoinDate,
+    contractEndDate: updateData.employment?.contractEndDate,
   });
 
   // Check the phone number validity + uniqueness in case of an update
@@ -350,7 +390,7 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     const existingPhoneUser = await User.findOne({
       phoneNumber: validatedPhoneNumber,
     });
-    if (existingPhoneUser && existingPhoneUser._id.toString() !== id) {
+    if (existingPhoneUser && existingPhoneUser._id.toString() !== actualId) {
       throw new AppError(
         errors.PHONE_NUMBER_UNAVAILABLE.message,
         errors.PHONE_NUMBER_UNAVAILABLE.code,
@@ -391,7 +431,7 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     // Check if the ID number exists for another user
     const existingIdUser = await User.findOne({
       "idNumber.number": trimmedIdNumber,
-      _id: { $ne: id },
+      _id: { $ne: actualId },
     });
     if (existingIdUser) {
       throw new AppError(
@@ -464,11 +504,16 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
   }
 
   if (updateData.contractType) {
-    updateData["employment.contractType"] = updateData.contractType;
+    if (updateData.employment) {
+      updateData.employment.contractType = updateData.contractType;
+    } else {
+      updateData["employment.contractType"] = updateData.contractType;
+    }
+    delete updateData.contractType;
   }
 
   // Update the user
-  const user = await User.findByIdAndUpdate(id, updateData, {
+  const user = await User.findOneAndUpdate({ _id: actualId }, updateData, {
     returnDocument: "after",
   })
     .select(`-faceDescriptors ${SENSITIVE_FIELDS}`)
@@ -519,7 +564,7 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
 // Delete a user
 export const deleteUserService = async (userId, currentUser, ip) => {
   // Check user existence
-  const user = await User.findById(userId);
+  const user = await User.findOne(resolveId(userId));
   if (!user) {
     throw new AppError(
       commonErrors.USER_NOT_FOUND.message,
@@ -528,6 +573,8 @@ export const deleteUserService = async (userId, currentUser, ip) => {
       commonErrors.USER_NOT_FOUND.suggestion,
     );
   }
+
+  const actualId = user._id;
 
   // Get the user's personal documents
   const documents = await Document.find({ user_id: userId });
@@ -540,10 +587,10 @@ export const deleteUserService = async (userId, currentUser, ip) => {
   }
 
   // Delete documents from DB
-  await Document.deleteMany({ user_id: userId });
+  await Document.deleteMany({ user_id: actualId });
 
   // Delete the user
-  await User.findByIdAndDelete(userId);
+  await User.findByIdAndDelete(actualId);
 
   // Audit log the deletion of the user + associated personal documents
   await logAuditAction({
@@ -565,7 +612,7 @@ export const deleteUserService = async (userId, currentUser, ip) => {
 // Toggle the user status (Active/Inactive)
 export const toggleUserStatusService = async (id, currentUser, ip) => {
   // Check the user existence
-  const user = await User.findById(id);
+  const user = await User.findOne(resolveId(id));
   if (!user) {
     throw new AppError(
       commonErrors.USER_NOT_FOUND.message,
