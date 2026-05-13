@@ -29,6 +29,8 @@ import { slugify } from "../utils/documentHelper.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { logAuditAction } from "../utils/logger.js";
 import { errors as documentRequestErrors } from "../errors/documentRequestErrors.js";
+import { createNotification } from "./notificationService.js";
+import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
 
 // ---------------------------------------------------------------------- //
 // -------------------- PERSONAL DOCUMENTS SERVICES --------------------- //
@@ -37,7 +39,7 @@ import { errors as documentRequestErrors } from "../errors/documentRequestErrors
 // Upload a personal document service
 export const uploadPersonalDocumentService = async ({
   targetUserId,
-  uploaderId,
+  uploader,
   file,
   title,
   isConfidential,
@@ -97,9 +99,33 @@ export const uploadPersonalDocumentService = async ({
     fileHash,
     documentType_id: personalType._id,
     user_id: targetUserId,
-    uploadedBy: uploaderId,
+    uploadedBy: uploader.id,
     isConfidential,
   });
+
+  // Notify the user if the Admin uploaded a personal document to a user profile
+  if (
+    uploader.role === "Admin" &&
+    uploader.id.toString() !== targetUserId.toString()
+  ) {
+    try {
+      await createNotification({
+        recipientId: targetUserId,
+        type: "PERSONAL_DOCUMENT",
+        title: "New Personal Document Uploaded",
+        message: `A new personal document "${document.title}" has been added to your profile by the HR department.`,
+        data: {
+          entityType: "USER",
+          entityId: targetUserId,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to send notification for new personal document upload:",
+        err,
+      );
+    }
+  }
 
   return {
     status: "Success",
@@ -110,12 +136,51 @@ export const uploadPersonalDocumentService = async ({
 };
 
 // Delete a personal document service
-export const deletePersonalDocumentService = async ({ documentId }) => {
+export const deletePersonalDocumentService = async ({
+  documentId,
+  currentUser,
+}) => {
   // Validate the document existence and type
   const document = await getValidPersonalDocument(documentId);
 
+  // Get the target user to notify them later if an admin deleted one of their personal documents
+  const targetUserId = document.user_id;
+  const targetUser = await User.findById(targetUserId);
+  if (!targetUser) {
+    throw new AppError(
+      commonErrors.USER_NOT_FOUND.message,
+      commonErrors.USER_NOT_FOUND.code,
+      commonErrors.USER_NOT_FOUND.errorCode,
+      commonErrors.USER_NOT_FOUND.suggestion,
+    );
+  }
+
   // Delete the document from Cloudinary and DB
   await deleteDocumentCore(document);
+
+  // Notify the user if an admin deleted the document
+  if (
+    currentUser.role === "Admin" &&
+    currentUser.id.toString() !== targetUserId.toString()
+  ) {
+    try {
+      await createNotification({
+        recipientId: targetUserId,
+        type: "PERSONAL_DOCUMENT",
+        title: "Personal Document Deleted",
+        message: `Your personal document "${document.title}" has been removed by the HR department.`,
+        data: {
+          entityType: "USER",
+          entityId: targetUserId,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to send notification for personal document deletion:",
+        err,
+      );
+    }
+  }
 
   return {
     status: "Success",
@@ -174,14 +239,39 @@ export const getPersonalDocumentsService = async ({
   return getDocumentsCore(finalQuery);
 };
 
-// Toggle the personal document confidentiality: STILL NOT TESTED
-export const toggleConfidentialityService = async ({ documentId }) => {
+// Toggle the personal document confidentiality
+export const toggleConfidentialityService = async ({
+  documentId,
+  currentUser,
+}) => {
   // Validate the document existence and type
   const document = await getValidPersonalDocument(documentId);
 
   // Toggle the confidentiality status
   document.isConfidential = !document.isConfidential;
   await document.save();
+
+  // Get the target user for notifications purposes
+  const targetUserId = document.user_id;
+
+  // Notify the user if the admin changed the document confidentiality
+  if (
+    currentUser.role === "Admin" &&
+    currentUser.id.toString() !== targetUserId.toString()
+  ) {
+    await createNotification({
+      recipientId: targetUserId,
+      type: "PERSONAL_DOCUMENT",
+      title: "Document Confidentiality Updated",
+      message: `The confidentiality setting of your document "${document.title}" has been ${
+        document.isConfidential ? "enabled" : "disabled"
+      } by the HR department.`,
+      data: {
+        entityType: "USER",
+        entityId: targetUserId,
+      },
+    });
+  }
 
   return {
     status: "Success",
@@ -303,6 +393,25 @@ export const uploadAdminDocumentService = async ({
     ipAddress: ip,
   });
 
+  // Notify all admins except the uploader about the new administrative document upload
+  try {
+    await createNotificationForAdminsExcept({
+      excludedUserId: uploadedBy,
+      type: "ADMINISTRATIVE_DOCUMENT",
+      title: "New Administrative Document Uploaded",
+      message: `A new document "${document.title}" has been uploaded.`,
+      data: {
+        entityType: "DOCUMENT",
+        entityId: document._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for administrative document upload:",
+      err,
+    );
+  }
+
   return {
     status: "Success",
     code: 201,
@@ -338,6 +447,25 @@ export const deleteAdminDocumentService = async ({
     details: document,
     ipAddress: ip,
   });
+
+  // Notify all admins (except the deleter) about the deleted administrative document
+  try {
+    await createNotificationForAdminsExcept({
+      excludedUserId: currentUser.id,
+      type: "ADMINISTRATIVE_DOCUMENT",
+      title: "Administrative Document Deleted",
+      message: `The administrative document "${document.title}" has been deleted.`,
+      data: {
+        entityType: "DOCUMENT",
+        entityId: document._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for administrative document deletion:",
+      err,
+    );
+  }
 
   return {
     status: "Success",
@@ -421,7 +549,13 @@ export const generateDocumentService = async ({
   const pdfBuffer = await generateDocumentCore(templateName, data);
 
   // Create the personnalised filename
-  const safeName = slugify(data.full_name? data.full_name : data.employee.name? `${data.employee.name} ${data.employee.lastName}` : "");
+  const safeName = slugify(
+    data.full_name
+      ? data.full_name
+      : data.employee.name
+        ? `${data.employee.name} ${data.employee.lastName}`
+        : "",
+  );
   const timestamp = new Date(Date.now())
     .toLocaleDateString("fr-FR")
     .replace(/\//g, "-");
@@ -470,6 +604,22 @@ export const generateDocumentService = async ({
     details: document,
     ipAddress: ip,
   });
+
+  // Notify all other admins that a document was generated
+  try {
+    await createNotificationForAdminsExcept({
+      excludedUserId: uploadedBy,
+      type: "ADMINISTRATIVE_DOCUMENT",
+      title: "New Document Generated",
+      message: `A new generated document "${document.title}" has been created for ${user.name} ${user.lastName}.`,
+      data: {
+        entityType: "DOCUMENT",
+        entityId: document._id,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to send notification for document generation:", err);
+  }
 
   return {
     status: "Success",
@@ -540,6 +690,25 @@ export const sendGeneratedDocumentByEmailService = async ({
     },
     ipAddress: ip,
   });
+
+  // Notify the user that a generated document was sent by email
+  try {
+    await createNotification({
+      recipientId: user._id,
+      type: "ADMINISTRATIVE_DOCUMENT",
+      title: "Generated Document Sent by Email",
+      message: `A generated document "${document.title}" has been sent to your email address.`,
+      data: {
+        entityType: "DOCUMENT",
+        entityId: document._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for generated document email:",
+      err,
+    );
+  }
 
   return {
     status: "Success",

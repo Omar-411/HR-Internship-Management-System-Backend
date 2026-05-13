@@ -10,7 +10,7 @@ export const uploadPersonalDocument = async (req, res, next) => {
   try {
     const result = await documentService.uploadPersonalDocumentService({
       targetUserId: req.params.id,
-      uploaderId: req.user.id,
+      uploader: req.user,
       file: req.file,
       title: req.body.title,
       isConfidential: req.body.isConfidential === "true",
@@ -27,6 +27,7 @@ export const deletePersonalDocument = async (req, res, next) => {
   try {
     const result = await documentService.deletePersonalDocumentService({
       documentId: req.params.id,
+      currentUser: req.user,
     });
 
     res.status(result.code).json(result);
@@ -80,6 +81,7 @@ export const toggleConfidentiality = async (req, res, next) => {
   try {
     const result = await documentService.toggleConfidentialityService({
       documentId: req.params.id,
+      currentUser: req.user,
     });
 
     res.status(result.code).json(result);
