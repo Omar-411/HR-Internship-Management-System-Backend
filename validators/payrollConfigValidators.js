@@ -73,7 +73,7 @@ export const validatePayrollConfig = (data) => {
       // Validate each bracket and ensure they are in the correct order
       let previousLimit = 0;
       data.irpp.brackets.forEach((bracket, index) => {
-        if (typeof bracket.limit !== "number" || bracket.limit <= 0) {
+        if (bracket.limit !== null && (typeof bracket.limit !== "number" || bracket.limit <= 0)) {
           throw new AppError(
             errors.INVALID_BRACKET_LIMIT.message,
             errors.INVALID_BRACKET_LIMIT.code,
@@ -84,16 +84,17 @@ export const validatePayrollConfig = (data) => {
 
         validateRate(bracket.rate);
 
-        if (bracket.limit <= previousLimit) {
-          throw new AppError(
-            errors.INVALID_BRACKET_ORDER.message,
-            errors.INVALID_BRACKET_ORDER.code,
-            errors.INVALID_BRACKET_ORDER.errorCode,
-            errors.INVALID_BRACKET_ORDER.suggestion,
-          );
+        if (bracket.limit !== null) {
+          if (bracket.limit <= previousLimit) {
+            throw new AppError(
+              errors.INVALID_BRACKET_ORDER.message,
+              errors.INVALID_BRACKET_ORDER.code,
+              errors.INVALID_BRACKET_ORDER.errorCode,
+              errors.INVALID_BRACKET_ORDER.suggestion,
+            );
+          }
+          previousLimit = bracket.limit;
         }
-
-        previousLimit = bracket.limit;
       });
     }
 

@@ -12,6 +12,10 @@ const payrollConfigSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    version: {
+      type: Number,
+      default: 1,
+    },
     cnss: {
       rate: {
         type: Number,
@@ -35,17 +39,23 @@ const payrollConfigSchema = new mongoose.Schema(
     },
     irpp: {
       // IRPP = Impôt sur le Revenu des Personnes Physiques (Income Tax)
-      brackets: [
-        {
-          limit: {
-            type: Number,
+      brackets: {
+        type: [
+          {
+            limit: { type: Number, default: null },
+            rate: { type: Number },
+            _id: false,
           },
-          rate: {
-            type: Number,
-          },
-          _id: false,
-        },
-      ],
+        ],
+        // Standard Tunisian IRPP brackets (Loi de finances 2026)
+        default: [
+          { limit: 5000,  rate: 0    },
+          { limit: 20000, rate: 0.26 },
+          { limit: 30000, rate: 0.28 },
+          { limit: 50000, rate: 0.32 },
+          { limit: null,  rate: 0.35 },
+        ],
+      },
       fraisPro: {
         // Frais professionnels
         rate: {

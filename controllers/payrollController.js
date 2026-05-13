@@ -38,6 +38,26 @@ export const getAllPayrolls = async (req, res, next) => {
   }
 };
 
+// Get monthly net payout trend (last 6 months)
+export const getPayrollTrend = async (req, res, next) => {
+  try {
+    const result = await payrollService.getPayrollTrend();
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Get net payout by department for a given month/year
+export const getPayrollByDepartment = async (req, res, next) => {
+  try {
+    const result = await payrollService.getPayrollByDepartment(req.query);
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Get an employee's payroll history
 export const getEmployeePayrolls = async (req, res, next) => {
   try {
@@ -91,5 +111,23 @@ export const recomputePayroll = async (req, res, next) => {
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
+  }
+};
+
+// Bulk calculate payroll for all eligible employees for a given month and year
+export const bulkCalculatePayroll = async (req, res, next) => {
+  try {
+    const { month, year } = req.params;
+
+    const result = await payrollService.calculateBulkPayroll(
+      parseInt(month),
+      parseInt(year),
+      req.user,
+      req.ip,
+    );
+
+    res.status(result.code).json(result);
+  } catch (error) {
+    next(error);
   }
 };

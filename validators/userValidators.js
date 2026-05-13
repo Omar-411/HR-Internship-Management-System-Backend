@@ -191,6 +191,15 @@ export const validateUserData = (data) => {
       errors.INVALID_BONUS.suggestion,
     );
 
+  if (data.salary && data.salary.base !== undefined && data.salary.base < 0) {
+    throw new AppError(
+      "Invalid base salary. It must be a non-negative number.",
+      400,
+      "INVALID_BASE_SALARY",
+      "Please provide a valid base salary."
+    );
+  }
+
   if (gender && !["Male", "Female"].includes(gender))
     throw new AppError(
       leaveTypeErrors.INVALID_GENDER.message,

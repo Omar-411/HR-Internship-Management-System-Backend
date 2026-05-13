@@ -98,6 +98,7 @@ if (process.env.NODE_ENV !== "test") {
 // Activate routes
 app.use('/api', authRoutes);
 app.use('/api', userRoutes);
+app.use('/api', leaveRequestRoutes);
 app.use('/api', UserRoleRoutes);
 app.use('/api', departmentRoutes);
 app.use('/api', auditLogRoutes);
@@ -107,7 +108,6 @@ app.use('/api', documentTypeRoutes);
 app.use('/api', documentRoutes);
 app.use('/api', specialShiftRoutes);
 app.use('/api', leaveTypeRoutes);
-app.use('/api', leaveRequestRoutes);
 app.use('/api', projectRoutes);
 app.use('/api', teamMemberRoutes);
 app.use('/api', taskRoutes);

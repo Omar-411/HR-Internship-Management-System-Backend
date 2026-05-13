@@ -243,6 +243,26 @@ const userSchema = mongoose.Schema(
         default: "DT",
       },
     },
+    bonus: {
+      type: Number,
+      default: 0,
+    },
+    isAvailable: {
+      type: Boolean,
+      default: true,
+    },
+    hasChildren: {
+      type: Boolean,
+      default: false,
+    },
+    nbOfChildren: {
+      type: Number,
+      default: 0,
+    },
+    leaveBalance: {
+      type: Number,
+      default: 21,
+    },
   },
   { timestamps: true },
 );

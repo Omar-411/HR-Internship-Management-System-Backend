@@ -34,6 +34,12 @@ import { resolveId } from "../utils/idResolver.js";
 // Sensitive fields that must never leave the backend
 const SENSITIVE_FIELDS = "-password -verificationCode -verificationCodeExpires -resetPasswordToken -resetPasswordExpires -loginAttempts -resendCount -resendDate -mustResetPassword";
 
+const ROLE_SALARY_DEFAULTS = {
+  employee: 1800,
+  supervisor: 3500,
+  admin: 5500,
+};
+
 // Get a single user by Id
 export const getUser = getOne(User, commonErrors.USER_NOT_FOUND, [
   { path: "role_id", select: "name" },
@@ -124,6 +130,7 @@ export const addUserService = async (data, currentUser, ip) => {
     contractJoinDate,
     contractEndDate,
     contractType,
+    salary,
   } = data;
 
   const trimmedEmail = (email || "").trim().toLowerCase();
@@ -160,6 +167,7 @@ export const addUserService = async (data, currentUser, ip) => {
     placeOfBirth,
     contractJoinDate,
     contractEndDate,
+    salary,
   });
 
   // Check the phone number validity
@@ -206,6 +214,13 @@ export const addUserService = async (data, currentUser, ip) => {
   const finalProfileImageURL =
     typeof profileImageURL === "string" ? profileImageURL : "";
 
+  // Handle salary defaults
+  const roleLower = (role || "").toLowerCase();
+  let baseSalary = salary?.base;
+  if (roleLower !== "intern" && (baseSalary === undefined || baseSalary === null)) {
+    baseSalary = ROLE_SALARY_DEFAULTS[roleLower] || 0;
+  }
+
   // Creation of the user
   const user = await User.create({
     name,
@@ -244,6 +259,7 @@ export const addUserService = async (data, currentUser, ip) => {
       contractEndDate,
       contractType: contractType || "CDI",
     },
+    salary: roleLower === "intern" ? undefined : { base: baseSalary || 0, currency: "DT" },
   });
 
   // Initialize the leave balances for the user based on role
@@ -321,7 +337,7 @@ export const addUserService = async (data, currentUser, ip) => {
 // Update an existing user
 export const updateUserService = async (id, updateData, currentUser, ip) => {
   // Check the user existence
-  const existingUser = await User.findOne(resolveId(id));
+  const existingUser = await User.findOne(resolveId(id)).populate("role_id");
   if (!existingUser)
     throw new AppError(
       commonErrors.USER_NOT_FOUND.message,
@@ -376,6 +392,9 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     placeOfBirth: updateData.placeOfBirth,
     contractJoinDate: updateData.employment?.contractJoinDate,
     contractEndDate: updateData.employment?.contractEndDate,
+    salary: updateData.salary,
+    isAvailable: updateData.isAvailable,
+    leaveBalance: updateData.leaveBalance,
   });
 
   // Check the phone number validity + uniqueness in case of an update
@@ -426,6 +445,8 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     updateData.idNumber = {
       number: trimmedIdNumber,
       countryCode: idCountryCode,
+      issueDate,
+      issuePlace,
     };
 
     // Check if the ID number exists for another user
@@ -476,6 +497,26 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     delete updateData.role;
   }
 
+  // Handle salary updates and defaults
+  const roleToUse = (roleChanged ? newRoleName : existingUser.role_id?.name || "").toLowerCase();
+
+  if (roleToUse === "intern") {
+    // Remove salary if user is or becomes an intern
+    if (roleChanged || updateData.role) {
+      updateData.$unset = { ...updateData.$unset, salary: "" };
+    }
+    delete updateData.salary;
+  } else {
+    // Not an intern
+    if (updateData.salary && updateData.salary.base !== undefined) {
+      // Explicit salary update from payload
+      updateData.salary = { base: updateData.salary.base, currency: "DT" };
+    } else if (roleChanged) {
+      // Role changed to non-intern and no explicit salary provided -> apply default
+      updateData.salary = { base: ROLE_SALARY_DEFAULTS[roleToUse] || 0, currency: "DT" };
+    }
+  }
+
   // Check the department validity
   if (updateData.department) {
     updateData.department_id = await resolveDepartmentId(updateData.department);
@@ -499,7 +540,12 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
 
   // Update the Status of the user
   if (updateData.isActive !== undefined) {
-    updateData.status = updateData.isActive ? "Active" : "Inactive";
+    if (updateData.isActive) {
+      updateData.status = "Active";
+    } else if (existingUser.status !== "Pending" && existingUser.status !== "Blocked") {
+      // Only set to Inactive if it wasn't already a special state
+      updateData.status = "Inactive";
+    }
     delete updateData.isActive;
   }
 

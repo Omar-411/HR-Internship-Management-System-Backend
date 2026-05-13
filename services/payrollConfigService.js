@@ -74,6 +74,13 @@ export const getActivePayrollConfig = async (year) => {
 export const createNewVersion = async (newConfig, user, ip) => {
   validatePayrollConfig(newConfig);
   
+  // Find the current highest version for this year
+  const latestConfig = await PayrollConfig.findOne({ year: newConfig.year })
+    .sort("-version")
+    .select("version");
+  
+  const nextVersion = (latestConfig?.version || 1) + 1;
+
   // Deactivate the current active config
   await PayrollConfig.updateMany({ year: newConfig.year, isActive: true }, { isActive: false });
 
@@ -81,6 +88,7 @@ export const createNewVersion = async (newConfig, user, ip) => {
   const config = await createOne(PayrollConfig)({
     ...newConfig,
     year: newConfig.year,
+    version: nextVersion,
     isActive: true,
   });
 
@@ -90,12 +98,23 @@ export const createNewVersion = async (newConfig, user, ip) => {
     action: "CREATE_NEW_PAYROLL_CONFIG_VERSION",
     targetType: "PayrollConfig",
     targetId: config.data._id,
-    targetName: `${config.data.year}`,
+    targetName: `${config.data.year} (v${nextVersion})`,
     details: config,
     ipAddress: ip,
   });
 
   return config;
+};
+
+// Get all versions for a specific year
+export const getYearVersions = async (year) => {
+  const versions = await PayrollConfig.find({ year }).sort("-version");
+  return {
+    status: "Success",
+    code: 200,
+    message: `All versions for ${year} retrieved successfully!`,
+    data: versions
+  };
 };
 
 // Toggle the activation status of a payroll configuration

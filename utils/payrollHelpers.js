@@ -178,8 +178,8 @@ const calculateFamilySnapshot = (user, config) => {
 
   const now = new Date();
 
-  // Spouse deduction (Only for married employees who are heads of family)
-  if (user.socialStatus === "Married" && user.isHeadOfFamily) {
+  // Spouse deduction (Only for married employees)
+  if (user.socialStatus === "Married") {
     const amount = config.irpp.family?.spouse || 300;
 
     spouse = {
@@ -191,31 +191,46 @@ const calculateFamilySnapshot = (user, config) => {
   }
 
   // Children
-  for (const child of user.children || []) {
-    const birthDate = new Date(child.dateOfBirth);
-    let age = now.getFullYear() - birthDate.getFullYear();
-
-    const m = now.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) {
-      age--;
+  const childrenData = user.children || [];
+  
+  if (childrenData.length === 0 && user.nbOfChildren > 0) {
+    // Fallback to nbOfChildren if detailed array is empty (assume normal children)
+    const amount = config.irpp.family?.perChild || 100;
+    for (let i = 0; i < user.nbOfChildren; i++) {
+      children.push({ category: "normal", amount });
+      total += amount;
+      if (children.length >= (config.irpp.family?.maxChildren || 4)) break;
     }
+  } else {
+    for (const child of childrenData) {
+      const birthDate = new Date(child.dateOfBirth);
+      let age = now.getFullYear() - birthDate.getFullYear();
 
-    let category = "normal";
-    let amount = config.irpp.family?.perChild || 0;
+      const m = now.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) {
+        age--;
+      }
 
-    // Disabled (priority)
-    if (child.isDisabled) {
-      category = "disabled";
-      amount = config.irpp.family?.disabledChild || 1200;
+      let category = "normal";
+      let amount = config.irpp.family?.perChild || 100;
+
+      // Disabled (priority)
+      if (child.isDisabled) {
+        category = "disabled";
+        amount = config.irpp.family?.disabledChild || 1200;
+      }
+      // Student
+      else if (child.isStudent && !child.hasScholarship && age < 25) {
+        category = "student";
+        amount = config.irpp.family?.studentChild || 1000;
+      }
+
+      children.push({ category, amount });
+      total += amount;
+
+      // Capped at maxChildren (default 4)
+      if (children.length >= (config.irpp.family?.maxChildren || 4)) break;
     }
-    // Student
-    else if (child.isStudent && !child.hasScholarship && age < 25) {
-      category = "student";
-      amount = config.irpp.family?.studentChild || 1000;
-    }
-
-    children.push({ category, amount });
-    total += amount;
   }
 
   return { spouse, children, total };
@@ -496,9 +511,9 @@ export const calculateUnpaidLeaveDeduction = async (
     $or: [{ startDate: { $lte: monthEnd }, endDate: { $gte: monthStart } }],
   }).populate("typeId");
 
-  // Keep only the unpaid leaves (Paid leaves do not affect the salary)
+  // Keep only the unpaid leaves: either isPaid is false, or the type is explicitly named "Unpaid"
   const unpaidLeaves = leaveRequests.filter(
-    (lr) => lr.typeId && !lr.typeId.isPaid,
+    (lr) => lr.typeId && (!lr.typeId.isPaid || lr.typeId.name === "Unpaid"),
   );
 
   // Fetch the employee's timetable for the month to determine expected working hours on leave days
@@ -508,6 +523,21 @@ export const calculateUnpaidLeaveDeduction = async (
   });
 
   const timetableMap = buildTimetableMap(timetables);
+
+  // Calculate a fallback daily hours value in case no timetable entry exists for a day
+  // (standardMonthlyHours / number of working weekdays in the month)
+  const standardMonthlyHours = config?.payroll?.standardMonthlyHours || 173;
+  let workingDaysInMonth = 0;
+  const tempCursor = new Date(monthStart);
+  while (tempCursor <= monthEnd) {
+    const day = tempCursor.getDay();
+    if (day !== 0 && day !== 6) workingDaysInMonth++;
+    tempCursor.setDate(tempCursor.getDate() + 1);
+  }
+  const fallbackDailyHours = workingDaysInMonth > 0
+    ? standardMonthlyHours / workingDaysInMonth
+    : standardMonthlyHours / 22;
+
   let totalUnpaidHours = 0;
 
   for (const leave of unpaidLeaves) {
@@ -516,11 +546,21 @@ export const calculateUnpaidLeaveDeduction = async (
     for (const date of dates) {
       if (date < monthStart || date > monthEnd) continue;
 
+      const dayOfWeek = new Date(date).getDay();
+      // Skip weekends — no expected hours on Saturday (6) or Sunday (0)
+      if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+
       const key = new Date(date).toDateString();
       const timetable = timetableMap.get(key);
 
       // Get the expected hours for the day based on the timetable and special shifts
-      const expectedHours = await resolveExpectedHours(timetable, SpecialShift);
+      let expectedHours = await resolveExpectedHours(timetable, SpecialShift);
+
+      // Step 3 fix: If no timetable entry exists for this working day, fall back to the
+      // average daily hours derived from the standard monthly hours configuration.
+      if (!timetable && expectedHours === 0) {
+        expectedHours = fallbackDailyHours;
+      }
 
       totalUnpaidHours += expectedHours;
     }
@@ -559,16 +599,17 @@ export const calculateIRPPMonthly = (monthlyTaxableIncome, config, user) => {
   let previousLimit = 0;
 
   const sortedBrackets = [...config.irpp.brackets].sort(
-    (a, b) => a.limit - b.limit,
+    (a, b) => (a.limit ?? Infinity) - (b.limit ?? Infinity),
   );
 
   for (const bracket of sortedBrackets) {
     if (netAnnualTaxable > previousLimit) {
+      const currentLimit = bracket.limit ?? Infinity;
       const taxableAmount =
-        Math.min(netAnnualTaxable, bracket.limit) - previousLimit;
+        Math.min(netAnnualTaxable, currentLimit) - previousLimit;
 
       tax += taxableAmount * bracket.rate;
-      previousLimit = bracket.limit;
+      previousLimit = currentLimit;
     } else break;
   }
 

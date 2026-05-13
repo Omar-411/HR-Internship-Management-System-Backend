@@ -339,7 +339,8 @@ export const addLeaveRequest = async (req, res, next) => {
     const duration = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
     // Ensure that the duration does not exceed the leave type's max days
-    if (leaveType.maxDays && duration > leaveType.maxDays) {
+    // Skip this check for "Unpaid" leave type as it should be unlimited
+    if (leaveType.name !== "Unpaid" && leaveType.maxDays && duration > leaveType.maxDays) {
       throw new AppError(
         `Maximum allowed days for ${leaveType.name} is ${leaveType.maxDays}`,
         errors.DURATION_EXCEEDS_ALLOWED.code,
@@ -869,8 +870,8 @@ export const approveOrRejectLeaveRequest = async (req, res, next) => {
 
       // APPROVE LOGIC
       if (action === "approve") {
-        // Only deduct if required
-        if (leaveType.deductFrom !== "none"){
+        // Only deduct if required AND it's not "Unpaid" leave (which is unlimited)
+        if (leaveType.deductFrom !== "none" && leaveType.name !== "Unpaid"){
           const balance = employee.leaveBalances.find(
             (b) => b.typeId.toString() === leaveType._id.toString(),
           );
