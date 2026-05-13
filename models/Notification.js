@@ -12,7 +12,7 @@ const notificationSchema = new mongoose.Schema(
     type: {
       // Type of notification
       type: String,
-      enum: ["ACCOUNT", "USER_ROLE", "DEPARTMENT"],
+      enum: ["ACCOUNT", "USER_ROLE", "DEPARTMENT", "DOCUMENT_TYPE"],
       required: true,
     },
     title: {

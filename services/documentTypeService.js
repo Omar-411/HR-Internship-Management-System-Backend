@@ -3,9 +3,13 @@ import AppError from "../utils/AppError.js";
 import { isEmpty } from "../validators/userValidators.js";
 import { errors } from "../errors/documentTypeErrors.js";
 import { getOne, getAll, createOne, updateOne } from "./handlersFactory.js";
+import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
 
 // Create a new document type
-export const createDocumentTypeService = async ({ name, description }) => {
+export const createDocumentTypeService = async (
+  { name, description },
+  currentUser,
+) => {
   if (isEmpty(name)) {
     throw new AppError(
       errors.DOCUMENT_TYPE_NAME_REQUIRED.message,
@@ -34,6 +38,25 @@ export const createDocumentTypeService = async ({ name, description }) => {
     description: trimmedDescription,
   });
 
+  // Notify all admins except the one who created the role
+  try {
+    await createNotificationForAdminsExcept({
+      excludedUserId: currentUser.id,
+      type: "DOCUMENT_TYPE",
+      title: "New Document Type Created",
+      message: `A new document type "${trimmedName}" has been created.`,
+      data: {
+        entityType: "DocumentType",
+        entityId: documentType.data._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for new document type creation:",
+      err,
+    );
+  }
+
   return documentType;
 };
 
@@ -54,7 +77,11 @@ export const getDocumentTypeByIdService = getOne(
 );
 
 // Update a document type
-export const updateDocumentTypeService = async (id, { name, description }) => {
+export const updateDocumentTypeService = async (
+  id,
+  { name, description },
+  currentUser,
+) => {
   const trimmedName = (name || "").trim();
   const trimmedDescription = description ? description.trim() : "";
 
@@ -79,6 +106,9 @@ export const updateDocumentTypeService = async (id, { name, description }) => {
     );
   }
 
+  // Store the old document type name for notification message
+  const oldDocumentTypeName = documentType.name;
+
   // Check for document type name existence
   const existing = await DocumentType.findOne({
     name: trimmedName,
@@ -98,6 +128,22 @@ export const updateDocumentTypeService = async (id, { name, description }) => {
     name: trimmedName,
     description: trimmedDescription,
   });
+
+  // Notify all admins except the one who updated the document type
+  try {
+    await createNotificationForAdminsExcept({
+      excludedUserId: currentUser.id,
+      type: "DOCUMENT_TYPE",
+      title: "Document Type Updated",
+      message: `The document type "${oldDocumentTypeName}" has been updated.`,
+      data: {
+        entityType: "DocumentType",
+        entityId: updatedDocumentType.data._id,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to send notification for document type update:", err);
+  }
 
   return updatedDocumentType;
 };
