@@ -16,6 +16,8 @@ import {
   consumeFaceEnrollmentPrompt,
 } from "../utils/authHelpers.js";
 import { validateUserStatus } from "../validators/authValidators.js";
+import { createNotificationForAdmins } from "../utils/notificationHelpers.js";
+import { createNotification } from "./notificationService.js";
 
 // The login service
 export const loginService = async ({ email, password }) => {
@@ -54,6 +56,17 @@ export const loginService = async ({ email, password }) => {
         alertType: "TECHNICAL",
         subject: `Account Blocked: ${user.name} ${user.lastName}`,
         description: `The account with email ${user.email} has been blocked after 3 unsuccessful login attempts. Please review the account status and take necessary actions.`,
+      });
+
+      // Create a notification for all admin users about the blocked account
+      await createNotificationForAdmins({
+        type: "ACCOUNT",
+        title: "Account Blocked",
+        message: `${user.name} ${user.lastName}'s account has been blocked after 3 failed login attempts.`,
+        data: {
+          entityType: "USER",
+          entityId: user._id,
+        },
       });
 
       throw new AppError(
@@ -151,6 +164,18 @@ export const verifyUserService = async ({ email, code }) => {
   const requiresFaceEnrollment = consumeFaceEnrollmentPrompt(user);
 
   await user.save();
+
+  // Create a welcome notification for the user about the successful account verification
+  await createNotification({
+    recipientId: user._id,
+    type: "ACCOUNT",
+    title: `Welcome to HRcoM, ${user.name}!`,
+    message: "Your account has been successfully verified. Welcome aboard!",
+    data: {
+      entityType: "USER",
+      entityId: user._id,
+    },
+  });
 
   return {
     status: "Success",

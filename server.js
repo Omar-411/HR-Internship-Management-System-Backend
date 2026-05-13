@@ -54,11 +54,13 @@ import bonusTypeRoutes from "./routes/bonusTypeRoutes.js";
 import employeeAllowanceRoutes from "./routes/employeeAllowanceRoutes.js";
 import employeeBonusRoutes from "./routes/employeeBonusRoutes.js";
 import alertRoutes from "./routes/alertRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 // Socket.io connection handler
 io.on("connection", (socket) => {
   console.log(`[Socket.io] Client connected: ${socket.id}`);
 
+  // Handle joining and leaving rooms
   socket.on("joinRoom", (room) => {
     socket.join(room);
     console.log(`[Socket] ${socket.id} joined room: ${room}`);
@@ -125,6 +127,7 @@ app.use('/api', bonusTypeRoutes);
 app.use('/api', employeeAllowanceRoutes);
 app.use('/api', employeeBonusRoutes);
 app.use('/api', alertRoutes);
+app.use('/api', notificationRoutes);
 
 // GLOBAL ERROR HANDLER
 app.use(errorHandler);

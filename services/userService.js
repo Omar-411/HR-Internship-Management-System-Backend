@@ -32,11 +32,16 @@ import { buildQuery } from "../utils/queryBuilder.js";
 import { SENSITIVE_FIELDS } from "../constants/userConstants.js";
 
 // Get a single user by Id
-export const getUser = getOne(User, commonErrors.USER_NOT_FOUND, [
-  { path: "role_id", select: "name" },
-  { path: "department_id", select: "name" },
-  { path: "supervisor_id", select: "name lastName email" },
-], SENSITIVE_FIELDS);
+export const getUser = getOne(
+  User,
+  commonErrors.USER_NOT_FOUND,
+  [
+    { path: "role_id", select: "name" },
+    { path: "department_id", select: "name" },
+    { path: "supervisor_id", select: "name lastName email" },
+  ],
+  SENSITIVE_FIELDS,
+);
 
 // Get all users
 export const getUsers = getAll(
@@ -141,7 +146,13 @@ export const addUserService = async (data, currentUser, ip) => {
   }
 
   // Check the CIN/Passport validity
-  fullCINPassportValidation(idType, idCountryCode, trimmedIdNumber, issueDate, issuePlace);
+  fullCINPassportValidation(
+    idType,
+    idCountryCode,
+    trimmedIdNumber,
+    issueDate,
+    issuePlace,
+  );
 
   // Resolve role, department and supervisor
   const roleId = await resolveRoleId(role);
@@ -152,7 +163,9 @@ export const addUserService = async (data, currentUser, ip) => {
   if (supervisor_id) {
     resolvedSupervisorId = await resolveSupervisorId(supervisor_id);
   } else if (trimmedSupervisorEmail) {
-    resolvedSupervisorId = await resolveSupervisorIdByEmail(trimmedSupervisorEmail);
+    resolvedSupervisorId = await resolveSupervisorIdByEmail(
+      trimmedSupervisorEmail,
+    );
   }
 
   // Password + OTP Code generation
@@ -200,7 +213,8 @@ export const addUserService = async (data, currentUser, ip) => {
     profileImageURL: finalProfileImageURL,
     employment: {
       contractJoinDate,
-      contractEndDate
+      contractEndDate,
+      contractType: "CDD", // Default value, will be updated later
     },
   });
 
@@ -212,20 +226,21 @@ export const addUserService = async (data, currentUser, ip) => {
   const INTERN_DEFAULTS = {
     "Annual Leave": 13,
     "Sick Leave": 8,
-    "Personal": 3,
+    Personal: 3,
   };
 
-  const leaveBalances = role === "Intern"
-    ? leaveTypes
-        .filter((type) => INTERN_ALLOWED.includes(type.name))
-        .map((type) => ({
+  const leaveBalances =
+    role === "Intern"
+      ? leaveTypes
+          .filter((type) => INTERN_ALLOWED.includes(type.name))
+          .map((type) => ({
+            typeId: type._id,
+            remainingDays: INTERN_DEFAULTS[type.name] ?? type.defaultDays,
+          }))
+      : leaveTypes.map((type) => ({
           typeId: type._id,
-          remainingDays: INTERN_DEFAULTS[type.name] ?? type.defaultDays,
-        }))
-    : leaveTypes.map((type) => ({
-        typeId: type._id,
-        remainingDays: type.defaultDays,
-      }));
+          remainingDays: type.defaultDays,
+        }));
 
   user.leaveBalances = leaveBalances;
   await user.save();
@@ -247,7 +262,7 @@ export const addUserService = async (data, currentUser, ip) => {
   // Log the creation action in the audit logs
   try {
     await logAuditAction({
-      adminId: currentUser._id,
+      adminId: currentUser.id,
       action: "CREATE_USER",
       targetType: "User",
       targetId: user._id,
@@ -446,7 +461,10 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     );
     updateData.supervisor_id = supervisorId;
     delete updateData.supervisor_email;
-  } else if ("supervisor_email" in updateData || "supervisor_id" in updateData) {
+  } else if (
+    "supervisor_email" in updateData ||
+    "supervisor_id" in updateData
+  ) {
     // Explicitly clearing the supervisor
     updateData.supervisor_id = null;
     if ("supervisor_email" in updateData) delete updateData.supervisor_email;
@@ -456,10 +474,30 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
   if (updateData.isActive !== undefined) {
     updateData.status = updateData.isActive ? "Active" : "Inactive";
 
-    // In case the admin unblocked or un-inactivated the user, we reset the login attempts to 0
-    if (updateData.isActive) {
+    // In case the admin unblocked or un-inactivated the user, we reset the login attempts to 0 and send an email
+    if (updateData.status === "Active" && existingUser.status !== updateData.status) {
       existingUser.loginAttempts = 0;
       await existingUser.save();
+
+      try {
+        console.log(
+          `[UPDATE-USER-DEBUG] Sending account re-activated email to: ${existingUser.email}`,
+        );
+
+        await sendEmail({
+          to: existingUser.email,
+          subject: "HRcoM! - Your Account Has Been Re-Activated",
+          type: "accountReactivation",
+          name: existingUser.name,
+        });
+
+        console.log(`[UPDATE-USER-DEBUG] Activation Email sent successfully.`);
+      } catch (emailErr) {
+        console.log(
+          `[UPDATE-USER-DEBUG] ACTIVATION EMAIL FAILED:`,
+          emailErr.message,
+        );
+      }
     }
 
     delete updateData.isActive;
@@ -489,9 +527,12 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
         newRole: user.position,
       });
 
-      console.log(`[UPDATE-USER-DEBUG] Email sent successfully.`);
+      console.log(`[UPDATE-USER-DEBUG] Promotion Email sent successfully.`);
     } catch (emailErr) {
-      console.log(`[UPDATE-USER-DEBUG] EMAIL FAILED:`, emailErr.message);
+      console.log(
+        `[UPDATE-USER-DEBUG] PROMOTION EMAIL FAILED:`,
+        emailErr.message,
+      );
     }
   }
 
