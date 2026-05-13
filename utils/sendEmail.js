@@ -7,6 +7,7 @@ import {
   getForgetPasswordValidationContent,
   getDocumentEmailContent,
   getAccountReactivationContent,
+  getAccountDeactivationContent,
 } from "./emailContent.js";
 
 export const sendEmail = async ({
@@ -48,6 +49,9 @@ export const sendEmail = async ({
       break;
     case "accountReactivation":
       bodyHtml = getAccountReactivationContent({ name });
+      break;
+    case "accountDeactivation":
+      bodyHtml = getAccountDeactivationContent({ name });
       break;
     default:
       bodyHtml = `<p>Default message</p>`;

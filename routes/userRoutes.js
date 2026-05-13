@@ -56,7 +56,6 @@ router.get(
   getAllUsers
 );
 
-
 // Route to Add user (Admin Only)
 /**
  * @swagger

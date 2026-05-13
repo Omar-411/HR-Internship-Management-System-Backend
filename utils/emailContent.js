@@ -154,3 +154,19 @@ export const getAccountReactivationContent = ({ name }) => {
     </p>
   `;
 };
+
+// Email of account deactivation after being blocked or inactive
+export const getAccountDeactivationContent = ({ name }) => {
+  return `
+    <h2 style="color: #232ED1;">Account Deactivation!</h2>
+    <p>Dear ${name},</p>
+    <p>
+      We are sorry to inform you that your account has been deactivated. 
+      You will no longer be able to access your HRcoM account.
+    </p>
+    <p>
+      If you believe this is an error or if you have any questions, please do not hesitate 
+      to contact our support team.
+    </p>
+  `;
+};

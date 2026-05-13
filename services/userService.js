@@ -30,6 +30,7 @@ import { sendEmail } from "../utils/sendEmail.js";
 import { logAuditAction } from "../utils/logger.js";
 import { buildQuery } from "../utils/queryBuilder.js";
 import { SENSITIVE_FIELDS } from "../constants/userConstants.js";
+import { createNotification } from "./notificationService.js";
 
 // Get a single user by Id
 export const getUser = getOne(
@@ -259,6 +260,24 @@ export const addUserService = async (data, currentUser, ip) => {
     console.log("Email failed:", e.message);
   }
 
+  // Notify the supervisor about the new team member assignment
+  if (resolvedSupervisorId) {
+    try {
+      await createNotification({
+        recipientId: resolvedSupervisorId,
+        type: "ACCOUNT",
+        title: "New Team Member Assigned",
+        message: `${user.name} ${user.lastName} has been assigned to you.`,
+        data: {
+          entityType: "USER",
+          entityId: user._id,
+        },
+      });
+    } catch (error) {
+      console.log("Notification failed:", error.message);
+    }
+  }
+
   // Log the creation action in the audit logs
   try {
     await logAuditAction({
@@ -301,6 +320,11 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
       commonErrors.USER_NOT_FOUND.errorCode,
       commonErrors.USER_NOT_FOUND.suggestion,
     );
+
+  // Store the old supervisor ID for later comparison (if the supervisor is being updated)
+  const oldSupervisorId = existingUser.supervisor_id
+    ? existingUser.supervisor_id.toString()
+    : null;
 
   // Check the email validity and the user existence
   if (updateData.email) {
@@ -475,7 +499,10 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     updateData.status = updateData.isActive ? "Active" : "Inactive";
 
     // In case the admin unblocked or un-inactivated the user, we reset the login attempts to 0 and send an email
-    if (updateData.status === "Active" && existingUser.status !== updateData.status) {
+    if (
+      updateData.status === "Active" &&
+      existingUser.status !== updateData.status
+    ) {
       existingUser.loginAttempts = 0;
       await existingUser.save();
 
@@ -511,6 +538,68 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     .populate("role_id")
     .populate("department_id")
     .populate("supervisor_id", "name lastName email");
+
+  // Get the new supervisor ID after the update (for comparison with the old supervisor ID)
+  const newSupervisorId = user.supervisor_id
+    ? user.supervisor_id._id.toString()
+    : null;
+
+  // Check if the supervisor is changed
+  if (oldSupervisorId !== newSupervisorId) {
+    // Notify the old supervisor about the team member removal change (if exists)
+    if (oldSupervisorId) {
+      try {
+        await createNotification({
+          recipientId: oldSupervisorId,
+          type: "ACCOUNT",
+          title: "Team Member Removed",
+          message: `${user.name} ${user.lastName} is no longer assigned to you.`,
+          // No redirect for this notification, it's just informational
+          data: {
+            entityType: null,
+            entityId: null,
+          },
+        });
+      } catch (error) {
+        console.log("Team Member Removal Notification failed:", error.message);
+      }
+    }
+
+    // Notify the new supervisor
+    if (newSupervisorId) {
+      await createNotification({
+        recipientId: newSupervisorId,
+        type: "ACCOUNT",
+        title: "New Team Member Assigned",
+        message: `${user.name} ${user.lastName} has been assigned to you.`,
+        data: {
+          entityType: "USER",
+          entityId: user._id,
+        },
+      });
+    }
+  }
+
+  // Notify the user about the profile update (In case the updater is an Admin, not himself)
+  if (
+    currentUser.role === "Admin" &&
+    currentUser.id.toString() !== user._id.toString()
+  ) {
+    try {
+      await createNotification({
+        recipientId: user._id,
+        type: "ACCOUNT",
+        title: "Profile Updated",
+        message: "Your profile information has been updated by HR.",
+        data: {
+          entityType: "USER",
+          entityId: user._id,
+        },
+      });
+    } catch (err) {
+      console.log("Profile update notification failed:", err.message);
+    }
+  }
 
   // Send the update user email ONLY if role changed
   if (roleChanged) {
@@ -581,8 +670,28 @@ export const deleteUserService = async (userId, currentUser, ip) => {
   // Delete documents from DB
   await Document.deleteMany({ user_id: userId });
 
+  // Store the supervisor ID before deleting the user (for supervisor notification after deletion)
+  const supervisorId = user.supervisor_id;
+
   // Delete the user
   await User.findByIdAndDelete(userId);
+
+  if (supervisorId) {
+    try {
+      await createNotification({
+        recipientId: supervisorId,
+        type: "ACCOUNT",
+        title: "Team Member Removed",
+        message: `${user.name} ${user.lastName} has been removed from your team.`,
+        data: {
+          entityType: null,
+          entityId: null,
+        },
+      });
+    } catch (err) {
+      console.log("Supervisor user deletion notification failed:", err.message);
+    }
+  }
 
   // Audit log the deletion of the user + associated personal documents
   await logAuditAction({
@@ -614,7 +723,35 @@ export const toggleUserStatusService = async (id, currentUser, ip) => {
     );
   }
 
+  const oldStatus = user.status;
+
   user.status = user.status === "Active" ? "Inactive" : "Active";
+
+  if (oldStatus !== "Active" && user.status === "Active") {
+    // Send the account re-activation email to the user
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: "HRcoM! - Your Account Has Been Re-Activated",
+        type: "accountReactivation",
+        name: user.name,
+      });
+    } catch (e) {
+      console.log("Email failed:", e.message);
+    }
+  } else if (oldStatus === "Active" && user.status !== "Active") {
+    // Send the account deactivation email to the user
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: "HRcoM! - Your Account Has Been Deactivated",
+        type: "accountDeactivation",
+        name: user.name,
+      });
+    } catch (e) {
+      console.log("Email failed:", e.message);
+    }
+  }
 
   await user.save();
 
@@ -632,7 +769,6 @@ export const toggleUserStatusService = async (id, currentUser, ip) => {
     status: "Success",
     code: 200,
     message: `User status changed to ${user.status} successfully!`,
-    // Sanitize: re-fetch with select to strip sensitive fields
     data: await User.findById(user._id)
       .select(`-faceDescriptors ${SENSITIVE_FIELDS}`)
       .populate("role_id", "name")
@@ -814,6 +950,23 @@ export const uploadProfileImageService = async (
     { returnDocument: "after" },
   );
 
+  // Notify the user only if an admin modified someone else's profile
+  if (
+    currentUser.role === "Admin" &&
+    currentUser.id.toString() !== user._id.toString()
+  ) {
+    await createNotification({
+      recipientId: user._id,
+      type: "ACCOUNT",
+      title: "Profile Picture Updated",
+      message: "Your profile picture has been updated by HR.",
+      data: {
+        entityType: "USER",
+        entityId: user._id,
+      },
+    });
+  }
+
   // Audit log
   await logAuditAction({
     adminId: currentUser.id,
@@ -863,6 +1016,23 @@ export const removeProfileImageService = async (userId, currentUser, ip) => {
     },
     { returnDocument: "after" },
   );
+
+  // Notify the user only if an admin modified someone else's profile
+  if (
+    currentUser.role === "Admin" &&
+    currentUser.id.toString() !== user._id.toString()
+  ) {
+    await createNotification({
+      recipientId: user._id,
+      type: "ACCOUNT",
+      title: "Profile Picture Removed",
+      message: "Your profile picture has been removed by HR.",
+      data: {
+        entityType: "USER",
+        entityId: user._id,
+      },
+    });
+  }
 
   // Audit log
   await logAuditAction({
