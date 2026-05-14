@@ -13,6 +13,8 @@ import {
 } from "../utils/exportHelpers.js";
 import { exportAttendanceStats } from "../services/attendanceExportService.js";
 import { markPayrollDirty } from "../utils/payrollHelpers.js";
+import { createNotification } from "../services/notificationService.js";
+import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
 
 // The company location (For the location check-in)
 const COMPANY_LOCATION = {
@@ -671,6 +673,17 @@ export const updateAttendance = async (req, res, next) => {
       });
     }
 
+    // Get the user for notification and payroll purposes
+    const user = await User.findById(attendance.userId).select(
+      "name lastName supervisor_id",
+    );
+    if (!user) {
+      return res.status(404).json({
+        status: "Error",
+        message: "User associated with attendance not found!",
+      });
+    }
+
     // Mark related payroll as dirty for recalculation
     await markPayrollDirty(
       attendance.userId,
@@ -683,6 +696,41 @@ export const updateAttendance = async (req, res, next) => {
       action: "adminUpdate",
       attendance,
     });
+
+    // Send notification to the user about the attendance update
+    try {
+      await createNotification({
+        recipientId: user._id,
+        type: "ATTENDANCE",
+        title: "Attendance Record Updated",
+        message: `Your attendance record for ${attendance.date.toDateString()} has been updated.`,
+        data: {
+          entityType: "ATTENDANCE",
+          entityId: attendance._id,
+        },
+      });
+    } catch (error) {
+      console.log("Attendance update notification failed:", error.message);
+    }
+
+    // Notify all admins except the one who updated the attendance record
+    try {
+      await createNotificationForAdminsExcept({
+        excludedUserId: req.user.id,
+        type: "ATTENDANCE",
+        title: "Attendance Record Updated",
+        message: `An attendance record of ${user.name} ${user.lastName} for ${attendance.date.toDateString()} has been updated.`,
+        data: {
+          entityType: "ATTENDANCE",
+          entityId: attendance._id,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to send notification for attendance update:",
+        err,
+      );
+    }
 
     res.status(200).json({
       status: "success",
@@ -1036,15 +1084,23 @@ export const getAttendanceById = async (req, res, next) => {
     });
 
     if (!record) {
-      return res.status(404).json({ status: "Error", message: "Attendance record not found!" });
+      return res
+        .status(404)
+        .json({ status: "Error", message: "Attendance record not found!" });
     }
 
     const requesterId = String(req.user.id);
     const recordOwnerId = String(record.userId._id || record.userId);
     const role = req.user.role;
 
-    if (role !== "Admin" && role !== "Supervisor" && requesterId !== recordOwnerId) {
-      return res.status(403).json({ status: "Error", message: "Unauthorized!" });
+    if (
+      role !== "Admin" &&
+      role !== "Supervisor" &&
+      requesterId !== recordOwnerId
+    ) {
+      return res
+        .status(403)
+        .json({ status: "Error", message: "Unauthorized!" });
     }
 
     res.status(200).json({ status: "Success", code: 200, data: record });
