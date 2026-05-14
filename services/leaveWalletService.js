@@ -55,6 +55,8 @@ export const syncLeaveTypeToUsers = async (
 export const addLeaveTypeToUsers = async (leaveType) => {
   const bulkOps = [];
 
+  const users = await User.find();
+
   for (const user of users) {
     // Check if the user already has a balance for this leave type to avoid duplicates
     const alreadyExists = user.leaveBalances.some((balance) =>

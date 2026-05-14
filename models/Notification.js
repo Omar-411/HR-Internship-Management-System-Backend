@@ -21,6 +21,7 @@ const notificationSchema = new mongoose.Schema(
         "ADMINISTRATIVE_DOCUMENT",
         "ATTENDANCE",
         "TIMETABLE",
+        "LEAVE_TYPE",
       ],
       required: true,
     },

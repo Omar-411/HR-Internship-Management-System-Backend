@@ -8,6 +8,7 @@ import {
   addLeaveTypeToUsers,
   removeLeaveTypeFromUsers,
 } from "../services/leaveWalletService.js";
+import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
 
 // ---------------------------------------------------------------- //
 // ----------------------- HELPER FUNCTIONS ----------------------- //
@@ -170,6 +171,25 @@ export const addLeaveType = async (req, res, next) => {
     // Add the new leave type to all users' leave balances
     await addLeaveTypeToUsers(newLeaveType);
 
+    // Notify all admins except the one who created the leave type
+    try {
+      await createNotificationForAdminsExcept({
+        excludedUserId: req.user.id,
+        type: "LEAVE_TYPE",
+        title: "New Leave Type Created",
+        message: `A new leave type "${name.trim()}" has been created.`,
+        data: {
+          entityType: null,
+          entityId: null,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to send notification for new leave type creation:",
+        err,
+      );
+    }
+
     // Logging the action
     try {
       await logAuditAction({
@@ -319,6 +339,22 @@ export const updateLeaveType = async (req, res, next) => {
       console.log("[AUDIT-LOG-ERROR]", logErr.message);
     }
 
+    // Notify all admins except the one who restored the leave type
+    try {
+      await createNotificationForAdminsExcept({
+        excludedUserId: req.user.id,
+        type: "LEAVE_TYPE",
+        title: "Leave Type Updated",
+        message: `The leave type "${updatedLeaveType.name}" has been updated.`,
+        data: {
+          entityType: null,
+          entityId: null,
+        },
+      });
+    } catch (err) {
+      console.error("Failed to send notification for leave type update:", err);
+    }
+
     res.status(200).json({
       status: "Success",
       code: 200,
@@ -377,6 +413,25 @@ export const archiveLeaveType = async (req, res, next) => {
       console.log("[AUDIT-LOG-ERROR]", logErr.message);
     }
 
+    // Notify all admins except the one who archived the leave type
+    try {
+      await createNotificationForAdminsExcept({
+        excludedUserId: req.user.id,
+        type: "LEAVE_TYPE",
+        title: "Leave Type Archived",
+        message: `The leave type "${existingLeaveType.name}" has been archived.`,
+        data: {
+          entityType: null,
+          entityId: null,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to send notification for leave type archiving:",
+        err,
+      );
+    }
+
     res.status(200).json({
       status: "Success",
       code: 200,
@@ -433,6 +488,25 @@ export const restoreLeaveType = async (req, res, next) => {
       });
     } catch (logErr) {
       console.log("[AUDIT-LOG-ERROR]", logErr.message);
+    }
+
+    // Notify all admins except the one who restored the leave type
+    try {
+      await createNotificationForAdminsExcept({
+        excludedUserId: req.user.id,
+        type: "LEAVE_TYPE",
+        title: "Leave Type Restored",
+        message: `The leave type "${existingLeaveType.name}" has been restored.`,
+        data: {
+          entityType: null,
+          entityId: null,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to send notification for leave type restoration:",
+        err,
+      );
     }
 
     res.status(200).json({
