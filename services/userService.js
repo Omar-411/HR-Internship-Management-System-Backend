@@ -29,15 +29,9 @@ import {
 import { sendEmail } from "../utils/sendEmail.js";
 import { logAuditAction } from "../utils/logger.js";
 import { buildQuery } from "../utils/queryBuilder.js";
-<<<<<<< HEAD
 import { SENSITIVE_FIELDS } from "../constants/userConstants.js";
 import { createNotification } from "./notificationService.js";
-=======
 import { resolveId } from "../utils/idResolver.js";
-
-// Sensitive fields that must never leave the backend
-const SENSITIVE_FIELDS = "-password -verificationCode -verificationCodeExpires -resetPasswordToken -resetPasswordExpires -loginAttempts -resendCount -resendDate -mustResetPassword";
->>>>>>> e5d4ec0c82ea2d8caab3e5ca76315f0406b7f62f
 
 const ROLE_SALARY_DEFAULTS = {
   employee: 1800,
@@ -275,11 +269,7 @@ export const addUserService = async (data, currentUser, ip) => {
     employment: {
       contractJoinDate,
       contractEndDate,
-<<<<<<< HEAD
-      contractType: "CDD", // Default value, will be updated later
-=======
-      contractType: contractType || "CDI",
->>>>>>> e5d4ec0c82ea2d8caab3e5ca76315f0406b7f62f
+      contractType: contractType || "CDI", // Default value, will be updated later
     },
     salary: roleLower === "intern" ? undefined : { base: baseSalary || 0, currency: "DT" },
   });
@@ -386,14 +376,13 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
       commonErrors.USER_NOT_FOUND.suggestion,
     );
 
-<<<<<<< HEAD
   // Store the old supervisor ID for later comparison (if the supervisor is being updated)
   const oldSupervisorId = existingUser.supervisor_id
     ? existingUser.supervisor_id.toString()
     : null;
-=======
+
+  // Get the actual ID string for comparison in uniqueness checks 
   const actualId = existingUser._id.toString();
->>>>>>> e5d4ec0c82ea2d8caab3e5ca76315f0406b7f62f
 
   // Check the email validity and the user existence
   if (updateData.email) {
@@ -590,7 +579,6 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
 
   // Update the Status of the user
   if (updateData.isActive !== undefined) {
-<<<<<<< HEAD
     updateData.status = updateData.isActive ? "Active" : "Inactive";
 
     // In case the admin unblocked or un-inactivated the user, we reset the login attempts to 0 and send an email
@@ -622,14 +610,6 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
       }
     }
 
-=======
-    if (updateData.isActive) {
-      updateData.status = "Active";
-    } else if (existingUser.status !== "Pending" && existingUser.status !== "Blocked") {
-      // Only set to Inactive if it wasn't already a special state
-      updateData.status = "Inactive";
-    }
->>>>>>> e5d4ec0c82ea2d8caab3e5ca76315f0406b7f62f
     delete updateData.isActive;
   }
 

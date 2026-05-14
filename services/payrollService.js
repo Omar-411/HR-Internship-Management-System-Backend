@@ -442,7 +442,6 @@ export const recomputePayroll = async (payrollId, user, ip) => {
   };
 };
 
-<<<<<<< HEAD
 // Export payroll to Excel (Admin only)
 export const exportPayrollToExcel = async (payrollId, currentUser, res) => {
   // Retrieve payroll with employee information
@@ -480,7 +479,8 @@ export const exportPayrollToExcel = async (payrollId, currentUser, res) => {
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
   res.send(buffer);
-=======
+};
+
 // Bulk calculation for all eligible employees for a given month and year
 export const calculateBulkPayroll = async (month, year, user, ip) => {
   // 1. Get the active config for the year
@@ -554,16 +554,11 @@ export const calculateBulkPayroll = async (month, year, user, ip) => {
     details: { month, year, results },
     ipAddress: ip,
   });
->>>>>>> e5d4ec0c82ea2d8caab3e5ca76315f0406b7f62f
 
   return {
     status: "Success",
     code: 200,
-<<<<<<< HEAD
-    message: "Payroll exported to Excel successfully!",
-=======
     message: `Bulk payroll calculation completed: ${results.created} created, ${results.skipped} skipped, ${results.errors} errors.`,
     data: results,
->>>>>>> e5d4ec0c82ea2d8caab3e5ca76315f0406b7f62f
   };
 };

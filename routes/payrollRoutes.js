@@ -10,6 +10,8 @@ import {
   markPayrollAsPaid,
   recomputePayroll,
   bulkCalculatePayroll,
+  getPayrollKPIs,
+  exportPayrollToExcel,
 } from "../controllers/payrollController.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
@@ -69,6 +71,14 @@ router.post(
   authenticate,
   authorize(["Admin"]),
   recomputePayroll,
+);
+
+// Route to export a payroll to Excel (Admin only)
+router.get(
+  "/payrolls/:id/export/excel",
+  authenticate,
+  authorize(["Admin"]),
+  exportPayrollToExcel,
 );
 
 // Route to bulk calculate payroll for all eligible employees for a given month and year
