@@ -5,7 +5,7 @@
 // Get the start and end dates of a given month and year
 export const getMonthRange = (year, month) => ({
   monthStart: new Date(year, month - 1, 1),
-  monthEnd: new Date(year, month, 1),
+  monthEnd: new Date(year, month, 0),
 });
 
 // Get the difference in hours between two time strings (HH:MM)

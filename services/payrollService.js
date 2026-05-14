@@ -27,6 +27,7 @@ import {
 import { getOne, getAll } from "./handlersFactory.js";
 import { logAuditAction } from "../utils/logger.js";
 import { generateDocumentService } from "./documentService.js";
+import { validateUserStatus } from "../validators/authValidators.js";
 
 // Payroll calculation for an employee for a given month and year
 export const calculatePayroll = async (employeeId, month, year) => {
@@ -381,16 +382,6 @@ export const recomputePayroll = async (payrollId, user, ip) => {
     );
   }
 
-  // Only draft payrolls can be recomputed
-  if (payroll.status !== "draft") {
-    throw new AppError(
-      errors.PAYROLL_NOT_DRAFT.message,
-      errors.PAYROLL_NOT_DRAFT.code,
-      errors.PAYROLL_NOT_DRAFT.errorCode,
-      errors.PAYROLL_NOT_DRAFT.suggestion,
-    );
-  }
-
   const employee = await User.findById(payroll.employeeId);
   if (!employee) {
     throw new AppError(
@@ -411,13 +402,13 @@ export const recomputePayroll = async (payrollId, user, ip) => {
     config,
   );
 
-  // Merge result safely
-  payroll.set(recomputed);
+  // Replace only the re-computed fields
+  Object.assign(payroll, recomputed);
 
   // Reset flags after recompute
   payroll.recalculationRequired = false;
   payroll.recalculationReason =
-    payroll.recalculationReason || "Manual recompute";
+  payroll.recalculationReason || "Manual recompute";
   payroll.recomputedAt = new Date();
   payroll.recomputedBy = user.id;
 

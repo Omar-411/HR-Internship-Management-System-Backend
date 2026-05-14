@@ -291,9 +291,13 @@ export const calculateProratedSalary = async (
   // Calculate the number of days worked in the month
   const workedDays = Math.floor((endDate - startDate) / MS_PER_DAY) + 1;
   const totalDaysInMonth = monthEnd.getDate();
+  console.log("Worked days", workedDays);
+  console.log("Total days in month", totalDaysInMonth);
 
   // Calculate the prorated salary
   const proratedSalary = (user.salary.base / totalDaysInMonth) * workedDays;
+
+  console.log("Prorated salary", proratedSalary);
 
   return {
     proratedSalary,
