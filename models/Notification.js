@@ -22,6 +22,7 @@ const notificationSchema = new mongoose.Schema(
         "ATTENDANCE",
         "TIMETABLE",
         "LEAVE_TYPE",
+        "PAYROLL_CONFIG",
       ],
       required: true,
     },

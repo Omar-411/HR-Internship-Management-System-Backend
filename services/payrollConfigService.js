@@ -4,6 +4,7 @@ import { errors } from "../errors/payrollConfigErrors.js";
 import AppError from "../utils/AppError.js";
 import { logAuditAction } from "../utils/logger.js";
 import { validatePayrollConfig } from "../validators/payrollConfigValidators.js";
+import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
 
 const createPayrollConfigFactory = createOne(PayrollConfig);
 
@@ -42,6 +43,25 @@ export const createPayrollConfig = async (data, user, ip) => {
     ipAddress: ip,
   });
 
+  // Notify all admins except the one who created the role
+  try {
+    await createNotificationForAdminsExcept({
+      excludedUserId: user.id,
+      type: "PAYROLL_CONFIG",
+      title: "New Payroll Configuration Created",
+      message: `A new payroll configuration for ${config.data.year} has been created.`,
+      data: {
+        entityType: "PayrollConfig",
+        entityId: config.data._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for new payroll configuration creation:",
+      err,
+    );
+  }
+
   return config;
 };
 
@@ -66,23 +86,26 @@ export const getActivePayrollConfig = async (year) => {
     status: "Success",
     code: 200,
     message: "Active payroll configuration retrieved successfully!",
-    data: config
+    data: config,
   };
 };
 
 // Create a new version of the current payroll configuration for a specific year
 export const createNewVersion = async (newConfig, user, ip) => {
   validatePayrollConfig(newConfig);
-  
+
   // Find the current highest version for this year
   const latestConfig = await PayrollConfig.findOne({ year: newConfig.year })
     .sort("-version")
     .select("version");
-  
+
   const nextVersion = (latestConfig?.version || 1) + 1;
 
   // Deactivate the current active config
-  await PayrollConfig.updateMany({ year: newConfig.year, isActive: true }, { isActive: false });
+  await PayrollConfig.updateMany(
+    { year: newConfig.year, isActive: true },
+    { isActive: false },
+  );
 
   // create new version
   const config = await createOne(PayrollConfig)({
@@ -103,6 +126,25 @@ export const createNewVersion = async (newConfig, user, ip) => {
     ipAddress: ip,
   });
 
+  // Notify all admins except the one who created the new payroll version
+  try {
+    await createNotificationForAdminsExcept({
+      excludedUserId: user.id,
+      type: "PAYROLL_CONFIG",
+      title: "New Payroll Configuration version Created",
+      message: `A new payroll configuration version for ${config.data.year} has been created.`,
+      data: {
+        entityType: "PayrollConfig",
+        entityId: config.data._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for new payroll configuration creation:",
+      err,
+    );
+  }
+
   return config;
 };
 
@@ -113,7 +155,7 @@ export const getYearVersions = async (year) => {
     status: "Success",
     code: 200,
     message: `All versions for ${year} retrieved successfully!`,
-    data: versions
+    data: versions,
   };
 };
 
@@ -146,10 +188,29 @@ export const togglePayrollConfigActivation = async (id, user, ip) => {
     ipAddress: ip,
   });
 
+  // Notify all admins except the one who toggled the payroll activation status
+  try {
+    await createNotificationForAdminsExcept({
+      excludedUserId: user.id,
+      type: "PAYROLL_CONFIG",
+      title: "Payroll Configuration Activation Toggled",
+      message: `The activation status of the payroll configuration for ${config.year} has been toggled.`,
+      data: {
+        entityType: "PayrollConfig",
+        entityId: config._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for payroll configuration activation toggle:",
+      err,
+    );
+  }
+
   return {
     status: "Success",
     code: 200,
     message: "Payroll configuration activation toggled successfully!",
-    data: config
+    data: config,
   };
 };
