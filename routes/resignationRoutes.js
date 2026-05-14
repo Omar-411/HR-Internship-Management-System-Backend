@@ -1,6 +1,7 @@
 import express from "express";
 import {
   getResignationById,
+  getMyResignation,
   getAllResignations,
   getResignationStatuses,
   submitResignation,
@@ -9,7 +10,7 @@ import {
   requestClarification,
   respondToClarification,
   approveResignation,
-  processFinalSettlement,
+  startExitProcess,
 } from "../controllers/resignationController.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
@@ -25,6 +26,13 @@ router.get(
   authenticate,
   authorize(["Admin"]),
   getResignationKPIs,
+);
+
+// Get the current user's own resignation request
+router.get(
+  "/resignations/my",
+  authenticate,
+  getMyResignation,
 );
 
 // Get a single resignation request by ID
@@ -65,7 +73,7 @@ router.patch(
 router.patch(
   "/resignations/:id/respond-clarification",
   authenticate,
-  authorize(["Employee"]),
+  authorize(["Employee", "Supervisor"]),
   respondToClarification,
 );
 
@@ -77,12 +85,12 @@ router.patch(
   approveResignation,
 );
 
-// Process the final settlement for a resignation (Admin only)
+// Start the exit process (Admin only)
 router.patch(
-  "/resignations/:id/process-final-settlement",
+  "/resignations/:id/start-exit",
   authenticate,
   authorize(["Admin"]),
-  processFinalSettlement,
+  startExitProcess,
 );
 
 export default router;

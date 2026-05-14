@@ -24,6 +24,7 @@ import {
   ensureCanUpdateProject,
 } from "../validators/projectValidators.js";
 import { decrementUsersProjectCount } from "../utils/projectCountHelper.js";
+import { resolveId } from "../utils/idResolver.js";
 
 // Get the list of the sectors (For the dropdown in the project filters)
 export const getAllSectors = async () => {
@@ -258,13 +259,8 @@ export const getAllProjects = async (req) => {
 export const getProjectById = async (projectId, user) => {
   const { role, id: userId } = user;
 
-  // Validate ID
-  if (!mongoose.Types.ObjectId.isValid(projectId)) {
-    throw new AppError(commonErrors.INVALID_ID.message, commonErrors.INVALID_ID.code);
-  }
-
   // Check existence
-  const existingProject = await Project.findById(projectId);
+  const existingProject = await Project.findOne(resolveId(projectId));
   if (!existingProject) {
     throw new AppError(
       errors.PROJECT_NOT_FOUND.message,
@@ -273,6 +269,8 @@ export const getProjectById = async (projectId, user) => {
       errors.PROJECT_NOT_FOUND.suggestion,
     );
   }
+
+  const actualProjectId = existingProject._id;
 
   // Authorization filter
   const match = await buildProjectAccessMatch(projectId, userId, role);
@@ -505,7 +503,7 @@ export const createProject = async (data, user) => {
 // Update a project 
 export const updateProject = async (projectId, data, userId) => {
   // Check the project existence
-  const project = await Project.findById(projectId);
+  const project = await Project.findOne(resolveId(projectId));
   if (!project) {
     throw new AppError(
       errors.PROJECT_NOT_FOUND.message,
@@ -536,7 +534,7 @@ export const updateProject = async (projectId, data, userId) => {
 // Archive a project
 export const archiveProject = async (projectId, userId) => {
   // Check the project existence
-  const project = await Project.findById(projectId);
+  const project = await Project.findOne(resolveId(projectId));
   if (!project) {
     throw new AppError(
       errors.PROJECT_NOT_FOUND.message,
@@ -594,10 +592,7 @@ export const archiveProject = async (projectId, userId) => {
 
 // Restore a project
 export const restoreProject = async (projectId, userId) => {
-  if (!mongoose.Types.ObjectId.isValid(projectId)) {
-    throw new AppError(commonErrors.INVALID_ID.message, commonErrors.INVALID_ID.code);
-  }
-  const project = await Project.findById(projectId);
+  const project = await Project.findOne(resolveId(projectId));
   if (!project) {
     throw new AppError(
       errors.PROJECT_NOT_FOUND.message,
@@ -647,7 +642,7 @@ export const deleteProject = async (projectId) => {
     session.startTransaction();
 
     // Check project existence
-    const project = await Project.findById(projectId).session(session);
+    const project = await Project.findOne(resolveId(projectId)).session(session);
     if (!project) {
       throw new AppError(
         errors.PROJECT_NOT_FOUND.message,

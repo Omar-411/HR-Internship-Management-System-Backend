@@ -386,6 +386,8 @@ export const getMyStatus = async (req, res, next) => {
   }
 };
 
+import { resolveId } from "../utils/idResolver.js";
+
 // Get attendance records (Admin/Supervisor)
 export const getAttendance = async (req, res, next) => {
   try {
@@ -407,9 +409,12 @@ export const getAttendance = async (req, res, next) => {
 
     const filter = {}; // Allow filtering
 
-    // Check for user existance if userId is provided
+    let targetUserId = userId;
+
+    // Check for user existence if userId is provided
     if (userId) {
-      const user = await User.findById(userId);
+      const userMatch = resolveId(userId);
+      const user = await User.findOne(userMatch);
       if (!user) {
         return res.status(404).json({
           status: "Error",
@@ -417,11 +422,12 @@ export const getAttendance = async (req, res, next) => {
           message: "User not found!",
         });
       }
+      targetUserId = user._id;
     }
 
     // Authorization & checking the Identity
     if (req.user.role === "Admin" || req.user.role === "Supervisor") {
-      if (userId) filter.userId = userId;
+      if (targetUserId) filter.userId = targetUserId;
     } else {
       filter.userId = req.user.id;
     }
@@ -1013,6 +1019,35 @@ export const exportAttendanceStatistics = async (req, res, next) => {
       format,
       res,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAttendanceById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const record = await Attendance.findById(id).populate({
+      path: "userId",
+      populate: [
+        { path: "role_id", select: "name" },
+        { path: "department_id", select: "name" },
+      ],
+    });
+
+    if (!record) {
+      return res.status(404).json({ status: "Error", message: "Attendance record not found!" });
+    }
+
+    const requesterId = String(req.user.id);
+    const recordOwnerId = String(record.userId._id || record.userId);
+    const role = req.user.role;
+
+    if (role !== "Admin" && role !== "Supervisor" && requesterId !== recordOwnerId) {
+      return res.status(403).json({ status: "Error", message: "Unauthorized!" });
+    }
+
+    res.status(200).json({ status: "Success", code: 200, data: record });
   } catch (error) {
     next(error);
   }

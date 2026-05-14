@@ -11,23 +11,10 @@ cron.schedule("0 0 * * *", async () => {
   const now = new Date();
 
   try {
-    // Move all approved resignations to scheduled_exit if their last working date has arrived
-    const scheduled = await Resignation.updateMany(
-      {
-        status: "approved",
-        lastWorkingDate: { $lte: now },
-      },
-      {
-        status: "scheduled_exit",
-      },
-    );
-
-    console.log(`Moved to scheduled_exit: ${scheduled.modifiedCount}`);
-
-    // Move scheduled_exit → inactive + deactivate user if the last working date has passed
+    // Move scheduled_exit → inactive + deactivate user if the exit date has passed
     const toDeactivate = await Resignation.find({
       status: "scheduled_exit",
-      lastWorkingDate: { $lt: now },
+      exitDate: { $lte: now },
     });
 
     for (const resignation of toDeactivate) {

@@ -207,6 +207,33 @@ router.get(
   consultPersonalDocument,
 );
 
+// Route to get non-confidential personal documents of a user (Special route for supervisors)
+/**
+ * @swagger
+ * /api/documents/personal-docs/non-confidential/{id}:
+ *   get:
+ *     summary: Get non-confidential personal documents of a user
+ *     tags:
+ *      - Personal Documents
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: Target user ID
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of non-confidential personal documents retrieved successfully
+ */
+router.get(
+  "/documents/personal-docs/non-confidential/:id",
+  authenticate,
+  getPersonalDocuments,
+);
+
 // Route to get all personal documents of a user (User himself or Admin)
 /**
  * @swagger

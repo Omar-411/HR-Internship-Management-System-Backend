@@ -1,3 +1,4 @@
+import Project from "../models/Project.js";
 import * as projectService from "../services/projectService.js";
 import * as projectAnalyticsService from "../services/analytics/projectAnalyticsService.js";
 
@@ -36,7 +37,17 @@ export const getAllProjects = async (req, res, next) => {
 // Get project overview (Stats about sprints, tasks, velocity, etc.)
 export const getProjectOverview = async (req, res, next) => {
   try {
-    const result = await projectAnalyticsService.getProjectOverview(req.params.id, req.user);
+    const param = req.params.id;
+    const project = await Project.findOne({
+      $or: [
+        { slug: param },
+        { publicId: param },
+        ...(param.match(/^[a-f\d]{24}$/i) ? [{ _id: param }] : [])
+      ]
+    });
+    if (!project) return res.status(404).json({ message: "Project not found" });
+
+    const result = await projectAnalyticsService.getProjectOverview(project._id, req.user);
     res.status(result.code).json(result);
   }
   catch (err) {
@@ -47,7 +58,17 @@ export const getProjectOverview = async (req, res, next) => {
 // Get a project details by ID
 export const getProjectById = async (req, res, next) => {
   try {
-    const result = await projectService.getProjectById(req.params.id, req.user);
+    const param = req.params.id;
+    const project = await Project.findOne({
+      $or: [
+        { slug: param },
+        { publicId: param },
+        ...(param.match(/^[a-f\d]{24}$/i) ? [{ _id: param }] : [])
+      ]
+    });
+    if (!project) return res.status(404).json({ message: "Project not found" });
+
+    const result = await projectService.getProjectById(project._id, req.user);
 
     res.status(result.code).json(result);
   } catch (err) {
@@ -69,8 +90,18 @@ export const createProject = async (req, res, next) => {
 // Update a project (Supervisor only): No team management here, just project details update
 export const updateProject = async (req, res, next) => {
   try {
+    const param = req.params.id;
+    const project = await Project.findOne({
+      $or: [
+        { slug: param },
+        { publicId: param },
+        ...(param.match(/^[a-f\d]{24}$/i) ? [{ _id: param }] : [])
+      ]
+    });
+    if (!project) return res.status(404).json({ message: "Project not found" });
+
     const result = await projectService.updateProject(
-      req.params.id,
+      project._id,
       req.body,
       req.user.id
     );
@@ -84,7 +115,17 @@ export const updateProject = async (req, res, next) => {
 // Archive a project (Supervisor Only)
 export const archiveProject = async (req, res, next) => {
   try {
-    const result = await projectService.archiveProject(req.params.id, req.user.id);
+    const param = req.params.id;
+    const project = await Project.findOne({
+      $or: [
+        { slug: param },
+        { publicId: param },
+        ...(param.match(/^[a-f\d]{24}$/i) ? [{ _id: param }] : [])
+      ]
+    });
+    if (!project) return res.status(404).json({ message: "Project not found" });
+
+    const result = await projectService.archiveProject(project._id, req.user.id);
 
     res.status(result.code).json(result);
   } catch (err) {
@@ -95,7 +136,17 @@ export const archiveProject = async (req, res, next) => {
 // Restore a Project (Supervisor Only)
 export const restoreProject = async (req, res, next) => {
   try {
-    const result = await projectService.restoreProject(req.params.id, req.user.id);
+    const param = req.params.id;
+    const project = await Project.findOne({
+      $or: [
+        { slug: param },
+        { publicId: param },
+        ...(param.match(/^[a-f\d]{24}$/i) ? [{ _id: param }] : [])
+      ]
+    });
+    if (!project) return res.status(404).json({ message: "Project not found" });
+
+    const result = await projectService.restoreProject(project._id, req.user.id);
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -105,7 +156,17 @@ export const restoreProject = async (req, res, next) => {
 // Delete a project (Admin only)
 export const deleteProject = async (req, res, next) => {
   try {
-    const result = await projectService.deleteProject(req.params.id);
+    const param = req.params.id;
+    const project = await Project.findOne({
+      $or: [
+        { slug: param },
+        { publicId: param },
+        ...(param.match(/^[a-f\d]{24}$/i) ? [{ _id: param }] : [])
+      ]
+    });
+    if (!project) return res.status(404).json({ message: "Project not found" });
+
+    const result = await projectService.deleteProject(project._id);
     res.status(result.code).json(result);
   } catch (err) {
     next(err);

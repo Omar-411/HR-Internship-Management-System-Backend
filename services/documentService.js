@@ -54,8 +54,15 @@ export const uploadPersonalDocumentService = async ({
     );
   }
 
-  // Check the user existence
-  const user = await User.findById(targetUserId);
+  // Resolve user ID (supports slug, publicId, or _id)
+  const user = await User.findOne({
+    $or: [
+      { publicId: targetUserId },
+      { slug: targetUserId },
+      ...(targetUserId.match(/^[a-f\d]{24}$/i) ? [{ _id: targetUserId }] : [])
+    ]
+  });
+
   if (!user) {
     throw new AppError(
       commonErrors.USER_NOT_FOUND.message,
@@ -64,6 +71,8 @@ export const uploadPersonalDocumentService = async ({
       commonErrors.USER_NOT_FOUND.suggestion,
     );
   }
+
+  const resolvedId = user._id;
 
   // Get the Personal document type
   const personalType = await getPersonalType();
@@ -211,6 +220,25 @@ export const getPersonalDocumentsService = async ({
   queryParams,
   requester, // To check if we allow seeing the confidential documents or not
 }) => {
+  // Resolve user ID (supports slug, publicId, or _id)
+  const user = await User.findOne({
+    $or: [
+      { publicId: userId },
+      { slug: userId },
+      ...(userId.match(/^[a-f\d]{24}$/i) ? [{ _id: userId }] : [])
+    ]
+  });
+
+  if (!user) {
+    throw new AppError(
+      commonErrors.USER_NOT_FOUND.message,
+      commonErrors.USER_NOT_FOUND.code,
+      commonErrors.USER_NOT_FOUND.errorCode,
+      commonErrors.USER_NOT_FOUND.suggestion,
+    );
+  }
+
+  const resolvedId = user._id;
   const personalType = await getPersonalType();
 
   // Convert isConfidential query param to boolean for the filter to work correctly
@@ -220,7 +248,7 @@ export const getPersonalDocumentsService = async ({
   }
 
   // Access Control
-  const isOwner = requester.id === userId;
+  const isOwner = requester.id === resolvedId.toString();
   const isAdmin = requester.role === "Admin";
 
   if (!isOwner && !isAdmin) {
@@ -230,7 +258,7 @@ export const getPersonalDocumentsService = async ({
 
   const finalQuery = {
     ...parsedQuery,
-    user_id: userId,
+    user_id: resolvedId,
     documentType_id: personalType._id,
     limit: 5,
     sort: "-createdAt",

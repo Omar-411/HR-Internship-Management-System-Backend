@@ -21,6 +21,97 @@ const router = express.Router();
  *     description: Endpoints for managing leave requests
  */
 
+// ─── Leave Requests — Mutations (Action Specific) ───────────────────────────
+
+// Route to mark a leave request as under review (Supervisor/Admin)
+/**
+ * @swagger
+ * /api/leave-requests/mark-under-review/{id}:
+ *   patch:
+ *     tags:
+ *       - Leave Requests
+ *     summary: Mark a leave request as under review (Supervisor/Admin)
+ *     description: It allows a supervisor or an admin to mark a leave request as under review when they start reviewing it.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Leave request ID
+ *     responses:
+ *       200:
+ *         description: Leave request marked under review
+ *       400:
+ *         description: Leave request cannot be marked under review | Leave request unavailable
+ *       401:
+ *         description: Invalid/missing token
+ *       403:
+ *         description: Unauthorized
+ *       404:
+ *         description: Leave request not found
+ *       500:
+ *         description: Server error
+ */
+router.patch(
+  "/leave-requests/mark-under-review/:id",
+  authenticate,
+  markLeaveRequestUnderReview,
+);
+
+// Route to approve or reject a leave request (Supervisor/Admin)
+/**
+ * @swagger
+ * /api/leave-requests/approve-reject/{id}:
+ *   patch:
+ *     tags:
+ *       - Leave Requests
+ *     summary: Approve or reject a leave request (Supervisor/Admin)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Leave request ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               action:
+ *                 type: string
+ *                 enum: [approve, reject]
+ *               comments:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Leave request approved or rejected successfully
+ *       400:
+ *         description: Action must be 'approve' or 'reject'
+ *       401:
+ *         description: Invalid/missing token
+ *       403:
+ *         description: Unauthorized
+ *       404:
+ *         description: Leave request not found
+ *       500:
+ *         description: Server error
+ */
+router.patch(
+  "/leave-requests/approve-reject/:id",
+  authenticate,
+  approveOrRejectLeaveRequest,
+);
+
+// ─── Leave Requests — Mutations (General) ──────────────────────────────────
+
 // Route to add a new leave request (Every authenticated user)
 /**
  * @swagger
@@ -70,6 +161,8 @@ router.post(
   upload("doc").single("attachment"),
   addLeaveRequest,
 );
+
+// ─── Leave Statuses & Reads ──────────────────────────────────────────────────
 
 // Route to get leave request statuses based on user role (Every authenticated user)
 /**
@@ -179,93 +272,6 @@ router.get("/leave-requests", authenticate, getAllLeaveRequests);
  *         description: Server error
  */
 router.get("/leave-requests/:id", authenticate, getLeaveRequestById);
-
-// Route to mark a leave request as under review (Supervisor/Admin)
-/**
- * @swagger
- * /api/leave-requests/mark-under-review/{id}:
- *   patch:
- *     tags:
- *       - Leave Requests
- *     summary: Mark a leave request as under review (Supervisor/Admin)
- *     description: It allows a supervisor or an admin to mark a leave request as under review when they start reviewing it.
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Leave request ID
- *     responses:
- *       200:
- *         description: Leave request marked under review
- *       400:
- *         description: Leave request cannot be marked under review | Leave request unavailable
- *       401:
- *         description: Invalid/missing token
- *       403:
- *         description: Unauthorized
- *       404:
- *         description: Leave request not found
- *       500:
- *         description: Server error
- */
-router.patch(
-  "/leave-requests/mark-under-review/:id",
-  authenticate,
-  markLeaveRequestUnderReview,
-);
-
-// Route to approve or reject a leave request (Supervisor/Admin)
-/**
- * @swagger
- * /api/leave-requests/approve-reject/{id}:
- *   patch:
- *     tags:
- *       - Leave Requests
- *     summary: Approve or reject a leave request (Supervisor/Admin)
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Leave request ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               action:
- *                 type: string
- *                 enum: [approve, reject]
- *               comments:
- *                 type: string
- *     responses:
- *       200:
- *         description: Leave request approved or rejected successfully
- *       400:
- *         description: Action must be 'approve' or 'reject'
- *       401:
- *         description: Invalid/missing token
- *       403:
- *         description: Unauthorized
- *       404:
- *         description: Leave request not found
- *       500:
- *         description: Server error
- */
-router.patch(
-  "/leave-requests/approve-reject/:id",
-  authenticate,
-  approveOrRejectLeaveRequest,
-);
 
 // Route to update a leave request (The user himself)
 /**

@@ -107,8 +107,9 @@ export const loginService = async ({ email, password }) => {
     message: "Logged in successfully!",
     data: {
       token,
-      userId: user._id,
+      userId: user.publicId,
       role: roleName,
+      slug: user.slug,
       requiresFaceEnrollment,
     },
   };
@@ -183,8 +184,9 @@ export const verifyUserService = async ({ email, code }) => {
     message: "Account verified successfully!",
     data: {
       token,
-      userId: user._id,
+      userId: user.publicId,
       role: roleName,
+      slug: user.slug,
       requiresPasswordChange: user.mustResetPassword,
       requiresFaceEnrollment,
     },
@@ -309,8 +311,9 @@ export const resetPasswordService = async ({ email, newPassword }) => {
     message: "Password reset successfully!",
     data: {
       token,
-      userId: user._id,
+      userId: user.publicId,
       role: roleName,
+      slug: user.slug,
       requiresFaceEnrollment,
     },
   };
@@ -412,8 +415,9 @@ export const forgetPasswordService = async ({ email, token, newPassword }) => {
     message: "Password reset successfully!",
     data: {
       token: tokenGen,
-      userId: user._id,
+      userId: user.publicId,
       role: roleName,
+      slug: user.slug,
       requiresFaceEnrollment,
     },
   };

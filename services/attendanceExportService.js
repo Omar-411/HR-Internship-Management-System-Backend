@@ -59,6 +59,8 @@ export const getStatsPeriodLabel = ({
   return "period";
 };
 
+import { resolveId } from "../utils/idResolver.js";
+
 // Main export function for attendance stats
 export const exportAttendanceStats = async ({
   userId,
@@ -71,13 +73,18 @@ export const exportAttendanceStats = async ({
   res,
 }) => {
   let userIds = [];
+  let actualUserId = userId;
 
   // Get all relevant users
   if (departmentId) {
     const users = await User.find({ department_id: departmentId });
     userIds = users.map((u) => u._id);
   } else if (userId) {
-    userIds = [userId];
+    const userMatch = resolveId(userId);
+    const user = await User.findOne(userMatch);
+    if (!user) throw new Error("User not found!");
+    actualUserId = user._id;
+    userIds = [actualUserId];
   } else {
     const users = await User.find();
     userIds = users.map((u) => u._id);
@@ -138,8 +145,8 @@ export const exportAttendanceStats = async ({
   let deptName = "";
 
   // Get the username if it's a single user export (for filename)
-  if (userId) {
-    const user = await User.findById(userId);
+  if (actualUserId) {
+    const user = await User.findById(actualUserId);
     const fullName = `${user.name}_${user.lastName || ""}`;
     cleanName = sanitize(fullName);
   }

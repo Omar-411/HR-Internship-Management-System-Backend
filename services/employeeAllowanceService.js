@@ -174,7 +174,7 @@ export const getAllEmployeeAllowances = async (queryParams) => {
   return await getAll(
     EmployeeAllowance,
     [
-      { path: "userId", select: "name lastName" },
+      { path: "userId", select: "name lastName profileImageURL position" },
       { path: "allowanceTypeId", select: "name code isTaxable" },
     ],
     null,

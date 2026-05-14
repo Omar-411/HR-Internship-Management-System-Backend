@@ -23,6 +23,16 @@ export const getAdminDashboard = async (req, res, next) => {
   }
 };
 
+// Employee/Intern Stats
+export const getDashboardStats = async (req, res, next) => {
+  try {
+    const result = await dashboardService.getDashboardStats(req.user);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 /**
  * Get project chart datasets (task completion by status + velocity by sprint)
  * derived from real tasks stored in the database.

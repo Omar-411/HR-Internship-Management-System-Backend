@@ -2,7 +2,8 @@ import express from "express";
 import { 
   getSupervisorDashboard, 
   getAdminDashboard, 
-  getProjectCharts 
+  getProjectCharts,
+  getDashboardStats
 } from "../controllers/dashboardController.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
@@ -24,5 +25,10 @@ router.get("/dashboard/admin", authenticate, authorize(["Admin"]), getAdminDashb
  * accessible by project members (Admin, Supervisor, Employee, Intern)
  */
 router.get("/dashboard/project/:id/charts", authenticate, authorize(["Admin", "Supervisor", "Employee", "Intern"]), getProjectCharts);
+
+/**
+ * Route to get stats for Employee/Intern dashboards
+ */
+router.get("/dashboard/stats", authenticate, getDashboardStats);
 
 export default router;

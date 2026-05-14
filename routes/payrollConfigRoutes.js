@@ -4,6 +4,7 @@ import {
   getActivePayrollConfig,
   getAllConfigs,
   createNewVersion,
+  getYearVersions,
   toggleActivation,
 } from "../controllers/payrollConfigController.js";
 import authenticate from "../middleware/authenticate.js";
@@ -41,6 +42,14 @@ router.post(
   authenticate,
   authorize(["Admin"]),
   createNewVersion,
+);
+
+// Get all versions for a specific year
+router.get(
+  "/payroll-config/:year/versions",
+  authenticate,
+  authorize(["Admin"]),
+  getYearVersions,
 );
 
 // Toggle the activation status of a payroll configuration for a specific year

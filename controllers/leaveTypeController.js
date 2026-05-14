@@ -101,7 +101,7 @@ export const getAllLeaveTypes = async (req, res, next) => {
     let queryParams = req.query;
     queryParams = {
       ...queryParams,
-      limit: 6,
+      limit: queryParams.limit || 100,
       sort: "-createdAt",
     };
 

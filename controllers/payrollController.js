@@ -39,6 +39,26 @@ export const getAllPayrolls = async (req, res, next) => {
   }
 };
 
+// Get monthly net payout trend (last 6 months)
+export const getPayrollTrend = async (req, res, next) => {
+  try {
+    const result = await payrollService.getPayrollTrend();
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Get net payout by department for a given month/year
+export const getPayrollByDepartment = async (req, res, next) => {
+  try {
+    const result = await payrollService.getPayrollByDepartment(req.query);
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Get an employee's payroll history
 export const getEmployeePayrolls = async (req, res, next) => {
   try {
@@ -99,21 +119,20 @@ export const recomputePayroll = async (req, res, next) => {
   }
 };
 
-// Get payroll KPIs for the current month and year
-export const getPayrollKPIs = async (req, res, next) => {
+// Bulk calculate payroll for all eligible employees for a given month and year
+export const bulkCalculatePayroll = async (req, res, next) => {
   try {
-    const result = await payrollStatsService.getPayrollKPIs();
-    res.status(result.code).json(result);
-  } catch (err) {
-    next(err);
-  }
-};
+    const { month, year } = req.params;
 
-// Export payroll to Excel
-export const exportPayrollToExcel = async (req, res, next) => {
-  try {
-    const result = await payrollService.exportPayrollToExcel(req.params.id, req.user, res);
-  } catch (err) {
-    next(err);
+    const result = await payrollService.calculateBulkPayroll(
+      parseInt(month),
+      parseInt(year),
+      req.user,
+      req.ip,
+    );
+
+    res.status(result.code).json(result);
+  } catch (error) {
+    next(error);
   }
 };

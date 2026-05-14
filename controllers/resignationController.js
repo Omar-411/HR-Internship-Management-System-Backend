@@ -49,6 +49,16 @@ export const getAllResignations = async (req, res, next) => {
   }
 };
 
+// Get the current user's own resignation request
+export const getMyResignation = async (req, res, next) => {
+  try {
+    const result = await resignationService.getMyResignation(req.user.id);
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Submit a resignation request
 export const submitResignation = async (req, res, next) => {
   try {
@@ -138,13 +148,13 @@ export const approveResignation = async (req, res, next) => {
   }
 };
 
-// Process the final settlement for a resignation (Admin Only)
-export const processFinalSettlement = async (req, res, next) => {
+// Start the exit process (Admin Only)
+export const startExitProcess = async (req, res, next) => {
   try {
     const resignationId = req.params.id;
     const adminId = req.user.id;
 
-    const result = await resignationService.processFinalSettlementService(
+    const result = await resignationService.startExitProcess(
       resignationId,
       adminId,
       req.ip,

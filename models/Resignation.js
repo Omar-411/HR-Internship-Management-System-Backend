@@ -39,9 +39,20 @@ const resignationSchema = new mongoose.Schema(
       required: true,
       default: 14,
     },
-    lastWorkingDate: {
-      // The date when the employee's last working day is: submissionDate + noticePeriod
+    exitDate: {
+      // The date when the employee's last working day is: approvedDate + 14 days
       type: Date,
+    },
+    startedExitProcessAt: {
+      // The date when the admin clicks "Start Exit Process"
+      type: Date,
+      default: null,
+    },
+    exitSummary: {
+      finalSalary: { type: Number, default: 0 },
+      pendingTasksCount: { type: Number, default: 0 },
+      remainingLeaveDays: { type: Number, default: 0 },
+      taskPreview: { type: [String], default: [] },
     },
     reason: {
       // The reason for resignation provided by the employee

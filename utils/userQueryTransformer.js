@@ -19,5 +19,16 @@ export const transformUserFilters = async (queryParams) => {
     delete newQuery.supervisorId;
   }
 
+  if (newQuery.search) {
+    const regex = new RegExp(newQuery.search, "i");
+    newQuery._searchCondition = [{ name: regex }, { email: regex }];
+    delete newQuery.search;
+  }
+
+  if (newQuery.status) {
+    // Capitalize the first letter (active -> Active) to match backend enum
+    newQuery.status = newQuery.status.charAt(0).toUpperCase() + newQuery.status.slice(1);
+  }
+
   return newQuery;
 };

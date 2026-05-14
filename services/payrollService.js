@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import User from "../models/User.js";
 import Payroll from "../models/Payroll.js";
 import PayrollConfig from "../models/PayrollConfig.js";
+import UserRole from "../models/UserRole.js";
 import { errors } from "../errors/payrollErrors.js";
 import { errors as commonErrors } from "../errors/commonErrors.js";
 import { errors as payrollConfigErrors } from "../errors/payrollConfigErrors.js";
@@ -117,6 +118,79 @@ export const getAllPayrolls = getAll(Payroll, {
   path: "employeeId",
   select: "name lastName email position",
 });
+
+// Get monthly net payout trend for the last 6 months
+export const getPayrollTrend = async () => {
+  const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const now = new Date();
+
+  // Build the last 6 months (inclusive of current)
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
+  }
+
+  const trend = await Promise.all(
+    months.map(async ({ year, month }) => {
+      const result = await Payroll.aggregate([
+        { $match: { year, month } },
+        { $group: { _id: null, netPayout: { $sum: "$netSalary" } } },
+      ]);
+      return {
+        month: MONTH_NAMES[month - 1],
+        netPayout: result[0]?.netPayout ?? 0,
+      };
+    })
+  );
+
+  return { status: "Success", code: 200, data: trend };
+};
+
+// Get net payout aggregated by department for a given month/year
+export const getPayrollByDepartment = async (queryParams) => {
+  const now = new Date();
+  const month = parseInt(queryParams?.month) || now.getMonth() + 1;
+  const year  = parseInt(queryParams?.year)  || now.getFullYear();
+
+  const result = await Payroll.aggregate([
+    { $match: { month, year } },
+    {
+      $lookup: {
+        from: "users",
+        localField: "employeeId",
+        foreignField: "_id",
+        as: "employee",
+      },
+    },
+    { $unwind: { path: "$employee", preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: "departments",
+        localField: "employee.department_id",
+        foreignField: "_id",
+        as: "department",
+      },
+    },
+    { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
+    {
+      $group: {
+        _id: { $ifNull: ["$department.name", "Unknown"] },
+        netPayout: { $sum: "$netSalary" },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        department: "$_id",
+        netPayout: 1,
+      },
+    },
+    { $sort: { netPayout: -1 } },
+  ]);
+
+  return { status: "Success", code: 200, data: result };
+};
 
 // Get an employee's payroll history
 export const getEmployeePayrolls = async (user, queryParams) => {
@@ -368,6 +442,7 @@ export const recomputePayroll = async (payrollId, user, ip) => {
   };
 };
 
+<<<<<<< HEAD
 // Export payroll to Excel (Admin only)
 export const exportPayrollToExcel = async (payrollId, currentUser, res) => {
   // Retrieve payroll with employee information
@@ -405,10 +480,90 @@ export const exportPayrollToExcel = async (payrollId, currentUser, res) => {
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
   res.send(buffer);
+=======
+// Bulk calculation for all eligible employees for a given month and year
+export const calculateBulkPayroll = async (month, year, user, ip) => {
+  // 1. Get the active config for the year
+  const configDoc = await PayrollConfig.findOne({ year, isActive: true });
+  if (!configDoc) {
+    throw new AppError(
+      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.message,
+      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.code,
+      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.errorCode,
+      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.suggestion,
+    );
+  }
+
+  // 2. Find all active employees who are NOT interns
+  // We identify interns by role name "Intern"
+  const roles = await UserRole.find({ name: { $nin: ["Intern", "intern"] } });
+  const roleIds = roles.map(r => r._id);
+
+  const users = await User.find({
+    status: "Active",
+    role_id: { $in: roleIds }
+  });
+
+  const results = {
+    created: 0,
+    skipped: 0,
+    errors: 0
+  };
+
+  for (const employee of users) {
+    try {
+      // Check if payroll already exists
+      const existing = await Payroll.findOne({ employeeId: employee._id, month, year });
+      if (existing) {
+        results.skipped++;
+        continue;
+      }
+
+      // Compute the payroll
+      const computed = await computePayroll(employee, month, year, configDoc);
+
+      // Create payroll
+      await Payroll.create({
+        employeeId: employee._id,
+        month,
+        year,
+        ...computed,
+        configSnapshot: {
+          year,
+          cnss: configDoc.cnss,
+          css: configDoc.css,
+          irpp: configDoc.irpp,
+          payroll: {
+            standardMonthlyHours: configDoc.payroll.standardMonthlyHours,
+          }
+        },
+        status: "draft",
+      });
+      results.created++;
+    } catch (err) {
+      console.error(`Error calculating payroll for ${employee.name}:`, err);
+      results.errors++;
+    }
+  }
+
+  // Audit log
+  await logAuditAction({
+    adminId: user.id,
+    action: "BULK_CALCULATE_PAYROLL",
+    targetType: "Payroll",
+    details: { month, year, results },
+    ipAddress: ip,
+  });
+>>>>>>> e5d4ec0c82ea2d8caab3e5ca76315f0406b7f62f
 
   return {
     status: "Success",
     code: 200,
+<<<<<<< HEAD
     message: "Payroll exported to Excel successfully!",
+=======
+    message: `Bulk payroll calculation completed: ${results.created} created, ${results.skipped} skipped, ${results.errors} errors.`,
+    data: results,
+>>>>>>> e5d4ec0c82ea2d8caab3e5ca76315f0406b7f62f
   };
 };

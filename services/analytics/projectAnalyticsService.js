@@ -6,15 +6,13 @@ import AppError from "../../utils/AppError.js";
 import { isTeamMemberOrProductOwnerOrAdmin } from "../../utils/projectHelpers.js";
 import { getMonthRange } from "../../utils/timeHelpers.js";
 
+import { resolveId } from "../../utils/idResolver.js";
+
 // Get a precise project overview (Stats about sprints, tasks, velocity, etc.)
 export const getProjectOverview = async (projectId, currentUser) => {
-  // Validate ID
-  if (!mongoose.Types.ObjectId.isValid(projectId)) {
-    throw new AppError(commonErrors.INVALID_ID.message, commonErrors.INVALID_ID.code);
-  }
-
   // Check the project existence
-  const project = await Project.findById(projectId);
+  const projectMatch = resolveId(projectId);
+  const project = await Project.findOne(projectMatch);
   if (!project)
     throw new AppError(
       errors.PROJECT_NOT_FOUND.message,

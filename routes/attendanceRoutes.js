@@ -10,6 +10,7 @@ import {
   exportDepartmentAttendance,
   exportAttendanceStatistics,
   getAllStatuses,
+  getAttendanceById,
 } from "../controllers/attendanceController.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
@@ -221,6 +222,14 @@ router.get(
   authenticate,
   authorize(["Admin", "Supervisor"]),
   getAllStatuses
+);
+
+// Individual record routes
+router.get(
+  "/attendance/:id",
+  authenticate,
+  authorize(["Admin", "Supervisor", "Employee", "Intern"]),
+  getAttendanceById
 );
 
 // Update attendance record (Admin only)
