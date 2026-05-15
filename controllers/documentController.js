@@ -1,4 +1,5 @@
 import * as documentService from "../services/documentService.js";
+import * as documentStatsService from "../services/analytics/documentStatsService.js";
 
 // ------------------------------------------------------------------------------- //
 // ------------------------ PERSONAL DOCUMENTS CONTROLLERS ----------------------- //
@@ -9,7 +10,7 @@ export const uploadPersonalDocument = async (req, res, next) => {
   try {
     const result = await documentService.uploadPersonalDocumentService({
       targetUserId: req.params.id,
-      uploaderId: req.user.id,
+      uploader: req.user,
       file: req.file,
       title: req.body.title,
       isConfidential: req.body.isConfidential === "true",
@@ -26,6 +27,7 @@ export const deletePersonalDocument = async (req, res, next) => {
   try {
     const result = await documentService.deletePersonalDocumentService({
       documentId: req.params.id,
+      currentUser: req.user,
     });
 
     res.status(result.code).json(result);
@@ -113,6 +115,7 @@ export const uploadAdminDocument = async (req, res, next) => {
       title: req.body.title,
       documentTypeId: req.body.documentType_id,
       uploadedBy: req.user.id,
+      ip: req.ip,
     });
 
     res.status(result.code).json(result);
@@ -151,12 +154,59 @@ export const deleteAdminDocument = async (req, res, next) => {
   try {
     const result = await documentService.deleteAdminDocumentService({
       documentId: req.params.id,
+      currentUser: req.user,
+      ip: req.ip,
     });
 
     res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
   }
-  catch (err) {
-    next(err);  
+};
+
+// Generate an administratif document
+export const generateDocument = async (req, res, next) => {
+  try {
+    const { templateName } = req.params;
+
+    const result = await documentService.generateDocumentService({
+      templateName,
+      data: req.body,
+      uploadedBy: req.user.id,
+      ip: req.ip,
+    });
+
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Send a generated document by email
+export const sendGeneratedDocumentByEmail = async (req, res, next) => {
+  try {
+    const { documentId } = req.params;
+
+    const result = await documentService.sendGeneratedDocumentByEmailService({
+      documentId,
+      currentUser: req.user,
+      ip: req.ip,
+    });
+
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Get the document KPIs
+export const getAdminDocumentsKPIsService = async (req, res, next) => {
+  try {
+    const result = await documentStatsService.getAdminDocumentsKPIsService();
+
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
   }
 };
 
@@ -170,7 +220,11 @@ export const fulfillDocumentRequest = async (req, res) => {
     const file = req.file;
     if (!file) return res.status(400).json({ message: "No file provided" });
 
-    const result = await documentService.fulfillDocumentRequestService(id, file, req.user._id);
+    const result = await documentService.fulfillDocumentRequestService(
+      id,
+      file,
+      req.user._id,
+    );
     res.status(200).json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });

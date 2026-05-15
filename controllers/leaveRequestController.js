@@ -234,9 +234,6 @@ export const getLeaveRequestById = async (req, res, next) => {
   }
 };
 
-
-
-
 // Add a new leave request (Every authenticated user)
 export const addLeaveRequest = async (req, res, next) => {
   try {
@@ -278,10 +275,9 @@ export const addLeaveRequest = async (req, res, next) => {
       );
     }
 
-    // Gender validation (In case of childbirth leaves)
+    // Gender validation (In case of paternity/maternity leaves)
     if (
-      (leaveType.gender !== "Both" && leaveType.gender !== dbUser.gender) ||
-      (leaveType.requiresChildBirth && !dbUser.hasChildren)
+      (leaveType.gender !== "Both" && leaveType.gender !== dbUser.gender) 
     ) {
       throw new AppError(
         errors.INELIGIBLE_FOR_LEAVE_TYPE.message,

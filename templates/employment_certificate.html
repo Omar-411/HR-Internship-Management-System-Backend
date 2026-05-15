@@ -1,0 +1,323 @@
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Employment Certificate - DOTJCOM</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;900&amp;family=Noto+Serif:ital,wght@0,400;0,700;1,400&amp;family=Inter:wght@400;500&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-secondary-container": "#683d00",
+              "on-surface-variant": "#4b444d",
+              secondary: "#885200",
+              "on-background": "#111c2d",
+              "inverse-on-surface": "#ecf1ff",
+              tertiary: "#1e242a",
+              "on-error": "#ffffff",
+              "surface-dim": "#cfdaf2",
+              "on-error-container": "#93000a",
+              "tertiary-fixed": "#dde3eb",
+              surface: "#f9f9ff",
+              "on-secondary-fixed": "#2b1700",
+              background: "#f9f9ff",
+              "on-secondary-fixed-variant": "#673d00",
+              "on-primary-container": "#bb95cf",
+              "tertiary-container": "#333a40",
+              primary: "#341547",
+              "tertiary-fixed-dim": "#c1c7cf",
+              "surface-container-highest": "#d8e3fb",
+              "on-tertiary-fixed-variant": "#41474e",
+              "on-secondary": "#ffffff",
+              "surface-container-lowest": "#ffffff",
+              "primary-container": "#4b2c5e",
+              "on-primary-fixed-variant": "#593a6d",
+              "on-tertiary-container": "#9da3ab",
+              "on-primary": "#ffffff",
+              outline: "#7d747e",
+              "primary-fixed-dim": "#e0b8f4",
+              "inverse-surface": "#263143",
+              "error-container": "#ffdad6",
+              "surface-container-low": "#f0f3ff",
+              error: "#ba1a1a",
+              "on-primary-fixed": "#2b0c3e",
+              "surface-variant": "#d8e3fb",
+              "surface-tint": "#735186",
+              "surface-container": "#e7eeff",
+              "surface-container-high": "#dee8ff",
+              "primary-fixed": "#f4d9ff",
+              "on-tertiary": "#ffffff",
+              "secondary-fixed": "#ffdcbb",
+              "surface-bright": "#f9f9ff",
+              "outline-variant": "#cec3ce",
+              "secondary-container": "#ffa11e",
+              "secondary-fixed-dim": "#ffb869",
+              "on-surface": "#111c2d",
+              "inverse-primary": "#e0b8f4",
+              "on-tertiary-fixed": "#161c22",
+            },
+            borderRadius: {
+              DEFAULT: "0.25rem",
+              lg: "0.5rem",
+              xl: "0.75rem",
+              full: "9999px",
+            },
+            spacing: {
+              "signature-width": "200px",
+              "margin-page": "48px",
+              "dot-pattern-size": "8px",
+              "gutter-grid": "24px",
+              "section-gap": "40px",
+            },
+            fontFamily: {
+              "meta-label": ["Work Sans"],
+              "sub-title": ["Work Sans"],
+              "recipient-name": ["Noto Serif"],
+              "document-title": ["Work Sans"],
+              "body-text": ["Inter"],
+            },
+            fontSize: {
+              "meta-label": ["10px", { lineHeight: "14px", fontWeight: "600" }],
+              "sub-title": [
+                "28px",
+                {
+                  lineHeight: "36px",
+                  letterSpacing: "0.2em",
+                  fontWeight: "500",
+                },
+              ],
+              "recipient-name": [
+                "48px",
+                { lineHeight: "56px", fontWeight: "400" },
+              ],
+              "document-title": [
+                "64px",
+                {
+                  lineHeight: "72px",
+                  letterSpacing: "0.05em",
+                  fontWeight: "700",
+                },
+              ],
+              "body-text": ["12px", { lineHeight: "20px", fontWeight: "400" }],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      @page {
+        size: A4 landscape;
+        margin: 0;
+      }
+      body {
+        background: #f1f5f9;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+      }
+      .a4-container {
+        width: 297mm;
+        height: 210mm;
+        background: white;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        padding: 48px;
+      }
+      .dot-grid {
+        background-image: radial-gradient(#885200 1px, transparent 1px);
+        background-size: 8px 8px;
+      }
+      .geometric-accent {
+        clip-path: polygon(0 0, 100% 0, 0 100%);
+      }
+      .geometric-accent-inverted {
+        clip-path: polygon(100% 100%, 100% 0, 0 100%);
+      }
+    </style>
+  </head>
+  <body class="bg-surface-variant font-body-text text-on-surface">
+    <div class="a4-container relative border-[16px] border-primary-container">
+      <!-- Top-Left Decoration -->
+      <div
+        class="absolute top-0 left-0 w-64 h-64 overflow-hidden pointer-events-none"
+      >
+        <div
+          class="absolute top-0 left-0 w-full h-full bg-primary opacity-10 geometric-accent"
+        ></div>
+        <div
+          class="absolute top-4 left-4 w-32 h-32 bg-secondary opacity-20 geometric-accent"
+        ></div>
+        <div class="absolute top-8 left-8 w-16 h-16 dot-grid opacity-30"></div>
+      </div>
+      <!-- Bottom-Right Decoration -->
+      <div
+        class="absolute bottom-0 right-0 w-64 h-64 overflow-hidden pointer-events-none"
+      >
+        <div
+          class="absolute bottom-0 right-0 w-full h-full bg-primary opacity-10 geometric-accent-inverted"
+        ></div>
+        <div
+          class="absolute bottom-4 right-4 w-32 h-32 bg-secondary opacity-20 geometric-accent-inverted"
+        ></div>
+        <div
+          class="absolute bottom-16 right-16 w-16 h-16 dot-grid opacity-30"
+        ></div>
+      </div>
+      <!-- Shell: TopAppBar Logic (Integrated) -->
+      <header class="flex justify-between items-center w-full mb-12 z-10">
+        <div class="flex items-center gap-4">
+          <img
+            alt="DOTJCOM Logo"
+            class="h-16 w-auto object-contain"
+            src="https://i.ibb.co/rRF2dcSy/dotjcom-logo-only.png"
+          />
+          <span
+            class="font-document-title text-meta-label text-primary tracking-[0.3em] uppercase"
+            >DOTJCOM LTD</span
+          >
+        </div>
+      </header>
+      <!-- Main Content Canvas -->
+      <main class="flex-1 flex flex-col items-center text-center z-10">
+        <h1
+          class="font-document-title text-document-title text-primary mb-2 uppercase"
+        >
+          EMPLOYMENT CERTIFICATE
+        </h1>
+        <p
+          class="font-sub-title text-sub-title text-secondary mb-12 italic opacity-80"
+        >
+          This is to certify that
+        </p>
+        <div class="mb-12 relative py-4">
+          <div
+            class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-secondary/30 to-transparent"
+          ></div>
+          <h2
+            class="font-recipient-name text-recipient-name text-primary-container px-12"
+          >
+            {{full_name}}
+          </h2>
+          <div
+            class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-secondary/30 to-transparent"
+          ></div>
+        </div>
+        <div class="max-w-2xl mx-auto mb-12">
+          <p
+            class="font-body-text text-body-text text-on-surface leading-relaxed tracking-wide text-lg"
+          >
+            This document serves as an official confirmation that the individual
+            detailed above has been employed at
+            <span class="font-bold text-primary">DOTJCOM LTD</span> as
+            <span class="text-secondary font-semibold italic"
+              >{{position}}</span
+            >
+            from
+            <span class="font-medium underline decoration-secondary/40"
+              >{{start_date}}</span
+            >
+            to
+            <span class="font-medium underline decoration-secondary/40"
+              >{{end_date}}</span
+            >. We acknowledge their professional contributions during their
+            tenure.
+          </p>
+        </div>
+        <!-- Details Section -->
+        <div
+          class="w-full border-y border-slate-100 py-6 mb-16 flex justify-center"
+        >
+          <div class="text-center">
+            <span
+              class="font-meta-label text-meta-label text-slate-400 block mb-1 uppercase tracking-widest"
+            >
+              Issue Date
+            </span>
+
+            <span class="font-body-text text-primary font-bold">
+              {{issue_date}}
+            </span>
+          </div>
+        </div>
+        <!-- Signature & Seal Area -->
+        <div
+          class="w-full flex justify-between items-end mt-auto px-12 relative"
+        >
+          <!-- HR Manager Signature -->
+          <div class="text-center w-64">
+            <div class="border-b-2 border-primary mb-2">
+              <!-- Placeholder for signature -->
+              <div class="h-12"></div>
+            </div>
+            <p class="font-meta-label text-meta-label text-primary uppercase">
+              {{hr_manager_name}}
+            </p>
+            <p
+              class="font-body-text text-xs text-slate-500 uppercase tracking-tighter"
+            >
+              HR Manager
+            </p>
+          </div>
+          <!-- Gold Seal Medal -->
+          <div
+            class="absolute left-1/2 -translate-x-1/2 bottom-0 flex flex-col items-center"
+          >
+            <div class="relative">
+              <div
+                class="w-20 h-20 rounded-full bg-secondary shadow-lg flex items-center justify-center border-4 border-on-secondary-container/20"
+              >
+                <span
+                  class="material-symbols-outlined text-white text-4xl"
+                  data-weight="fill"
+                  >verified_user</span
+                >
+              </div>
+              <div
+                class="absolute -bottom-4 left-1/2 -translate-x-1/2 flex gap-1"
+              >
+                <div
+                  class="w-4 h-12 bg-secondary/80 transform -rotate-12 origin-top rounded-b-sm"
+                ></div>
+                <div
+                  class="w-4 h-12 bg-secondary/80 transform rotate-12 origin-top rounded-b-sm"
+                ></div>
+              </div>
+            </div>
+          </div>
+          <!-- Director Signature -->
+          <div class="text-center w-64">
+            <div class="border-b-2 border-primary mb-2">
+              <!-- Placeholder for signature -->
+              <div class="h-12"></div>
+            </div>
+            <p class="font-meta-label text-meta-label text-primary uppercase">
+              {{director_name}}
+            </p>
+            <p
+              class="font-body-text text-xs text-slate-500 uppercase tracking-tighter"
+            >
+              Director
+            </p>
+          </div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

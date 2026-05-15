@@ -13,6 +13,8 @@ import {
 } from "../utils/exportHelpers.js";
 import { exportAttendanceStats } from "../services/attendanceExportService.js";
 import { markPayrollDirty } from "../utils/payrollHelpers.js";
+import { createNotification } from "../services/notificationService.js";
+import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
 
 // The company location (For the location check-in)
 const COMPANY_LOCATION = {
@@ -30,9 +32,7 @@ const getDistanceInMeters = (lat1, lon1, lat2, lon2) => {
 
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) *
-    Math.cos(toRad(lat2)) *
-    Math.sin(dLon / 2) ** 2;
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
@@ -55,14 +55,12 @@ const purgeExpiredFaceChallenges = () => {
 };
 
 const signablePayloadString = (payload) => {
-  return JSON.stringify(
-    {
-      nonce: String(payload.nonce),
-      result: String(payload.result),
-      timestamp: Number(payload.timestamp),
-      userId: String(payload.userId),
-    }
-  );
+  return JSON.stringify({
+    nonce: String(payload.nonce),
+    result: String(payload.result),
+    timestamp: Number(payload.timestamp),
+    userId: String(payload.userId),
+  });
 };
 
 const safeEqualHex = (a, b) => {
@@ -77,12 +75,15 @@ const safeEqualHex = (a, b) => {
 };
 
 const verifyFaceProof = (jwtUserId, faceProof) => {
-  if (!FACE_ATTESTATION_SECRET) return { ok: false, message: "Face attestation secret is not configured" };
-  if (!faceProof || typeof faceProof !== "object") return { ok: false, message: "Missing faceProof" };
+  if (!FACE_ATTESTATION_SECRET)
+    return { ok: false, message: "Face attestation secret is not configured" };
+  if (!faceProof || typeof faceProof !== "object")
+    return { ok: false, message: "Missing faceProof" };
 
   const payload = faceProof.payload;
   const signature = faceProof.signature;
-  if (!payload || !signature) return { ok: false, message: "Invalid faceProof format" };
+  if (!payload || !signature)
+    return { ok: false, message: "Invalid faceProof format" };
 
   if (String(payload.userId) !== String(jwtUserId)) {
     return { ok: false, message: "Face proof user mismatch" };
@@ -109,8 +110,10 @@ const verifyFaceProof = (jwtUserId, faceProof) => {
   purgeExpiredFaceChallenges();
   const key = nonceKey(jwtUserId, payload.nonce);
   const challenge = faceNonceStore.get(key);
-  if (!challenge) return { ok: false, message: "Face challenge not found or expired" };
-  if (challenge.used) return { ok: false, message: "Face challenge already used" };
+  if (!challenge)
+    return { ok: false, message: "Face challenge not found or expired" };
+  if (challenge.used)
+    return { ok: false, message: "Face challenge already used" };
   if (challenge.expiresAt <= now) {
     faceNonceStore.delete(key);
     return { ok: false, message: "Face challenge expired" };
@@ -206,7 +209,8 @@ export const checkIn = async (req, res, next) => {
     if (!user.faceEnrolled) {
       return res.status(403).json({
         status: "Error",
-        message: "Face not enrolled! Please enroll your face before your check-in!",
+        message:
+          "Face not enrolled! Please enroll your face before your check-in!",
       });
     }
 
@@ -226,7 +230,8 @@ export const checkIn = async (req, res, next) => {
 
     // Determine presence status (late/present)
     let status = "present";
-    const resolvedStartTime = shift?.startTime || shift?.specialShiftData?.periods?.[0]?.startTime;
+    const resolvedStartTime =
+      shift?.startTime || shift?.specialShiftData?.periods?.[0]?.startTime;
 
     if (resolvedStartTime) {
       const [startHour, startMinute] = resolvedStartTime.split(":").map(Number);
@@ -237,7 +242,9 @@ export const checkIn = async (req, res, next) => {
       if (now > lateThreshold) status = "late";
     } else {
       // Fallback if no shift: mark late after 09:15 local time
-      console.warn(`[ATTENDANCE-FALLBACK] No shift timing found for user ${userId} on date ${todayUTC.toISOString().split('T')[0]}. Falling back to 09:15 threshold.`);
+      console.warn(
+        `[ATTENDANCE-FALLBACK] No shift timing found for user ${userId} on date ${todayUTC.toISOString().split("T")[0]}. Falling back to 09:15 threshold.`,
+      );
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
       if (currentHour > 9 || (currentHour === 9 && currentMinute > 15)) {
@@ -306,7 +313,9 @@ export const getMyStatus = async (req, res, next) => {
     const { start: today, end: tomorrow } = getUtcDayRange(new Date());
 
     const indicatesCheckIn = (record) =>
-      !!record?.checkInTime || record?.status === "present" || record?.status === "late";
+      !!record?.checkInTime ||
+      record?.status === "present" ||
+      record?.status === "late";
 
     // Check the user's existence
     const user = await User.findById(userId);
@@ -343,11 +352,17 @@ export const getMyStatus = async (req, res, next) => {
       }
     } else if (attendance && legacyCheckIn && !indicatesCheckIn(attendance)) {
       // Merge legacy check-in details into the canonical "today" record
-      attendance.checkInTime = legacyCheckIn.checkInTime || attendance.checkInTime;
-      attendance.checkOutTime = legacyCheckIn.checkOutTime ?? attendance.checkOutTime;
+      attendance.checkInTime =
+        legacyCheckIn.checkInTime || attendance.checkInTime;
+      attendance.checkOutTime =
+        legacyCheckIn.checkOutTime ?? attendance.checkOutTime;
       attendance.location = legacyCheckIn.location || attendance.location;
-      attendance.workLocation = legacyCheckIn.workLocation || attendance.workLocation;
-      if (legacyCheckIn.status === "present" || legacyCheckIn.status === "late") {
+      attendance.workLocation =
+        legacyCheckIn.workLocation || attendance.workLocation;
+      if (
+        legacyCheckIn.status === "present" ||
+        legacyCheckIn.status === "late"
+      ) {
         attendance.status = legacyCheckIn.status;
       }
       await attendance.save();
@@ -442,12 +457,16 @@ export const getAttendance = async (req, res, next) => {
     }
 
     if (role) {
-      const roleDoc = await UserRole.findOne({ name: { $regex: `^${role}$`, $options: "i" } });
+      const roleDoc = await UserRole.findOne({
+        name: { $regex: `^${role}$`, $options: "i" },
+      });
       if (roleDoc) userFilter.role_id = roleDoc._id;
     }
 
     if (department) {
-      const deptDoc = await Department.findOne({ name: { $regex: `^${department}$`, $options: "i" } });
+      const deptDoc = await Department.findOne({
+        name: { $regex: `^${department}$`, $options: "i" },
+      });
       if (deptDoc) userFilter.department_id = deptDoc._id;
     }
 
@@ -472,7 +491,7 @@ export const getAttendance = async (req, res, next) => {
           $lte: getEndOfDay(endDate),
         },
       };
-      const userIds = pagedUsers.map(u => u._id);
+      const userIds = pagedUsers.map((u) => u._id);
       attendanceFilter.userId = { $in: userIds };
 
       const records = await Attendance.find(attendanceFilter)
@@ -486,31 +505,34 @@ export const getAttendance = async (req, res, next) => {
         })
         .lean();
 
-
       // Map attendance onto the users (Left Join)
-      const mappedResults = pagedUsers.map(user => {
-        const record = records.find(r => r.userId.toString() === user._id.toString());
-        return record || {
-          userId: {
-            _id: user._id,
-            name: user.name,
-            lastName: user.lastName,
-            email: user.email,
-            role_id: user.role_id,
-            department_id: user.department_id,
-            supervisor_id: user.supervisor_id,
-          },
-          date: getStartOfDay(startDate),
-          status: "absent",
-          checkInTime: null,
-          checkOutTime: null,
-          workLocation: null,
-          isImplicit: true,
-        };
+      const mappedResults = pagedUsers.map((user) => {
+        const record = records.find(
+          (r) => r.userId.toString() === user._id.toString(),
+        );
+        return (
+          record || {
+            userId: {
+              _id: user._id,
+              name: user.name,
+              lastName: user.lastName,
+              email: user.email,
+              role_id: user.role_id,
+              department_id: user.department_id,
+              supervisor_id: user.supervisor_id,
+            },
+            date: getStartOfDay(startDate),
+            status: "absent",
+            checkInTime: null,
+            checkOutTime: null,
+            workLocation: null,
+            isImplicit: true,
+          }
+        );
       });
 
       // Special handling: if we return the user object inside 'userId', it matches 'populate' format
-      const finalResults = mappedResults.map(res => {
+      const finalResults = mappedResults.map((res) => {
         if (res.isImplicit) {
           // Flatten user if already populated
           return res;
@@ -522,7 +544,9 @@ export const getAttendance = async (req, res, next) => {
 
       // Mandatory Logging
       // [DEBUG-ATTENDANCE] Total users: X | Users with attendance: Y | Date: selectedDate
-      console.log(`[DEBUG-ATTENDANCE] Total users: ${totalUsers} | Users with attendance: ${records.length} | Page: ${parsedPage} | Date: ${startDate}`);
+      console.log(
+        `[DEBUG-ATTENDANCE] Total users: ${totalUsers} | Users with attendance: ${records.length} | Page: ${parsedPage} | Date: ${startDate}`,
+      );
 
       return res.status(200).json({
         status: "Success",
@@ -557,7 +581,7 @@ export const getAttendance = async (req, res, next) => {
       if (filter.userId && !Array.isArray(filter.userId)) {
         // A specific userId was already set — check if it's in the matched set
         const specificId = filter.userId.toString();
-        const inSet = userIds.some(id => id.toString() === specificId);
+        const inSet = userIds.some((id) => id.toString() === specificId);
         if (!inSet) {
           return res.status(200).json({
             status: "Success",
@@ -591,7 +615,9 @@ export const getAttendance = async (req, res, next) => {
       .lean();
 
     // [PAGINATION-DEBUG] Added log to track backend output
-    console.log(`[PAGINATION] Module: Attendance | Page: ${parsedPage || 1} | Limit: ${limit || 10} | Returned: ${attendanceRecords?.length || 0} records`);
+    console.log(
+      `[PAGINATION] Module: Attendance | Page: ${parsedPage || 1} | Limit: ${limit || 10} | Returned: ${attendanceRecords?.length || 0} records`,
+    );
 
     res.status(200).json({
       status: "Success",
@@ -637,7 +663,7 @@ export const updateAttendance = async (req, res, next) => {
     const updates = req.body;
 
     const attendance = await Attendance.findByIdAndUpdate(id, updates, {
-      new: true,
+      returnDocument: "after",
     });
 
     if (!attendance) {
@@ -647,14 +673,64 @@ export const updateAttendance = async (req, res, next) => {
       });
     }
 
+    // Get the user for notification and payroll purposes
+    const user = await User.findById(attendance.userId).select(
+      "name lastName supervisor_id",
+    );
+    if (!user) {
+      return res.status(404).json({
+        status: "Error",
+        message: "User associated with attendance not found!",
+      });
+    }
+
     // Mark related payroll as dirty for recalculation
-    await markPayrollDirty(attendance.userId, attendance.date, "Attendance updated");
+    await markPayrollDirty(
+      attendance.userId,
+      attendance.date,
+      "Attendance updated",
+    );
 
     // Emit real-time event for admin updates too
     req.app?.get("io")?.emit("attendanceUpdated", {
       action: "adminUpdate",
       attendance,
     });
+
+    // Send notification to the user about the attendance update
+    try {
+      await createNotification({
+        recipientId: user._id,
+        type: "ATTENDANCE",
+        title: "Attendance Record Updated",
+        message: `Your attendance record for ${attendance.date.toDateString()} has been updated.`,
+        data: {
+          entityType: "ATTENDANCE",
+          entityId: attendance._id,
+        },
+      });
+    } catch (error) {
+      console.log("Attendance update notification failed:", error.message);
+    }
+
+    // Notify all admins except the one who updated the attendance record
+    try {
+      await createNotificationForAdminsExcept({
+        excludedUserId: req.user.id,
+        type: "ATTENDANCE",
+        title: "Attendance Record Updated",
+        message: `An attendance record of ${user.name} ${user.lastName} for ${attendance.date.toDateString()} has been updated.`,
+        data: {
+          entityType: "ATTENDANCE",
+          entityId: attendance._id,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to send notification for attendance update:",
+        err,
+      );
+    }
 
     res.status(200).json({
       status: "success",
@@ -1008,15 +1084,23 @@ export const getAttendanceById = async (req, res, next) => {
     });
 
     if (!record) {
-      return res.status(404).json({ status: "Error", message: "Attendance record not found!" });
+      return res
+        .status(404)
+        .json({ status: "Error", message: "Attendance record not found!" });
     }
 
     const requesterId = String(req.user.id);
     const recordOwnerId = String(record.userId._id || record.userId);
     const role = req.user.role;
 
-    if (role !== "Admin" && role !== "Supervisor" && requesterId !== recordOwnerId) {
-      return res.status(403).json({ status: "Error", message: "Unauthorized!" });
+    if (
+      role !== "Admin" &&
+      role !== "Supervisor" &&
+      requesterId !== recordOwnerId
+    ) {
+      return res
+        .status(403)
+        .json({ status: "Error", message: "Unauthorized!" });
     }
 
     res.status(200).json({ status: "Success", code: 200, data: record });

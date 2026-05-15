@@ -67,15 +67,6 @@ export const getSupervisorDashboard = async (user) => {
     };
   });
 
-  // Late vs On-Time (Dummy weekly distribution for now, but based on real totals)
-  // In a real app, you'd group by week. Here we provide a 4-week snapshot.
-  const lateVsOnTime = [
-    { week: "Week 1", onTime: 12, late: 2 },
-    { week: "Week 2", onTime: 15, late: 1 },
-    { week: "Week 3", onTime: 10, late: 4 },
-    { week: "Week 4", onTime: 18, late: 0 },
-  ];
-
   return {
     status: "Success",
     code: 200,
@@ -85,7 +76,6 @@ export const getSupervisorDashboard = async (user) => {
       tasksOverview,
       activities,
       completionByUser,
-      lateVsOnTime
     },
   };
 };

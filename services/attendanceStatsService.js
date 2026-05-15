@@ -66,7 +66,7 @@ export const generateStats = async ({ startDate, endDate, periodType }) => {
         avgCheckInMinutes,
         totalAttendance: records.length, // Sum of present + late + absent
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
   }
 };

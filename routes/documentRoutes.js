@@ -12,6 +12,9 @@ import {
   consultAdminDocument,
   deleteAdminDocument,
   fulfillDocumentRequest,
+  generateDocument,
+  sendGeneratedDocumentByEmail,
+  getAdminDocumentsKPIsService,
 } from "../controllers/documentController.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
@@ -551,6 +554,14 @@ router.delete(
   deleteAdminDocument,
 );
 
+// Route to get the administrative documents KPIs (Admin only)
+router.get(
+  "/documents/administrative-docs/kpis",
+  authenticate,
+  authorize(["Admin"]),
+  getAdminDocumentsKPIsService,
+);
+
 // -------------------------------------------------------------- //
 // ----------------- DOCUMENT REQUESTS ROUTES ------------------- //
 // -------------------------------------------------------------- //
@@ -590,6 +601,22 @@ router.post(
   authenticate,
   upload("doc").single("file"),
   fulfillDocumentRequest,
+);
+
+// Route to generate an administrative document from a template
+router.post(
+  "/documents/generate/:templateName",
+  authenticate,
+  authorize(["Admin"]),
+  generateDocument,
+);
+
+// Route to send a generated document by email
+router.post(
+  "/documents/send-generated/:documentId",
+  authenticate,
+  authorize(["Admin"]),
+  sendGeneratedDocumentByEmail,
 );
 
 export default router;

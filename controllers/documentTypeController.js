@@ -26,8 +26,11 @@ export const getDocumentTypeById = async (req, res, next) => {
 // Add a new document type
 export const addDocumentType = async (req, res, next) => {
   try {
-    const result = await documentTypeService.createDocumentTypeService(req.body);
-    
+    const result = await documentTypeService.createDocumentTypeService(
+      req.body,
+      req.user,
+    );
+
     // Logging the action
     await logAuditAction({
       adminId: req.user.id,
@@ -48,19 +51,23 @@ export const addDocumentType = async (req, res, next) => {
 // Update a document type
 export const updateDocumentType = async (req, res, next) => {
   try {
-    const result = await documentTypeService.updateDocumentTypeService(req.params.id, req.body);
+    const result = await documentTypeService.updateDocumentTypeService(
+      req.params.id,
+      req.body,
+      req.user,
+    );
 
     // Logging the action
     await logAuditAction({
       adminId: req.user.id,
-        action: "UPDATE_DOCUMENT_TYPE", 
-        targetType: "DocumentType",
-        targetId: result.data._id,
-        targetName: result.data.name,
-        details: req.body,
-        ipAddress: req.ip,
+      action: "UPDATE_DOCUMENT_TYPE",
+      targetType: "DocumentType",
+      targetId: result.data._id,
+      targetName: result.data.name,
+      details: req.body,
+      ipAddress: req.ip,
     });
-    
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);

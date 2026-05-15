@@ -103,3 +103,70 @@ export const getForgetPasswordValidationContent = ({ name, resetLink }) => {
     <p>If you did not request this, please ignore this email!</p>
   `;
 };
+
+// Email of sending the generated document to the user
+export const getDocumentEmailContent = ({ name, documentTitle }) => {
+  return `
+    <h2 style="color: #232ED1;">
+      Official Document Notification
+    </h2>
+
+    <p>Dear ${name},</p>
+
+    <p>
+      We are pleased to inform you that your document,
+      <strong>${documentTitle}</strong>,
+      has been successfully generated and is now available.
+    </p>
+
+    <p>
+      Please find the document attached to this email for your records and use.
+    </p>
+
+    <p>
+      Should you require any additional information or assistance regarding this document,
+      please do not hesitate to contact us.
+    </p>
+  `;
+};
+
+// Email of account re-activation after being blocked or inactive
+export const getAccountReactivationContent = ({ name }) => {
+  return `
+    <h2 style="color: #232ED1;">Account Re-Activation!</h2>
+    <p>Dear ${name},</p>
+    <p>
+      We are pleased to inform you that your account has been re-activated. 
+      You can now log in to your HRcoM account and continue using our platform.
+    </p>
+    <p>
+      Please ensure to use the correct credentials to avoid any further issues. 
+      If you have forgotten your password, you can use the <strong>Forgot Password</strong> 
+      feature on the login page to reset it.
+    </p>
+    <p>
+      If you have any questions or need assistance, please do not hesitate 
+      to contact our support team.
+    </p>
+    <p>
+      We are glad to have you back on board and look forward to 
+      your continued success with us!
+    </p>
+  `;
+};
+
+// Email of account deactivation after being blocked or inactive
+export const getAccountDeactivationContent = ({ name }) => {
+  return `
+    <h2 style="color: #232ED1;">Account Deactivation!</h2>
+    <p>Dear ${name},</p>
+    <p>
+      We are sorry to inform you that your account has been deactivated. 
+      You will no longer be able to access your HRcoM account.
+    </p>
+    <p>
+      If you believe this is an error or if you have any questions, please do not hesitate 
+      to contact our support team.
+    </p>
+  `;
+};

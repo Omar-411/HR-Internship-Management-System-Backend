@@ -5,7 +5,7 @@ import { logAuditAction } from "../utils/logger.js";
 export const getAllDepartments = async (req, res, next) => {
   try {
     const result = await departmentService.getDepartments(req.query);
-    
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -21,12 +21,15 @@ export const getDepartmentById = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-}; 
+};
 
-// Add new Department Functionnality 
+// Add new Department Functionnality
 export const addDepartment = async (req, res, next) => {
-  try{
-    const result = await departmentService.createDepartmentService(req.body);
+  try {
+    const result = await departmentService.createDepartmentService(
+      req.body,
+      req.user,
+    );
 
     // Logging the action
     await logAuditAction({
@@ -40,16 +43,19 @@ export const addDepartment = async (req, res, next) => {
     });
 
     res.status(result.code).json(result);
-  }
-  catch(err){
+  } catch (err) {
     next(err);
   }
-}; 
+};
 
 // Update a Department
 export const updateDepartment = async (req, res, next) => {
   try {
-    const result = await departmentService.updateDepartmentService(req.params.id, req.body);
+    const result = await departmentService.updateDepartmentService(
+      req.params.id,
+      req.body,
+      req.user,
+    );
 
     // Logging the action
     await logAuditAction({
@@ -71,9 +77,12 @@ export const updateDepartment = async (req, res, next) => {
 // Delete a Department (All admins can do it)
 export const deleteDepartment = async (req, res, next) => {
   try {
-    const deletedDepartment = await departmentService.deleteDepartmentService(req.params.id);
+    const deletedDepartment = await departmentService.deleteDepartmentService(
+      req.params.id,
+      req.user,
+    );
 
-    // Logging the action    
+    // Logging the action
     await logAuditAction({
       adminId: req.user.id,
       action: "DELETE_DEPARTMENT",

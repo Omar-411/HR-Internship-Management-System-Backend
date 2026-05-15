@@ -7,7 +7,6 @@ import { errors } from "../errors/payrollErrors.js";
 import { errors as commonErrors } from "../errors/commonErrors.js";
 import { errors as payrollConfigErrors } from "../errors/payrollConfigErrors.js";
 import AppError from "../utils/AppError.js";
-import { validateUserStatus } from "../validators/authValidators.js";
 import {
   calculateProratedSalary,
   calculateOvertime,
@@ -22,9 +21,13 @@ import {
   buildBonusesSnapshot,
   canAccessPayroll,
   computePayroll,
+  generatePayrollExcel,
+  buildPayslipData,
 } from "../utils/payrollHelpers.js";
 import { getOne, getAll } from "./handlersFactory.js";
 import { logAuditAction } from "../utils/logger.js";
+import { generateDocumentService } from "./documentService.js";
+import { validateUserStatus } from "../validators/authValidators.js";
 
 // Payroll calculation for an employee for a given month and year
 export const calculatePayroll = async (employeeId, month, year) => {
@@ -249,10 +252,28 @@ export const validatePayroll = async (payrollId, user, ip) => {
     // Get the employee details for the audit log
     await payroll.populate({
       path: "employeeId",
-      select: "name lastName",
+      select: "name lastName email position department_id employment joinDate",
+      populate: {
+        path: "department_id",
+        select: "name",
+      },
     });
 
     const employee = payroll.employeeId;
+
+    // Prepare the data for the payslip generation
+    const payslipData = buildPayslipData(payroll, employee);
+
+    // Generate the pdf payslip automatically
+    await generateDocumentService({
+      templateName: "monthly_payslip",
+      data: {
+        userId: employee._id,
+        ...payslipData,
+      },
+      uploadedBy: user.id,
+      ip,
+    });
 
     // Create the audit log for this action
     await logAuditAction({
@@ -272,7 +293,10 @@ export const validatePayroll = async (payrollId, user, ip) => {
       data: payroll,
     };
   } catch (err) {
-    await session.abortTransaction();
+    try {
+      await session.abortTransaction();
+    } catch (_) {}
+
     session.endSession();
     throw err;
   }
@@ -358,16 +382,6 @@ export const recomputePayroll = async (payrollId, user, ip) => {
     );
   }
 
-  // Only draft payrolls can be recomputed
-  if (payroll.status !== "draft") {
-    throw new AppError(
-      errors.PAYROLL_NOT_DRAFT.message,
-      errors.PAYROLL_NOT_DRAFT.code,
-      errors.PAYROLL_NOT_DRAFT.errorCode,
-      errors.PAYROLL_NOT_DRAFT.suggestion,
-    );
-  }
-
   const employee = await User.findById(payroll.employeeId);
   if (!employee) {
     throw new AppError(
@@ -388,12 +402,13 @@ export const recomputePayroll = async (payrollId, user, ip) => {
     config,
   );
 
-  // Merge result safely
-  payroll.set(recomputed);
+  // Replace only the re-computed fields
+  Object.assign(payroll, recomputed);
 
   // Reset flags after recompute
   payroll.recalculationRequired = false;
-  payroll.recalculationReason = payroll.recalculationReason || "Manual recompute";
+  payroll.recalculationReason =
+  payroll.recalculationReason || "Manual recompute";
   payroll.recomputedAt = new Date();
   payroll.recomputedBy = user.id;
 
@@ -416,6 +431,45 @@ export const recomputePayroll = async (payrollId, user, ip) => {
     message: "Payroll recomputed successfully!",
     data: payroll,
   };
+};
+
+// Export payroll to Excel (Admin only)
+export const exportPayrollToExcel = async (payrollId, currentUser, res) => {
+  // Retrieve payroll with employee information
+  const payroll = await Payroll.findById(payrollId).populate({
+    path: "employeeId",
+    select: "name lastName email position",
+  });
+
+  if (!payroll) {
+    throw new AppError(
+      errors.PAYROLL_NOT_FOUND.message,
+      errors.PAYROLL_NOT_FOUND.code,
+      errors.PAYROLL_NOT_FOUND.errorCode,
+      errors.PAYROLL_NOT_FOUND.suggestion,
+    );
+  }
+
+  // Ensure user has access
+  canAccessPayroll(currentUser, payroll.employeeId);
+
+  // Generate Excel buffer
+  const buffer = await generatePayrollExcel(payroll);
+
+  // Create the personnalised filename
+  const employee = payroll.employeeId;
+  const safeName = `${employee.name}_${employee.lastName}`.replace(/\s+/g, "_");
+  const filename = `Payslip_${safeName}_${payroll.month}_${payroll.year}.xlsx`;
+
+  // Send file
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+  res.send(buffer);
 };
 
 // Bulk calculation for all eligible employees for a given month and year

@@ -5,7 +5,7 @@ import { logAuditAction } from "../utils/logger.js";
 export const getAllUserRoles = async (req, res, next) => {
   try {
     const result = await userRoleService.getUserRoles(req.query);
-    
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -23,10 +23,13 @@ export const getUserRoleById = async (req, res, next) => {
   }
 };
 
-// Add new Role Functionnality 
+// Add new Role Functionnality
 export const addUserRole = async (req, res, next) => {
-  try{
-    const result = await userRoleService.createUserRoleService(req.body);
+  try {
+    const result = await userRoleService.createUserRoleService(
+      req.body,
+      req.user,
+    );
 
     // Logging the action
     await logAuditAction({
@@ -40,16 +43,19 @@ export const addUserRole = async (req, res, next) => {
     });
 
     res.status(result.code).json(result);
-  }
-  catch(err){
+  } catch (err) {
     next(err);
   }
-}; 
+};
 
 // Update a User Role
 export const updateUserRole = async (req, res, next) => {
   try {
-    const result = await userRoleService.updateUserRoleService(req.params.id, req.body);
+    const result = await userRoleService.updateUserRoleService(
+      req.params.id,
+      req.body,
+      req.user,
+    );
 
     // Logging the action
     await logAuditAction({
@@ -71,9 +77,12 @@ export const updateUserRole = async (req, res, next) => {
 // Delete a User Role (All admins can do it)
 export const deleteUserRole = async (req, res, next) => {
   try {
-    const deletedRole = await userRoleService.deleteUserRoleService(req.params.id);
+    const deletedRole = await userRoleService.deleteUserRoleService(
+      req.params.id,
+      req.user,
+    );
 
-    // Logging the action    
+    // Logging the action
     await logAuditAction({
       adminId: req.user.id,
       action: "DELETE_ROLE",

@@ -21,8 +21,8 @@ cron.schedule("10 0 1 * *", async () => {
 
     // Fetch the active users (Exclude the Interns since they don't have payroll)
     const users = await User.find({
-      status: "active",
-      role_id: { $ne: internRole._id },
+      status: "Active",
+      role_id: { $ne: internRole?._id },
     });
 
     if (!users.length) {
@@ -32,36 +32,12 @@ cron.schedule("10 0 1 * *", async () => {
 
     for (const user of users) {
       try {
-        // Prevent duplicate payrolls
-        const existing = await Payroll.findOne({
-          employeeId: user._id,
-          month,
-          year,
-        });
-
-        if (existing) {
-          console.log(
-            `[CRON] Payroll already exists for ${user.name} ${user.lastName}`,
-          );
-          continue;
-        }
-
         // Compute payroll snapshot
         const computed = await calculatePayroll(
           user._id,
           month,
           year,
         );
-
-        // Create payroll draft
-        await Payroll.create({
-          employeeId: user._id,
-          month,
-          year,
-          ...computed,
-          status: "draft",
-          recalculationRequired: false,
-        });
 
         console.log(`[CRON] Payroll created for ${user.name} ${user.lastName}`);
       } catch (err) {

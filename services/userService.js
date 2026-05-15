@@ -29,10 +29,9 @@ import {
 import { sendEmail } from "../utils/sendEmail.js";
 import { logAuditAction } from "../utils/logger.js";
 import { buildQuery } from "../utils/queryBuilder.js";
+import { SENSITIVE_FIELDS } from "../constants/userConstants.js";
+import { createNotification } from "./notificationService.js";
 import { resolveId } from "../utils/idResolver.js";
-
-// Sensitive fields that must never leave the backend
-const SENSITIVE_FIELDS = "-password -verificationCode -verificationCodeExpires -resetPasswordToken -resetPasswordExpires -loginAttempts -resendCount -resendDate -mustResetPassword";
 
 const ROLE_SALARY_DEFAULTS = {
   employee: 1800,
@@ -41,11 +40,16 @@ const ROLE_SALARY_DEFAULTS = {
 };
 
 // Get a single user by Id
-export const getUser = getOne(User, commonErrors.USER_NOT_FOUND, [
-  { path: "role_id", select: "name" },
-  { path: "department_id", select: "name" },
-  { path: "supervisor_id", select: "name lastName email" },
-], SENSITIVE_FIELDS);
+export const getUser = getOne(
+  User,
+  commonErrors.USER_NOT_FOUND,
+  [
+    { path: "role_id", select: "name" },
+    { path: "department_id", select: "name" },
+    { path: "supervisor_id", select: "name lastName email" },
+  ],
+  SENSITIVE_FIELDS,
+);
 
 // Get all users
 export const getUsers = async (queryParams) => {
@@ -190,7 +194,13 @@ export const addUserService = async (data, currentUser, ip) => {
   }
 
   // Check the CIN/Passport validity
-  fullCINPassportValidation(idType, idCountryCode, trimmedIdNumber, issueDate, issuePlace);
+  fullCINPassportValidation(
+    idType,
+    idCountryCode,
+    trimmedIdNumber,
+    issueDate,
+    issuePlace,
+  );
 
   // Resolve role, department and supervisor
   const roleId = await resolveRoleId(role);
@@ -201,7 +211,9 @@ export const addUserService = async (data, currentUser, ip) => {
   if (supervisor_id) {
     resolvedSupervisorId = await resolveSupervisorId(supervisor_id);
   } else if (trimmedSupervisorEmail) {
-    resolvedSupervisorId = await resolveSupervisorIdByEmail(trimmedSupervisorEmail);
+    resolvedSupervisorId = await resolveSupervisorIdByEmail(
+      trimmedSupervisorEmail,
+    );
   }
 
   // Password + OTP Code generation
@@ -257,7 +269,7 @@ export const addUserService = async (data, currentUser, ip) => {
     employment: {
       contractJoinDate,
       contractEndDate,
-      contractType: contractType || "CDI",
+      contractType: contractType || "CDI", // Default value, will be updated later
     },
     salary: roleLower === "intern" ? undefined : { base: baseSalary || 0, currency: "DT" },
   });
@@ -270,20 +282,21 @@ export const addUserService = async (data, currentUser, ip) => {
   const INTERN_DEFAULTS = {
     "Annual Leave": 13,
     "Sick Leave": 8,
-    "Personal": 3,
+    Personal: 3,
   };
 
-  const leaveBalances = role === "Intern"
-    ? leaveTypes
-        .filter((type) => INTERN_ALLOWED.includes(type.name))
-        .map((type) => ({
+  const leaveBalances =
+    role === "Intern"
+      ? leaveTypes
+          .filter((type) => INTERN_ALLOWED.includes(type.name))
+          .map((type) => ({
+            typeId: type._id,
+            remainingDays: INTERN_DEFAULTS[type.name] ?? type.defaultDays,
+          }))
+      : leaveTypes.map((type) => ({
           typeId: type._id,
-          remainingDays: INTERN_DEFAULTS[type.name] ?? type.defaultDays,
-        }))
-    : leaveTypes.map((type) => ({
-        typeId: type._id,
-        remainingDays: type.defaultDays,
-      }));
+          remainingDays: type.defaultDays,
+        }));
 
   user.leaveBalances = leaveBalances;
   await user.save();
@@ -302,10 +315,28 @@ export const addUserService = async (data, currentUser, ip) => {
     console.log("Email failed:", e.message);
   }
 
+  // Notify the supervisor about the new team member assignment
+  if (resolvedSupervisorId) {
+    try {
+      await createNotification({
+        recipientId: resolvedSupervisorId,
+        type: "ACCOUNT",
+        title: "New Team Member Assigned",
+        message: `${user.name} ${user.lastName} has been assigned to you.`,
+        data: {
+          entityType: "USER",
+          entityId: user._id,
+        },
+      });
+    } catch (error) {
+      console.log("Notification failed:", error.message);
+    }
+  }
+
   // Log the creation action in the audit logs
   try {
     await logAuditAction({
-      adminId: currentUser._id,
+      adminId: currentUser.id,
       action: "CREATE_USER",
       targetType: "User",
       targetId: user._id,
@@ -320,8 +351,7 @@ export const addUserService = async (data, currentUser, ip) => {
     status: "Success",
     code: 201,
     message: "User created successfully!",
-    // Sanitize: strip all sensitive fields before returning to client
-    result: {
+    data: {
       _id: user._id,
       name: user.name,
       lastName: user.lastName,
@@ -346,6 +376,12 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
       commonErrors.USER_NOT_FOUND.suggestion,
     );
 
+  // Store the old supervisor ID for later comparison (if the supervisor is being updated)
+  const oldSupervisorId = existingUser.supervisor_id
+    ? existingUser.supervisor_id.toString()
+    : null;
+
+  // Get the actual ID string for comparison in uniqueness checks 
   const actualId = existingUser._id.toString();
 
   // Check the email validity and the user existence
@@ -532,7 +568,10 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     );
     updateData.supervisor_id = supervisorId;
     delete updateData.supervisor_email;
-  } else if ("supervisor_email" in updateData || "supervisor_id" in updateData) {
+  } else if (
+    "supervisor_email" in updateData ||
+    "supervisor_id" in updateData
+  ) {
     // Explicitly clearing the supervisor
     updateData.supervisor_id = null;
     if ("supervisor_email" in updateData) delete updateData.supervisor_email;
@@ -540,12 +579,37 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
 
   // Update the Status of the user
   if (updateData.isActive !== undefined) {
-    if (updateData.isActive) {
-      updateData.status = "Active";
-    } else if (existingUser.status !== "Pending" && existingUser.status !== "Blocked") {
-      // Only set to Inactive if it wasn't already a special state
-      updateData.status = "Inactive";
+    updateData.status = updateData.isActive ? "Active" : "Inactive";
+
+    // In case the admin unblocked or un-inactivated the user, we reset the login attempts to 0 and send an email
+    if (
+      updateData.status === "Active" &&
+      existingUser.status !== updateData.status
+    ) {
+      existingUser.loginAttempts = 0;
+      await existingUser.save();
+
+      try {
+        console.log(
+          `[UPDATE-USER-DEBUG] Sending account re-activated email to: ${existingUser.email}`,
+        );
+
+        await sendEmail({
+          to: existingUser.email,
+          subject: "HRcoM! - Your Account Has Been Re-Activated",
+          type: "accountReactivation",
+          name: existingUser.name,
+        });
+
+        console.log(`[UPDATE-USER-DEBUG] Activation Email sent successfully.`);
+      } catch (emailErr) {
+        console.log(
+          `[UPDATE-USER-DEBUG] ACTIVATION EMAIL FAILED:`,
+          emailErr.message,
+        );
+      }
     }
+
     delete updateData.isActive;
   }
 
@@ -567,6 +631,68 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     .populate("department_id")
     .populate("supervisor_id", "name lastName email");
 
+  // Get the new supervisor ID after the update (for comparison with the old supervisor ID)
+  const newSupervisorId = user.supervisor_id
+    ? user.supervisor_id._id.toString()
+    : null;
+
+  // Check if the supervisor is changed
+  if (oldSupervisorId !== newSupervisorId) {
+    // Notify the old supervisor about the team member removal change (if exists)
+    if (oldSupervisorId) {
+      try {
+        await createNotification({
+          recipientId: oldSupervisorId,
+          type: "ACCOUNT",
+          title: "Team Member Removed",
+          message: `${user.name} ${user.lastName} is no longer assigned to you.`,
+          // No redirect for this notification, it's just informational
+          data: {
+            entityType: null,
+            entityId: null,
+          },
+        });
+      } catch (error) {
+        console.log("Team Member Removal Notification failed:", error.message);
+      }
+    }
+
+    // Notify the new supervisor
+    if (newSupervisorId) {
+      await createNotification({
+        recipientId: newSupervisorId,
+        type: "ACCOUNT",
+        title: "New Team Member Assigned",
+        message: `${user.name} ${user.lastName} has been assigned to you.`,
+        data: {
+          entityType: "USER",
+          entityId: user._id,
+        },
+      });
+    }
+  }
+
+  // Notify the user about the profile update (In case the updater is an Admin, not himself)
+  if (
+    currentUser.role === "Admin" &&
+    currentUser.id.toString() !== user._id.toString()
+  ) {
+    try {
+      await createNotification({
+        recipientId: user._id,
+        type: "ACCOUNT",
+        title: "Profile Updated",
+        message: "Your profile information has been updated by HR.",
+        data: {
+          entityType: "USER",
+          entityId: user._id,
+        },
+      });
+    } catch (err) {
+      console.log("Profile update notification failed:", err.message);
+    }
+  }
+
   // Send the update user email ONLY if role changed
   if (roleChanged) {
     try {
@@ -579,12 +705,15 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
         subject: "HRcoM! - Congratulations! Your Role Has Been Updated",
         type: "updateUser",
         name: user.name,
-        newRole: newRoleName,
+        newRole: user.position,
       });
 
-      console.log(`[UPDATE-USER-DEBUG] Email sent successfully.`);
+      console.log(`[UPDATE-USER-DEBUG] Promotion Email sent successfully.`);
     } catch (emailErr) {
-      console.log(`[UPDATE-USER-DEBUG] EMAIL FAILED:`, emailErr.message);
+      console.log(
+        `[UPDATE-USER-DEBUG] PROMOTION EMAIL FAILED:`,
+        emailErr.message,
+      );
     }
   }
 
@@ -635,8 +764,28 @@ export const deleteUserService = async (userId, currentUser, ip) => {
   // Delete documents from DB
   await Document.deleteMany({ user_id: actualId });
 
+  // Store the supervisor ID before deleting the user (for supervisor notification after deletion)
+  const supervisorId = user.supervisor_id;
+
   // Delete the user
   await User.findByIdAndDelete(actualId);
+
+  if (supervisorId) {
+    try {
+      await createNotification({
+        recipientId: supervisorId,
+        type: "ACCOUNT",
+        title: "Team Member Removed",
+        message: `${user.name} ${user.lastName} has been removed from your team.`,
+        data: {
+          entityType: null,
+          entityId: null,
+        },
+      });
+    } catch (err) {
+      console.log("Supervisor user deletion notification failed:", err.message);
+    }
+  }
 
   // Audit log the deletion of the user + associated personal documents
   await logAuditAction({
@@ -668,7 +817,35 @@ export const toggleUserStatusService = async (id, currentUser, ip) => {
     );
   }
 
+  const oldStatus = user.status;
+
   user.status = user.status === "Active" ? "Inactive" : "Active";
+
+  if (oldStatus !== "Active" && user.status === "Active") {
+    // Send the account re-activation email to the user
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: "HRcoM! - Your Account Has Been Re-Activated",
+        type: "accountReactivation",
+        name: user.name,
+      });
+    } catch (e) {
+      console.log("Email failed:", e.message);
+    }
+  } else if (oldStatus === "Active" && user.status !== "Active") {
+    // Send the account deactivation email to the user
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: "HRcoM! - Your Account Has Been Deactivated",
+        type: "accountDeactivation",
+        name: user.name,
+      });
+    } catch (e) {
+      console.log("Email failed:", e.message);
+    }
+  }
 
   await user.save();
 
@@ -686,7 +863,6 @@ export const toggleUserStatusService = async (id, currentUser, ip) => {
     status: "Success",
     code: 200,
     message: `User status changed to ${user.status} successfully!`,
-    // Sanitize: re-fetch with select to strip sensitive fields
     data: await User.findById(user._id)
       .select(`-faceDescriptors ${SENSITIVE_FIELDS}`)
       .populate("role_id", "name")
@@ -868,6 +1044,27 @@ export const uploadProfileImageService = async (
     { returnDocument: "after" },
   );
 
+  // Notify the user only if an admin modified someone else's profile
+  if (
+    currentUser.role === "Admin" &&
+    currentUser.id.toString() !== user._id.toString()
+  ) {
+    try {
+      await createNotification({
+        recipientId: user._id,
+        type: "ACCOUNT",
+        title: "Profile Picture Updated",
+        message: "Your profile picture has been updated by HR.",
+        data: {
+          entityType: "USER",
+          entityId: user._id,
+        },
+      });
+    } catch (err) {
+      console.log("Profile picture update notification failed:", err.message);
+    }
+  }
+
   // Audit log
   await logAuditAction({
     adminId: currentUser.id,
@@ -917,6 +1114,27 @@ export const removeProfileImageService = async (userId, currentUser, ip) => {
     },
     { returnDocument: "after" },
   );
+
+  // Notify the user only if an admin modified someone else's profile
+  if (
+    currentUser.role === "Admin" &&
+    currentUser.id.toString() !== user._id.toString()
+  ) {
+    try {
+      await createNotification({
+        recipientId: user._id,
+        type: "ACCOUNT",
+        title: "Profile Picture Removed",
+        message: "Your profile picture has been removed by HR.",
+        data: {
+          entityType: "USER",
+          entityId: user._id,
+        },
+      });
+    } catch (err) {
+      console.log("Profile picture removal notification failed:", err.message);
+    }
+  }
 
   // Audit log
   await logAuditAction({

@@ -361,7 +361,7 @@ export const markDocumentRequestAsFulfilled = async (requestId, user) => {
   };
 };
 
-// Reject a document request
+// Reject a document request file response (Only the requester can reject and ask for re-upload)
 export const rejectDocumentRequest = async (requestId, comment, user) => {
   const request = await DocumentRequest.findById(requestId);
   if (!request) {

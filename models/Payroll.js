@@ -243,7 +243,7 @@ const payrollSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    recalculationReason: {
+    recalculationMessage: {
       // Reason for recalculation (e.g., "Attendance Change", "Bonus Update", etc.)
       type: String,
       default: null,

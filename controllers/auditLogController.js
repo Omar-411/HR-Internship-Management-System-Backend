@@ -132,6 +132,30 @@ const formatAuditLog = (log) => {
     case "CREATE_NEW_PAYROLL_CONFIG_VERSION":
       description = `Created New Version of Payroll Configuration for ${log.target_name || ""}`;
       break;
+    case "UPLOAD_ADMIN_DOCUMENT":
+      description = `Uploaded Administrative Document ${log.target_name || ""}`;
+      break;
+    case "DELETE_ADMIN_DOCUMENT":
+      description = `Deleted Administrative Document ${log.target_name || ""}`;
+      break;
+    case "GENERATE_DOCUMENT":
+      description = `Generated Document ${log.target_name || ""}`;
+      break;
+    case "SEND_GENERATED_DOCUMENT_BY_EMAIL":
+      description = `Sent Generated Document ${log.target_name || ""} by Email`;
+      break;
+    case "PROCESS_FINAL_SETTLEMENT":
+      description = `Processed Final Settlement for ${log.target_name || ""}`;
+      break;
+    case "MARK_ALERT_UNDER_REVIEW":
+      description = `Marked Alert of ${log.target_name || ""} as Under Review`;
+      break;
+    case "RESOLVE_ALERT":
+      description = `Resolved Alert of ${log.target_name || ""}`;
+      break;
+    case "DISMISS_ALERT":
+      description = `Dismissed Alert of ${log.target_name || ""}`;
+      break;
     default:
       description = `Performed ${log.action} on ${log.target_type || "Target"}`;
   }

@@ -3,6 +3,11 @@ import { errors } from "../errors/leaveTypeErrors.js";
 import AppError from "../utils/AppError.js";
 import { logAuditAction } from "../utils/logger.js"; // For audit logs
 import { getAll } from "../services/handlersFactory.js";
+import {
+  syncLeaveTypeToUsers,
+  addLeaveTypeToUsers,
+  removeLeaveTypeFromUsers,
+} from "../services/leaveWalletService.js";
 
 // ---------------------------------------------------------------- //
 // ----------------------- HELPER FUNCTIONS ----------------------- //
@@ -90,7 +95,7 @@ export const checkLeaveTypeNameExistence = async (name, id) => {
 // ---------------------- LEAVE TYPE MANAGEMENT ------------------- //
 // ---------------------------------------------------------------- //
 
-// Get all leave types 
+// Get all leave types
 export const getAllLeaveTypes = async (req, res, next) => {
   try {
     let queryParams = req.query;
@@ -98,14 +103,9 @@ export const getAllLeaveTypes = async (req, res, next) => {
       ...queryParams,
       limit: queryParams.limit || 100,
       sort: "-createdAt",
-    }
+    };
 
-    const result = await getAll(
-      LeaveType,
-      null,
-      null,
-      ["name"]
-    )(queryParams);
+    const result = await getAll(LeaveType, null, null, ["name"])(queryParams);
 
     res.status(result.code).json(result);
   } catch (err) {
@@ -117,14 +117,14 @@ export const getAllLeaveTypes = async (req, res, next) => {
 export const addLeaveType = async (req, res, next) => {
   try {
     let { name } = req.body;
-    const { 
-      description, 
-      isPaid, 
+    const {
+      description,
+      isPaid,
       deductFrom,
       defaultDays,
       maxDays,
-      gender, 
-      requiresChildBirth 
+      gender,
+      requiresChildBirth,
     } = req.body;
 
     // Validate the leave type name
@@ -167,6 +167,9 @@ export const addLeaveType = async (req, res, next) => {
       maxDays,
     });
 
+    // Add the new leave type to all users' leave balances
+    await addLeaveTypeToUsers(newLeaveType);
+
     // Logging the action
     try {
       await logAuditAction({
@@ -196,15 +199,15 @@ export const addLeaveType = async (req, res, next) => {
 export const updateLeaveType = async (req, res, next) => {
   try {
     const { id } = req.params;
-    let { 
-      name, 
-      description, 
-      isPaid, 
+    let {
+      name,
+      description,
+      isPaid,
       defaultDays,
       maxDays,
       deductFrom,
       gender,
-      requiresChildBirth 
+      requiresChildBirth,
     } = req.body;
 
     // Check the leave type existance
@@ -217,6 +220,9 @@ export const updateLeaveType = async (req, res, next) => {
         errors.LEAVE_TYPE_NOT_FOUND.suggestion,
       );
     }
+
+    // Store the old defaultDays value before the update
+    const oldDefaultDays = existingLeaveType.defaultDays;
 
     // Prevent updating an archived leave type
     if (existingLeaveType.status === "Archived") {
@@ -272,7 +278,7 @@ export const updateLeaveType = async (req, res, next) => {
     }
 
     // Update requiresChildBirth
-    const finalGender = gender?? existingLeaveType.gender;
+    const finalGender = gender ?? existingLeaveType.gender;
     if (requiresChildBirth !== undefined) {
       if (requiresChildBirth && finalGender === "Both") {
         throw new AppError(
@@ -289,6 +295,15 @@ export const updateLeaveType = async (req, res, next) => {
       returnDocument: "after",
       runValidators: true,
     });
+
+    // Only sync if defaultDays was actually changed
+    if (defaultDays !== undefined) {
+      await syncLeaveTypeToUsers(
+        id,
+        oldDefaultDays,
+        updatedLeaveType.defaultDays,
+      );
+    }
 
     // Logging the action
     try {
@@ -345,6 +360,9 @@ export const archiveLeaveType = async (req, res, next) => {
     existingLeaveType.status = "Archived";
     await existingLeaveType.save();
 
+    // Remove the leave type from users' leave balances
+    await removeLeaveTypeFromUsers(existingLeaveType._id);
+
     // Logging the action
     try {
       await logAuditAction({
@@ -399,6 +417,9 @@ export const restoreLeaveType = async (req, res, next) => {
     // Restore the leave type
     existingLeaveType.status = "Active";
     await existingLeaveType.save();
+
+    // Add the restored leave type to all users' leave balances
+    await addLeaveTypeToUsers(existingLeaveType);
 
     // Logging the action
     try {

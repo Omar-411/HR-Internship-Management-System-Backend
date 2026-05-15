@@ -17,17 +17,7 @@ import {
 import { isProjectInactive } from "../validators/projectValidators.js";
 import { isTeamMemberOrProductOwnerOrAdmin } from "../utils/projectHelpers.js";
 import { resolveId } from "../utils/idResolver.js";
-
-const normalizeStatus = (status) => {
-  if (!status) return status;
-  const s = status.toLowerCase().replace(/[_-]/g, " ");
-  if (s === "backlog") return "Backlog";
-  if (s === "todo" || s === "to do") return "To Do";
-  if (s === "in progress") return "In Progress";
-  if (s === "review") return "Review";
-  if (s === "done") return "Done";
-  return status;
-};
+import { normalizeStatus } from "../utils/taskHelpers.js";
 
 // Get all the statuses of a task
 export const getAllTaskStatuses = async (req, res, next) => {
@@ -384,9 +374,6 @@ export const getTaskById = async (req, res, next) => {
 // Add a task to a specific project (Product owner only)
 export const addTask = async (req, res, next) => {
   try {
-    console.log("✅ ADD TASK CONTROLLER HIT");
-    console.log("PARAM ID:", req.params.id);
-    console.log("BODY:", req.body);
     // Get the project ID to which the task will be added
     const { id } = req.params;
 
@@ -403,12 +390,9 @@ export const addTask = async (req, res, next) => {
       dueDate,
     } = req.body;
 
-    console.log("ASSIGNEES RECEIVED:", assignees);
-
     // Check the project existence
     const project = await Project.findOne(resolveId(id));
     if (!project) {
-      console.log("❌ FAIL REASON: project not found");
       throw new AppError(
         projectErrors.PROJECT_NOT_FOUND.message,
         projectErrors.PROJECT_NOT_FOUND.code,

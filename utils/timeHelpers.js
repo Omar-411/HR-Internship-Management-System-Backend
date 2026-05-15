@@ -96,3 +96,15 @@ export const parseDate = (value) => {
   const date = new Date(value);
   return isNaN(date.getTime()) ? null : date;
 };
+
+// Get the start of today
+export const getStartAndEndOfToday = () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  return { start: today, end: tomorrow };
+};
+

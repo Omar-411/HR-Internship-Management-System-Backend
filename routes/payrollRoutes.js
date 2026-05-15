@@ -10,12 +10,22 @@ import {
   markPayrollAsPaid,
   recomputePayroll,
   bulkCalculatePayroll,
+  getPayrollKPIs,
+  exportPayrollToExcel,
 } from "../controllers/payrollController.js";
 import { exportPayslipToExcel } from "../services/payrollExportService.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
 
 const router = express.Router();
+
+// Route to get payroll KPIs for the current month and year
+router.get(
+  "/payroll/kpis",
+  authenticate,
+  authorize(["Admin"]),
+  getPayrollKPIs,
+);
 
 // Route to calculate payroll for an employee for a given month and year
 router.post(
@@ -62,6 +72,14 @@ router.post(
   authenticate,
   authorize(["Admin"]),
   recomputePayroll,
+);
+
+// Route to export a payroll to Excel (Admin only)
+router.get(
+  "/payrolls/:id/export/excel",
+  authenticate,
+  authorize(["Admin"]),
+  exportPayrollToExcel,
 );
 
 // Route to bulk calculate payroll for all eligible employees for a given month and year
