@@ -75,7 +75,13 @@ router.post("/departments", authenticate, authorize(["Admin"]), addDepartment);
  *       500:
  *         description: Server Error
  */
-router.get("/departments", authenticate, getAllDepartments);
+/*
+ * WHAT: Added "Supervisor" to authorize list for GET /departments.
+ * WHY: Supervisors need department data to populate the filter dropdown in the Attendance modal.
+ *      Write operations remain Admin-only.
+ */
+router.get("/departments", authenticate, authorize(["Admin", "Supervisor"]), getAllDepartments);
+
 
 // Route to get a department by Id
 /**
