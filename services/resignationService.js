@@ -8,8 +8,12 @@ import { errors as commonErrors } from "../errors/commonErrors.js";
 import AppError from "../utils/AppError.js";
 import { isEmpty } from "../validators/userValidators.js";
 import { validateUserStatus } from "../validators/authValidators.js";
-import { logAuditAction } from "../utils/logger.js"; // For logging resignation-related actions in the audit logs
-import { markPayrollDirty } from "../utils/payrollHelpers.js"; // To mark payroll as dirty for recalculation when a resignation is approved
+import { logAuditAction } from "../utils/logger.js";
+import { markPayrollDirty } from "../utils/payrollHelpers.js";
+import { refreshExitSummary } from "../utils/resignationHelpers.js";
+import { createNotification } from "./notificationService.js";
+import { createNotificationForAdmins } from "../utils/notificationHelpers.js";
+import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
 
 // Get the resignation request statuses
 export const getResignationStatuses = () => {
@@ -21,44 +25,6 @@ export const getResignationStatuses = () => {
     message: "Resignation statuses retrieved successfully!",
     data: statuses,
   };
-};
-
-
-// Helper function to dynamically refresh the exit summary (tasks, salary, etc.)
-const refreshExitSummary = async (resignation) => {
-  if (!resignation || !["approved", "scheduled_exit", "inactive"].includes(resignation.status)) {
-    return resignation;
-  }
-
-  const employee = await User.findById(resignation.employeeId);
-  if (!employee) return resignation;
-
-  const pendingTasks = await Task.find({
-    assignedTo: resignation.employeeId,
-    status: { $ne: "Done" },
-  })
-    .select("title")
-    .limit(3);
-
-  const pendingTasksCount = await Task.countDocuments({
-    assignedTo: resignation.employeeId,
-    status: { $ne: "Done" },
-  });
-
-  const remainingLeaveDays = (employee.leaveBalances || []).reduce(
-    (sum, b) => sum + b.remainingDays,
-    0,
-  );
-
-  resignation.exitSummary = {
-    finalSalary: employee.salary?.base || 0,
-    pendingTasksCount,
-    remainingLeaveDays,
-    taskPreview: pendingTasks.map((t) => t.title),
-  };
-
-  await resignation.save();
-  return resignation;
 };
 
 // Get a single resignation request by ID (Admin + Employee who submitted it only)
@@ -108,7 +74,7 @@ export const getAllResignations = async (queryParams) => {
     Resignation,
     { path: "employeeId", select: "profileImageURL" },
     null,
-    ["employeeSnapshot.name"]
+    ["employeeSnapshot.name"],
   )(finalQuery);
 };
 
@@ -117,7 +83,12 @@ export const getMyResignation = async (userId) => {
   const resignation = await Resignation.findOne({
     employeeId: userId,
     status: {
-      $in: ["submitted", "clarification_requested", "approved", "scheduled_exit"],
+      $in: [
+        "submitted",
+        "clarification_requested",
+        "approved",
+        "scheduled_exit",
+      ],
     },
   }).sort({ createdAt: -1 });
 
@@ -126,7 +97,9 @@ export const getMyResignation = async (userId) => {
   return {
     status: "Success",
     code: 200,
-    message: refreshed ? "Resignation retrieved successfully!" : "No active resignation found.",
+    message: refreshed
+      ? "Resignation retrieved successfully!"
+      : "No active resignation found.",
     data: refreshed ?? null,
   };
 };
@@ -197,7 +170,27 @@ export const submitResignation = async (employeeId, payload) => {
     status: "submitted",
   };
 
-  return await createOne(Resignation)(resignationData);
+  const resignation = await createOne(Resignation)(resignationData);
+
+  // Send a notification for all admin users about the resignation submitted
+  try {
+    await createNotificationForAdmins({
+      type: "RESIGNATION",
+      title: "New Resignation Submitted",
+      message: `${user.name} ${user.lastName} has submitted a resignation request.`,
+      data: {
+        entityType: "USER",
+        entityId: user._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for the resignation submission:",
+      err,
+    );
+  }
+
+  return resignation;
 };
 
 // Update a resignation request (Employee only)
@@ -340,6 +333,45 @@ export const requestClarification = async (
     ipAddress: ip,
   });
 
+  // Send a notification to the employee about the clarification request
+  try {
+    await createNotification({
+      recipientId: employee._id,
+      type: "RESIGNATION",
+      title: "Clarification Requested",
+      message:
+        "Your resignation request requires clarification. Please provide more information.",
+      data: {
+        entityType: null,
+        entityId: null,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for the resignation clarification request:",
+      err,
+    );
+  }
+
+  // Notify all admins except the one who requested the clarification
+  try {
+    await createNotificationForAdminsExcept({
+      excludedUserId: adminId,
+      type: "RESIGNATION",
+      title: "Resignation Clarification Requested",
+      message: `${employee.name} ${employee.lastName}'s resignation has been submitted for clarification.`,
+      data: {
+        entityType: null,
+        entityId: null,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send admin notification for resignation clarification submission:",
+      err,
+    );
+  }
+
   return {
     status: "Success",
     code: 200,
@@ -389,6 +421,27 @@ export const respondToClarification = async (
     );
   }
 
+  // Get the employee details for notification purposes
+  const employee = await User.findById(employeeId).select("name lastName");
+
+  // Send a notification for all admin users about the clarification response
+  try {
+    await createNotificationForAdmins({
+      type: "RESIGNATION",
+      title: "New Clarification Response",
+      message: `${employee.name} ${employee.lastName} has submitted a clarification response.`,
+      data: {
+        entityType: null,
+        entityId: null,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for the clarification response:",
+      err,
+    );
+  }
+
   return {
     status: "Success",
     code: 200,
@@ -407,6 +460,17 @@ export const approveResignation = async (resignationId, adminId, ip) => {
       commonErrors.USER_NOT_FOUND.code,
       commonErrors.USER_NOT_FOUND.errorCode,
       "Please provide a valid admin ID to proceed with the resignation approval.",
+    );
+  }
+
+  // Check the resignation existence
+  const resignation = await Resignation.findById(resignationId);
+  if (!resignation) {
+    throw new AppError(
+      errors.RESIGNATION_REQUEST_NOT_FOUND.message,
+      errors.RESIGNATION_REQUEST_NOT_FOUND.code,
+      errors.RESIGNATION_REQUEST_NOT_FOUND.errorCode,
+      errors.RESIGNATION_REQUEST_NOT_FOUND.suggestion,
     );
   }
 
@@ -475,6 +539,44 @@ export const approveResignation = async (resignationId, adminId, ip) => {
     ipAddress: ip,
   });
 
+  // Send a notification to the employee about the resignation approval
+  try {
+    await createNotification({
+      recipientId: employee._id,
+      type: "RESIGNATION",
+      title: "Resignation Approved",
+      message: "Your resignation request has been approved.",
+      data: {
+        entityType: null,
+        entityId: null,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for the resignation approval:",
+      err,
+    );
+  }
+
+  // Notify all admins except the one who approved the resignation
+  try {
+    await createNotificationForAdminsExcept({
+      excludedUserId: adminId,
+      type: "RESIGNATION",
+      title: "Resignation Approved",
+      message: `${employee.name} ${employee.lastName}'s resignation has been approved.`,
+      data: {
+        entityType: null,
+        entityId: null,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send admin notification for resignation approval:",
+      err,
+    );
+  }
+
   return {
     status: "Success",
     code: 200,
@@ -484,7 +586,11 @@ export const approveResignation = async (resignationId, adminId, ip) => {
 };
 
 // Process the final settlement for a resignation
-export const processFinalSettlementService = async (resignationId, adminId, ip) => {
+export const processFinalSettlementService = async (
+  resignationId,
+  adminId,
+  ip,
+) => {
   // Check the resignation existence
   const resignation = await Resignation.findById(resignationId);
   if (!resignation) {

@@ -29,6 +29,7 @@ const notificationSchema = new mongoose.Schema(
         "EMPLOYEE_BONUS",
         "EMPLOYEE_ALLOWANCE",
         "LEAVE_REQUEST",
+        "RESIGNATION",
       ],
       required: true,
     },

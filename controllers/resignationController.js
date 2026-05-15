@@ -121,7 +121,6 @@ export const respondToClarification = async (req, res, next) => {
       resignationId,
       employeeId,
       req.body,
-      req.ip,
     );
 
     res.status(result.code).json(result);
