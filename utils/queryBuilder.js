@@ -15,8 +15,8 @@ export const buildQuery = (Model, queryParams, searchFields = []) => {
   // Advanced filtering (gte, lt, ne, etc.)
   let queryStr = JSON.stringify(queryObj);
   queryStr = queryStr.replace(
-    /\b(gt|gte|lt|lte|in|ne)\b/g,
-    (match) => `$${match}`,
+    /"(gt|gte|lt|lte|in|ne)":/g,
+    (_, match) => `"$${match}":`,
   );
 
   const parsedQuery = JSON.parse(queryStr);

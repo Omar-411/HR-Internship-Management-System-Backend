@@ -8,13 +8,14 @@ import mongoose from "mongoose";
 export const resolveId = (id) => {
   if (!id) return {};
 
-  const idStr = id.toString();
+  const idStr = id.toString().trim();
+  const normalizedStr = idStr.toLowerCase();
 
   return {
     $or: [
-      { slug: idStr },
+      { slug: normalizedStr },
       { publicId: idStr },
-      ...(idStr.match(/^[a-f\d]{24}$/i) ? [{ _id: id }] : [])
+      ...(idStr.match(/^[a-f\d]{24}$/i) ? [{ _id: idStr }] : [])
     ]
   };
 };

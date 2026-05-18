@@ -267,25 +267,42 @@ export const getPersonalDocumentsService = async ({
   return getDocumentsCore(finalQuery);
 };
 
-// Toggle the personal document confidentiality
+// Toggle the personal document confidentiality (Owner or Admin only)
 export const toggleConfidentialityService = async ({
   documentId,
-  currentUser,
+  requester,
 }) => {
   // Validate the document existence and type
   const document = await getValidPersonalDocument(documentId);
 
-  // Toggle the confidentiality status
-  document.isConfidential = !document.isConfidential;
-  await document.save();
+  // Ownership check: only the document's owner or an Admin can toggle
+  const isOwner = requester.id === document.user_id.toString();
+  const isAdmin = requester.role === "Admin";
+
+  if (!isOwner && !isAdmin) {
+    throw new AppError(
+      "You are not authorized to change the confidentiality of this document.",
+      403,
+      "UNAUTHORIZED",
+      "Only the document owner or an admin can toggle its confidentiality.",
+    );
+  }
+
+  // Use findByIdAndUpdate to flip just the one field — avoids re-running
+  // full Mongoose schema validation on the rest of the document's fields.
+  const updated = await Document.findByIdAndUpdate(
+    documentId,
+    { $set: { isConfidential: !document.isConfidential } },
+    { new: true, runValidators: false },
+  );
 
   // Get the target user for notifications purposes
   const targetUserId = document.user_id;
 
   // Notify the user if the admin changed the document confidentiality
   if (
-    currentUser.role === "Admin" &&
-    currentUser.id.toString() !== targetUserId.toString()
+    requester.role === "Admin" &&
+    requester.id.toString() !== targetUserId.toString()
   ) {
     await createNotification({
       recipientId: targetUserId,
@@ -304,8 +321,8 @@ export const toggleConfidentialityService = async ({
   return {
     status: "Success",
     code: 200,
-    message: "Personal document confidentiality toggled successfully!",
-    data: document,
+    message: `Document marked as ${updated.isConfidential ? "confidential" : "public"}.`,
+    data: updated,
   };
 };
 

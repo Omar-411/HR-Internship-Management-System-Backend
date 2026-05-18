@@ -38,9 +38,10 @@ export const getAllProjects = async (req, res, next) => {
 export const getProjectOverview = async (req, res, next) => {
   try {
     const param = req.params.id;
+    const normalizedParam = param.trim().toLowerCase();
     const project = await Project.findOne({
       $or: [
-        { slug: param },
+        { slug: normalizedParam },
         { publicId: param },
         ...(param.match(/^[a-f\d]{24}$/i) ? [{ _id: param }] : [])
       ]
@@ -59,9 +60,10 @@ export const getProjectOverview = async (req, res, next) => {
 export const getProjectById = async (req, res, next) => {
   try {
     const param = req.params.id;
+    const normalizedParam = param.trim().toLowerCase();
     const project = await Project.findOne({
       $or: [
-        { slug: param },
+        { slug: normalizedParam },
         { publicId: param },
         ...(param.match(/^[a-f\d]{24}$/i) ? [{ _id: param }] : [])
       ]
@@ -91,9 +93,10 @@ export const createProject = async (req, res, next) => {
 export const updateProject = async (req, res, next) => {
   try {
     const param = req.params.id;
+    const normalizedParam = param.trim().toLowerCase();
     const project = await Project.findOne({
       $or: [
-        { slug: param },
+        { slug: normalizedParam },
         { publicId: param },
         ...(param.match(/^[a-f\d]{24}$/i) ? [{ _id: param }] : [])
       ]
@@ -116,9 +119,10 @@ export const updateProject = async (req, res, next) => {
 export const archiveProject = async (req, res, next) => {
   try {
     const param = req.params.id;
+    const normalizedParam = param.trim().toLowerCase();
     const project = await Project.findOne({
       $or: [
-        { slug: param },
+        { slug: normalizedParam },
         { publicId: param },
         ...(param.match(/^[a-f\d]{24}$/i) ? [{ _id: param }] : [])
       ]
@@ -137,9 +141,10 @@ export const archiveProject = async (req, res, next) => {
 export const restoreProject = async (req, res, next) => {
   try {
     const param = req.params.id;
+    const normalizedParam = param.trim().toLowerCase();
     const project = await Project.findOne({
       $or: [
-        { slug: param },
+        { slug: normalizedParam },
         { publicId: param },
         ...(param.match(/^[a-f\d]{24}$/i) ? [{ _id: param }] : [])
       ]
@@ -157,9 +162,10 @@ export const restoreProject = async (req, res, next) => {
 export const deleteProject = async (req, res, next) => {
   try {
     const param = req.params.id;
+    const normalizedParam = param.trim().toLowerCase();
     const project = await Project.findOne({
       $or: [
-        { slug: param },
+        { slug: normalizedParam },
         { publicId: param },
         ...(param.match(/^[a-f\d]{24}$/i) ? [{ _id: param }] : [])
       ]

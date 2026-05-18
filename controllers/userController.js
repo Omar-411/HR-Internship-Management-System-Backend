@@ -4,6 +4,7 @@ import * as internService from "../services/internService.js";
 import { transformUserFilters } from "../utils/userQueryTransformer.js";
 import { resolveRoleId } from "../utils/userResolvers.js";
 
+
 // Get User by ID
 export const getUserById = async (req, res, next) => {
   try {
@@ -16,14 +17,19 @@ export const getUserById = async (req, res, next) => {
       Check if the requester is trying to access their own data or is it another user 
       (For ex: An admin or the user's supervisor accessing a user's profile data)
     */
-    const requesterId = req.user?.id;
-    const isSelf = requesterId && String(requesterId) === String(id);
-
+    const requesterId = req.user?.id || req.user?._id;
     const result = await userService.getUser(id);
 
-    // If not requester = user, we remove the faceDescriptors
+    // Robust self-check: compare the requester's ID from the token 
+    // against the database ID of the user we just found.
+    const dbUserId = result.data?._id?.toString() || result.data?.id?.toString();
+    const currentUserId = requesterId?.toString();
+    
+    const isSelf = currentUserId && dbUserId && currentUserId === dbUserId;
+
+    // If not requester = user, we remove the faceDescriptors for privacy
     if (!isSelf) {
-      result.data.faceDescriptors = undefined;
+      if (result.data) result.data.faceDescriptors = undefined;
     }
 
     res.status(result.code).json(result);

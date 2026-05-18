@@ -67,8 +67,9 @@ export const buildProjectMatchFilter = async ({
     Authorization Access: Admins can access all projects, supervisors can access projects they are product owners of, 
     and employees/interns can access projects where they are team members
   */
-  if (role !== "Admin") {
-    if (role === "Supervisor") {
+  const normalizedRole = role?.toLowerCase();
+  if (normalizedRole !== "admin") {
+    if (normalizedRole === "supervisor") {
       if (!mongoose.Types.ObjectId.isValid(userId)) {
         throw new AppError(commonErrors.INVALID_ID.message, commonErrors.INVALID_ID.code);
       }
@@ -113,18 +114,30 @@ export const buildProjectMatchFilter = async ({
 // Build the match filter for accessing a specific project by ID
 export const buildProjectAccessMatch = async (projectId, userId, role) => {
   const match = resolveId(projectId);
-  if (match._id) {
+  
+  // FIX: Robust casting for aggregation match stages. resolveId returns $or query.
+  // Mongoose find() casts automatically, but aggregate() does not.
+  if (match.$or) {
+    match.$or = match.$or.map(clause => {
+      if (clause._id && typeof clause._id === 'string' && mongoose.Types.ObjectId.isValid(clause._id)) {
+        return { ...clause, _id: new mongoose.Types.ObjectId(clause._id) };
+      }
+      return clause;
+    });
+  } else if (match._id && typeof match._id === 'string' && mongoose.Types.ObjectId.isValid(match._id)) {
     match._id = new mongoose.Types.ObjectId(match._id);
   }
 
-  if (role === "Supervisor") {
+  const normalizedRole = role?.toLowerCase();
+
+  if (normalizedRole === "supervisor") {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       throw new AppError(commonErrors.INVALID_ID.message, commonErrors.INVALID_ID.code);
     }
     match.productOwnerId = new mongoose.Types.ObjectId(userId);
   }
 
-  if (role === "Employee" || role === "Intern") {
+  if (normalizedRole === "employee" || normalizedRole === "intern") {
     const teams = await TeamMember.find({ userId }).select("teamId");
 
     if (!teams.length) {

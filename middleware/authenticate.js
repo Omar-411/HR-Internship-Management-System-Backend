@@ -7,7 +7,11 @@ dotenv.config();
 
 // Middleware to authenticate users based on JWT token
 const authenticate = (req, res, next) => {
-  const token = req.headers["authorization"]?.split(" ")[1];
+  const token =
+    (req.headers["authorization"]?.startsWith("Bearer ")
+      ? req.headers["authorization"].split(" ")[1]
+      : null) ?? req.query.token ?? null;
+
   if (!token) {
     return next(
       new AppError(

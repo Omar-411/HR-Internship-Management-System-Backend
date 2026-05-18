@@ -19,11 +19,12 @@ import { getIO } from "../socket.js";
 import { notifyProjectMembers } from "../utils/notificationHelpers.js";
 import { createNotification } from "./notificationService.js";
 import { deleteFromCloudinary } from "../utils/cloudinaryHelper.js";
+import { resolveId } from "../utils/idResolver.js";
 
 // Get all document requests for a project
 export const getAllDocumentRequests = async (projectId, queryParams, user) => {
   // Check the project existence
-  const project = await Project.findById(projectId);
+  const project = await Project.findOne(resolveId(projectId));
   if (!project) {
     throw new AppError(
       projectErrors.PROJECT_NOT_FOUND.message,
@@ -43,7 +44,7 @@ export const getAllDocumentRequests = async (projectId, queryParams, user) => {
   // Filter by project (To view only document requests related to the project)
   const filters = {
     ...queryParams,
-    projectId,
+    projectId: project._id,
   };
 
   return await getAll(
@@ -104,7 +105,7 @@ export const createDocumentRequest = async (data, currentUser) => {
     data;
 
   // Check the project existence
-  const project = await Project.findById(projectId);
+  const project = await Project.findOne(resolveId(projectId));
   if (!project) {
     throw new AppError(
       projectErrors.PROJECT_NOT_FOUND.message,
@@ -113,9 +114,10 @@ export const createDocumentRequest = async (data, currentUser) => {
       projectErrors.PROJECT_NOT_FOUND.suggestion,
     );
   }
+  const projectObjectId = project._id;
 
   // Check the team existence for the project
-  const team = await Team.findOne({ projectId });
+  const team = await Team.findOne({ projectId: projectObjectId });
   if (!team) {
     throw new AppError(
       projectErrors.TEAM_NOT_FOUND.message,
@@ -142,13 +144,13 @@ export const createDocumentRequest = async (data, currentUser) => {
   }
 
   // Validate the scope logic
-  await validateDocumentRequestScope(scope, sprintId, taskId, projectId);
+  await validateDocumentRequestScope(scope, sprintId, taskId, projectObjectId);
 
   // Create the document request
   const request = await DocumentRequest.create({
     title,
     description,
-    projectId,
+    projectId: projectObjectId,
     scope,
     sprintId: sprintId ? sprintId : null,
     taskId: taskId ? taskId : null,

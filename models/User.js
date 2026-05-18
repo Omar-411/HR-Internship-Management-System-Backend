@@ -274,12 +274,14 @@ userSchema.index(
 );
 
 userSchema.pre("save", async function () {
-  if (this.isModified("name") || this.isModified("lastName") || !this.slug) {
+  if (!this.slug) {
+    // First save only: generate slug from full name
     this.slug = await generateUniqueSlug(
       this.constructor,
       `${this.name}-${this.lastName}`
     );
   }
+  // Slug is immutable after first assignment.
 });
 
 export default mongoose.model("User", userSchema);

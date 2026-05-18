@@ -1,5 +1,6 @@
 import * as documentRequestService from "../services/documentRequestService.js";
 import * as projectDocumentService from "../services/projectDocumentService.js";
+import DocumentRequest from "../models/DocumentRequest.js";
 
 // Create a new document request
 export const createDocumentRequest = async (req, res, next) => {
@@ -150,15 +151,35 @@ export const consultDocumentFulfillRequest = async (req, res, next) => {
 // Download a document related to the document request
 export const downloadDocumentFulfillRequest = async (req, res, next) => {
   try {
-    const { id: documentId } = req.params;
+    const { id } = req.params;
 
-    await projectDocumentService.downloadDocumentForRequest(
-      documentId,
-      res,
-      req.user,
+    // Fetch the DocumentRequest by ID
+    const request = await DocumentRequest.findById(id).populate([
+      { path: "requestedBy", select: "name email" },
+      { path: "fulfilledBy", select: "name email" },
+    ]);
+
+    if (!request) {
+      return res.status(404).json({ message: "Document request not found" });
+    }
+
+    // Verify a file has been uploaded for this request
+    if (!request.fileURL) {
+      return res.status(400).json({
+        message: "No file has been uploaded for this document request yet"
+      });
+    }
+
+    // Construct the Cloudinary download URL using fl_attachment
+    const downloadURL = request.fileURL.replace(
+      "/upload/",
+      "/upload/fl_attachment/"
     );
+
+    // Redirect the client to the Cloudinary download URL
+    return res.redirect(302, downloadURL);
   } catch (err) {
-    next(err);
+    if (!res.headersSent) next(err);
   }
 };
 

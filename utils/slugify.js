@@ -1,3 +1,5 @@
+import { nanoid } from "nanoid";
+
 export function slugify(text) {
   return text
     .toString()
@@ -10,6 +12,8 @@ export function slugify(text) {
 
 export async function generateUniqueSlug(model, text, field = "slug") {
   let slug = slugify(text);
+  if (!slug) slug = nanoid(8).toLowerCase();
+
   let uniqueSlug = slug;
   let counter = 1;
 

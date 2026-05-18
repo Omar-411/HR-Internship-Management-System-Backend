@@ -3,6 +3,7 @@ import Department from "../models/Department.js";
 import Attendance from "../models/Attendance.js";
 import Timetable from "../models/Timetable.js";
 import UserRole from "../models/UserRole.js";
+import Alert from "../models/Alert.js";
 import crypto from "crypto";
 import { buildDateFilter } from "../utils/dateFilter.js";
 import {
@@ -15,29 +16,11 @@ import { exportAttendanceStats } from "../services/attendanceExportService.js";
 import { markPayrollDirty } from "../utils/payrollHelpers.js";
 import { createNotification } from "../services/notificationService.js";
 import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
-import { resolveId } from "../utils/idResolver.js";
-
-// The company location (For the location check-in)
-const COMPANY_LOCATION = {
-  lat: 51.5271,
-  lng: -0.0896,
-};
-
-// Function to calculate distance in meters between two coordinates
-const getDistanceInMeters = (lat1, lon1, lat2, lon2) => {
-  const R = 6371000; // Earth radius in meters
-  const toRad = (x) => (x * Math.PI) / 180;
-
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
+import {
+  COMPANY_LOCATION,
+  TOLERANCE_METERS,
+  getDistanceInMeters,
+} from "../utils/geo.js";
 
 const FACE_NONCE_TTL_MS = 30 * 1000;
 const FACE_CLOCK_SKEW_MS = 30 * 1000;
@@ -288,6 +271,67 @@ export const checkIn = async (req, res, next) => {
     );
 
     await markPayrollDirty(userId, now, "Check-in recorded");
+
+    // Location mismatch alert (system-generated)
+    // Only runs for Onsite check-ins to avoid unnecessary processing.
+    if (workLocation === "Onsite") {
+      try {
+        let shouldAlert = false;
+        let alertSubject = "Onsite Check-In Location Anomaly";
+        let alertDescription = "";
+
+        if (typeof latitude === "number" && typeof longitude === "number") {
+          const distanceMeters = getDistanceInMeters(
+            latitude,
+            longitude,
+            COMPANY_LOCATION.lat,
+            COMPANY_LOCATION.lng,
+          );
+
+          if (distanceMeters > TOLERANCE_METERS) {
+            shouldAlert = true;
+            alertDescription =
+              `Employee ${userId} checked in as Onsite but was detected ` +
+              `${Math.round(distanceMeters)}m from the office address. ` +
+              `User coordinates: (${latitude.toFixed(5)}, ` +
+              `${longitude.toFixed(5)}). ` +
+              `Office coordinates: (${COMPANY_LOCATION.lat}, ` +
+              `${COMPANY_LOCATION.lng}). ` +
+              `Tolerance: ${TOLERANCE_METERS}m. Attendance has been recorded.`;
+          }
+        } else {
+          shouldAlert = true;
+          alertSubject = "Onsite Check-In Location Permission Denied";
+          alertDescription =
+            `Employee ${userId} attempted an Onsite check-in but location ` +
+            `access was denied by the browser or device. ` +
+            `Unable to verify physical presence at the office. ` +
+            `Attendance has been recorded.`;
+        }
+
+        if (shouldAlert) {
+          await Alert.create({
+            senderId: null,
+            isSystemGenerated: true,
+            alertType: "TECHNICAL",
+            recipientType: "HR_DEPARTMENT",
+            recipientId: null,
+            subject: alertSubject,
+            description: alertDescription,
+            status: "NEW",
+            isAnonymous: false,
+            attachmentURL: "",
+            attachmentPublicId: "",
+            alertDate: now,
+          });
+        }
+      } catch (alertErr) {
+        console.error(
+          "[ATTENDANCE] Failed to create location alert:",
+          alertErr instanceof Error ? alertErr.message : alertErr,
+        );
+      }
+    }
 
     // Emit (Sends a message) real-time event to all connected clients
     req.app?.get("io")?.emit("attendanceUpdated", {

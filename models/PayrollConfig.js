@@ -109,7 +109,9 @@ const payrollConfigSchema = new mongoose.Schema(
 
 payrollConfigSchema.pre("save", function () {
   if (this.irpp?.brackets) {
-    this.irpp.brackets.sort((a, b) => a.limit - b.limit);
+    this.irpp.brackets.sort(
+      (a, b) => (a.limit ?? Infinity) - (b.limit ?? Infinity)
+    );
   }
 });
 

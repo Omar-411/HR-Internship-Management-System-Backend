@@ -399,7 +399,7 @@ router.patch(
 router.get(
   "/export", 
   authenticate, 
-  authorize("Admin"), 
+  authorize(["Admin", "Supervisor"]), 
   exportUserAttendance
 );
 
@@ -505,7 +505,7 @@ router.get(
 router.get(
   "/export/department",
   authenticate,
-  authorize("Admin"),
+  authorize(["Admin", "Supervisor"]),
   exportDepartmentAttendance
 );
 
@@ -625,7 +625,7 @@ router.get(
 router.get(
   "/stats/export", 
   authenticate, 
-  authorize("Admin"), 
+  authorize(["Admin", "Supervisor"]), 
   exportAttendanceStatistics
 );
 

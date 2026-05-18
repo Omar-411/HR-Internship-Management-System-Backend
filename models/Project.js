@@ -76,9 +76,12 @@ const projectSchema = mongoose.Schema(
 );
 
 projectSchema.pre("save", async function () {
-  if (this.isModified("name") || !this.slug) {
+  if (!this.slug) {
+    // First save only: generate slug from name
     this.slug = await generateUniqueSlug(this.constructor, this.name);
   }
+  // Do NOT regenerate slug on rename. Slug is immutable after
+  // first assignment to preserve URL stability.
 });
 
 export default mongoose.model("Project", projectSchema);

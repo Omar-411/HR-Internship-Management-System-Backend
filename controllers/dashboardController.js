@@ -1,7 +1,8 @@
-import mongoose from "mongoose";
 import Project from "../models/Project.js";
 import Task from "../models/Task.js";
 import * as dashboardService from "../services/dashboardService.js";
+import { resolveId } from "../utils/idResolver.js";
+import { isTeamMemberOrProductOwnerOrAdmin } from "../utils/projectHelpers.js";
 
 // Supervisor Dashboard
 export const getSupervisorDashboard = async (req, res, next) => {
@@ -37,32 +38,16 @@ export const getDashboardStats = async (req, res, next) => {
  * Get project chart datasets (task completion by status + velocity by sprint)
  * derived from real tasks stored in the database.
  */
-export const getProjectCharts = async (req, res) => {
+export const getProjectCharts = async (req, res, next) => {
   try {
     const { id: projectId } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(projectId)) {
-      return res.status(400).json({ message: "Invalid project ID" });
-    }
-
-    const project = await Project.findById(projectId).select("_id productOwnerId createdAt description");
+    const project = await Project.findOne(resolveId(projectId)).select("_id productOwnerId team_id createdAt description");
     if (!project) {
       return res.status(404).json({ message: "Project not found" });
     }
 
-    const userId = String(req.user?._id || req.user?.id || "");
-    const userRole = String(req.user?.role || "").toLowerCase();
-
-    if (userRole === "supervisor" && String(project.productOwnerId) !== userId) {
-      return res.status(403).json({ message: "Unauthorized to access this project" });
-    }
-
-    if (userRole !== "admin" && userRole !== "supervisor") {
-      const hasProjectTask = await Task.exists({ projectId: project._id, userId: req.user?._id });
-      if (!hasProjectTask) {
-        return res.status(403).json({ message: "Unauthorized to access this project" });
-      }
-    }
+    await isTeamMemberOrProductOwnerOrAdmin(project, req.user);
 
     const tasks = await Task.find({ projectId: project._id }).select("status completedAt createdAt dueDate");
 
@@ -154,6 +139,6 @@ export const getProjectCharts = async (req, res) => {
     });
   } catch (error) {
     console.error("Project chart calculation error:", error);
-    return res.status(500).json({ message: "Failed to calculate project chart data" });
+    return next(error);
   }
 };

@@ -81,7 +81,7 @@ export const toggleConfidentiality = async (req, res, next) => {
   try {
     const result = await documentService.toggleConfidentialityService({
       documentId: req.params.id,
-      currentUser: req.user,
+      requester: req.user,
     });
 
     res.status(result.code).json(result);

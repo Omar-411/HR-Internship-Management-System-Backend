@@ -15,6 +15,7 @@ import {
 } from "../utils/cloudinaryHelper.js";
 import { isProjectInactive } from "../validators/projectValidators.js";
 import { isTeamMemberOrProductOwnerOrAdmin } from "../utils/projectHelpers.js";
+import { resolveId } from "../utils/idResolver.js";
 import { normalizeStatus } from "../utils/taskHelpers.js";
 import { createNotification } from "../services/notificationService.js";
 
@@ -70,8 +71,7 @@ export const getAllTaskTypes = async (req, res, next) => {
 export const getProjectTasks = async (req, res, next) => {
   try {
     const { projectId } = req.params;
-
-    const objectId = new mongoose.Types.ObjectId(projectId);
+    
     const { sprintId, page = 1, type, status } = req.query;
 
     const limit = 10;
@@ -79,7 +79,7 @@ export const getProjectTasks = async (req, res, next) => {
     const skip = (parsedPage - 1) * limit;
 
     // Check project existence
-    const project = await Project.findById(objectId);
+    const project = await Project.findOne(resolveId(projectId));
     if (!project) {
       throw new AppError(
         projectErrors.PROJECT_NOT_FOUND.message,
@@ -95,6 +95,8 @@ export const getProjectTasks = async (req, res, next) => {
       req.user,
       errors.UNAUTHORIZED_TO_ACCESS_PROJECT_TASKS,
     );
+
+    const objectId = project._id;
 
     // Build the filter
     const filter = { projectId: objectId };
@@ -246,7 +248,7 @@ export const getMyTasks = async (req, res, next) => {
     // Filter by Project ID
     if (projectId) {
       // Check the project existence
-      const project = await Project.findById(projectId);
+      const project = await Project.findOne(resolveId(projectId));
       if (!project) {
         throw new AppError(
           projectErrors.PROJECT_NOT_FOUND.message,
@@ -256,7 +258,7 @@ export const getMyTasks = async (req, res, next) => {
         );
       }
 
-      filter.projectId = projectId;
+      filter.projectId = project._id;
     }
 
     // Filter by Sprint ID
@@ -374,7 +376,6 @@ export const addTask = async (req, res, next) => {
   try {
     // Get the project ID to which the task will be added
     const { id } = req.params;
-    const objectId = new mongoose.Types.ObjectId(id);
 
     const {
       title,
@@ -390,7 +391,7 @@ export const addTask = async (req, res, next) => {
     } = req.body;
 
     // Check the project existence
-    const project = await Project.findById(id);
+    const project = await Project.findOne(resolveId(id));
     if (!project) {
       throw new AppError(
         projectErrors.PROJECT_NOT_FOUND.message,
@@ -402,6 +403,8 @@ export const addTask = async (req, res, next) => {
 
     // Check if the project is archived, completed or on hold
     isProjectInactive(project);
+
+    const objectId = project._id;
 
     // Check the required fields
     if (!title) {

@@ -13,6 +13,7 @@ import {
   getPayrollKPIs,
   exportPayrollToExcel,
 } from "../controllers/payrollController.js";
+import { exportPayslipToExcel } from "../services/payrollExportService.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
 
@@ -88,5 +89,37 @@ router.post(
   authorize(["Admin"]),
   bulkCalculatePayroll,
 );
+
+// Route to export a payslip to Excel
+router.get("/payrolls/export/excel", authenticate, async (req, res, next) => {
+  try {
+    const { employeeId, month, year, payrollId } = req.query;
+    
+    // We prioritize payrollId if provided (as from the frontend row.id)
+    if (payrollId) {
+      return await exportPayslipToExcel(payrollId, res);
+    }
+
+    if (!employeeId || !month) {
+      return res.status(400).json({ message: "employeeId and month are required if payrollId is not provided" });
+    }
+
+    // If no payrollId, find by employee/month/year
+    const Payroll = (await import("../models/Payroll.js")).default;
+    const p = await Payroll.findOne({ 
+      employeeId, 
+      month: parseInt(month), 
+      year: parseInt(year || new Date().getFullYear()) 
+    });
+    
+    if (!p) {
+      return res.status(404).json({ message: "No payslip found for this period" });
+    }
+
+    await exportPayslipToExcel(p._id, res);
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;

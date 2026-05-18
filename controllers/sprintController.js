@@ -7,11 +7,7 @@ import AppError from "../utils/AppError.js";
 export const getProjectSprints = async (req, res, next) => {
   try {
     // Build the query parameters
-    const { projectId: pid } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(pid)) {
-      return res.status(400).json({ message: 'Invalid project ID' });
-    }
-    const projectId = new mongoose.Types.ObjectId(pid);
+    const { projectId } = req.params;
 
     const queryParams = {
       ...req.query,
