@@ -80,4 +80,10 @@ export const errors = {
     errorCode: "DOCUMENT_REQUEST_ALREADY_FULFILLED",
     suggestion: "This document request is already fulfilled. No further action is needed.",
   },
+  REQUESTER_CANNOT_FULFILL_OWN_REQUEST: {
+    message: "A requester cannot upload a document to fulfill their own request.",
+    code: 403,
+    errorCode: "REQUESTER_CANNOT_FULFILL_OWN_REQUEST",
+    suggestion: "Ask another project member to upload the document for this request."
+  },
 };

@@ -93,6 +93,16 @@ export const uploadDocumentForRequest = async (
     );
   }
 
+  // Prevent the requester from fulfilling their own request
+  if (request.requestedBy.toString() === currentUser.id.toString()) {
+    throw new AppError(
+      errors.REQUESTER_CANNOT_FULFILL_OWN_REQUEST.message,
+      errors.REQUESTER_CANNOT_FULFILL_OWN_REQUEST.code,
+      errors.REQUESTER_CANNOT_FULFILL_OWN_REQUEST.errorCode,
+      errors.REQUESTER_CANNOT_FULFILL_OWN_REQUEST.suggestion,
+    );
+  }
+
   // Generate a file hash
   const fileHash = crypto
     .createHash("sha256")
@@ -138,6 +148,36 @@ export const uploadDocumentForRequest = async (
     uploadedBy: currentUser.id,
     documentRequestId: requestId,
   });
+
+  // Update the parent DocumentRequest status to "in_review" and save the file details
+  request.status = "in_review";
+  request.fileURL = cloudResult.fileURL;
+  request.fileName = file.originalname || request.title;
+  request.public_id = cloudResult.filePublicId;
+  await request.save();
+
+  // Populate for real-time frontend display
+  await request.populate([
+    { path: "requestedBy", select: "name email" },
+    { path: "fulfilledBy", select: "name email" },
+    { path: "sprintId", select: "name" },
+    { path: "taskId", select: "title" }
+  ]);
+
+  // Emit socket event for real-time update
+  try {
+    const { getIO } = await import("../socket.js");
+    const io = getIO();
+    if (io) {
+      const projectRoom = `project:${request.projectId}`;
+      io.to(projectRoom).emit("documentRequestUpdated", {
+        projectId: String(request.projectId),
+        document: request
+      });
+    }
+  } catch (socketErr) {
+    console.error("[Socket] Failed to emit documentRequestUpdated (Upload):", socketErr);
+  }
 
   return {
     status: "Success",
