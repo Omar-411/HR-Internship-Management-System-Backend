@@ -10,11 +10,15 @@ import AppError from "../utils/AppError.js";
 import { isProjectInactive } from "../validators/projectValidators.js";
 import { isTeamMemberOrProductOwnerOrAdmin } from "../utils/projectHelpers.js";
 import { validateSprintFields } from "../validators/sprintValidators.js";
-import { 
-  checkSprintAndProjectExistence, 
-  upsertSprintReviewMeeting 
+import {
+  checkSprintAndProjectExistence,
+  upsertSprintReviewMeeting,
 } from "../utils/sprintHelpers.js";
 import { isEmpty } from "../validators/userValidators.js";
+import {
+  notifyProjectMembers,
+  notifyProjectDeletion,
+} from "../utils/notificationHelpers.js";
 
 // Get all sprints of a project
 export const getAllSprintsOfProject = async (queryParams) => {
@@ -33,7 +37,11 @@ export const getAllSprintsOfProject = async (queryParams) => {
   }
 
   // Authorization Control: Only team members, product owner of the project and admins can access the sprints of the project
-  await isTeamMemberOrProductOwnerOrAdmin(project, user, errors.UNAUTHORIZED_TO_ACCESS_PROJECT_SPRINTS);
+  await isTeamMemberOrProductOwnerOrAdmin(
+    project,
+    user,
+    errors.UNAUTHORIZED_TO_ACCESS_PROJECT_SPRINTS,
+  );
 
   // Filter the user token from the query parameters
   delete queryParams.user;
@@ -57,7 +65,7 @@ export const getSprintById = async (sprintId, user) => {
       errors.SPRINT_NOT_FOUND.message,
       errors.SPRINT_NOT_FOUND.code,
       errors.SPRINT_NOT_FOUND.errorCode,
-      errors.SPRINT_NOT_FOUND.suggestion
+      errors.SPRINT_NOT_FOUND.suggestion,
     );
   }
 
@@ -73,14 +81,16 @@ export const getSprintById = async (sprintId, user) => {
   }
 
   // Authorization Control: Only team members, product owner of the project and admins can access a sprint details
-  await isTeamMemberOrProductOwnerOrAdmin(project, user, errors.UNAUTHORIZED_TO_ACCESS_SPRINT);
+  await isTeamMemberOrProductOwnerOrAdmin(
+    project,
+    user,
+    errors.UNAUTHORIZED_TO_ACCESS_SPRINT,
+  );
 
-  return await getOne(
-    Sprint,
-    errors.SPRINT_NOT_FOUND,
-    [{ path: "projectId", select: "name sector status" }]
-  )(sprintId);
-}; 
+  return await getOne(Sprint, errors.SPRINT_NOT_FOUND, [
+    { path: "projectId", select: "name sector status" },
+  ])(sprintId);
+};
 
 // Create a new sprint
 export const createSprint = async (req) => {
@@ -113,7 +123,7 @@ export const createSprint = async (req) => {
   }
 
   // Input validation
-  validateSprintFields(req.body, project, {isUpdate: false});
+  validateSprintFields(req.body, project, { isUpdate: false });
 
   // Automatically calculate the end date based on the start date and duration
   const end = new Date(startDate);
@@ -166,6 +176,23 @@ export const createSprint = async (req) => {
   // Plan the sprint review meeting
   await upsertSprintReviewMeeting(sprint, project);
 
+  // Notify the active project members about the new sprint
+  try {
+    await notifyProjectMembers({
+      projectId: project._id,
+      excludedUserIds: [userId],
+      type: "SPRINT",
+      title: "New Sprint Created",
+      message: `A new sprint "${sprint.name}" has been created for the project "${project.name}".`,
+      data: {
+        entityType: "PROJECT",
+        entityId: project._id,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to notify team members about sprint creation:", err);
+  }
+
   return {
     status: "Success",
     message: "Sprint created successfully!",
@@ -190,7 +217,7 @@ export const updateSprint = async (sprintId, updates, user) => {
       errors.SPRINT_ALREADY_STARTED_OR_COMPLETED.message,
       errors.SPRINT_ALREADY_STARTED_OR_COMPLETED.code,
       errors.SPRINT_ALREADY_STARTED_OR_COMPLETED.errorCode,
-      errors.SPRINT_ALREADY_STARTED_OR_COMPLETED.suggestion
+      errors.SPRINT_ALREADY_STARTED_OR_COMPLETED.suggestion,
     );
   }
 
@@ -200,7 +227,7 @@ export const updateSprint = async (sprintId, updates, user) => {
       errors.UNAUTHORIZED_TO_UPDATE_SPRINT.message,
       errors.UNAUTHORIZED_TO_UPDATE_SPRINT.code,
       errors.UNAUTHORIZED_TO_UPDATE_SPRINT.errorCode,
-      errors.UNAUTHORIZED_TO_UPDATE_SPRINT.suggestion
+      errors.UNAUTHORIZED_TO_UPDATE_SPRINT.suggestion,
     );
   }
 
@@ -208,13 +235,15 @@ export const updateSprint = async (sprintId, updates, user) => {
   validateSprintFields(updates, project, { isUpdate: true });
 
   // Detect if the sprint schedule is being changed to update the sprint review meeting accordingly
-  const isScheduleChanged = updates.startDate !== undefined || updates.durationInWeeks !== undefined;
+  const isScheduleChanged =
+    updates.startDate !== undefined || updates.durationInWeeks !== undefined;
 
   // Assign the updated fields to the sprint
   if (updates.name !== undefined) sprint.name = updates.name;
   if (updates.goal !== undefined) sprint.goal = updates.goal;
   if (updates.startDate !== undefined) sprint.startDate = updates.startDate;
-  if (updates.durationInWeeks !== undefined) sprint.durationInWeeks = updates.durationInWeeks;
+  if (updates.durationInWeeks !== undefined)
+    sprint.durationInWeeks = updates.durationInWeeks;
 
   // Recompute the end date in case of an update
   const start = new Date(sprint.startDate);
@@ -227,7 +256,7 @@ export const updateSprint = async (sprintId, updates, user) => {
       errors.SPRINT_END_DATE_EXCEEDS_PROJECT_END_DATE.message,
       errors.SPRINT_END_DATE_EXCEEDS_PROJECT_END_DATE.code,
       errors.SPRINT_END_DATE_EXCEEDS_PROJECT_END_DATE.errorCode,
-      errors.SPRINT_END_DATE_EXCEEDS_PROJECT_END_DATE.suggestion
+      errors.SPRINT_END_DATE_EXCEEDS_PROJECT_END_DATE.suggestion,
     );
   }
 
@@ -246,15 +275,31 @@ export const updateSprint = async (sprintId, updates, user) => {
       errors.SPRINT_OVERLAPPING.message,
       errors.SPRINT_OVERLAPPING.code,
       errors.SPRINT_OVERLAPPING.errorCode,
-      errors.SPRINT_OVERLAPPING.suggestion
+      errors.SPRINT_OVERLAPPING.suggestion,
     );
   }
 
   // Save the changes
   await sprint.save();
-
   if (isScheduleChanged) {
     await upsertSprintReviewMeeting(sprint, project);
+  }
+
+  // Notify the active project members about the updated sprint
+  try {
+    await notifyProjectMembers({
+      projectId: project._id,
+      excludedUserIds: [userId],
+      type: "SPRINT",
+      title: "Sprint Updated",
+      message: `The sprint "${sprint.name}" has been updated in the project "${project.name}".`,
+      data: {
+        entityType: "PROJECT",
+        entityId: project._id,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to notify team members about sprint update:", err);
   }
 
   return {
@@ -282,7 +327,7 @@ export const deleteSprint = async (sprintId, user) => {
       errors.UNAUTHORIZED_TO_DELETE_SPRINT.message,
       errors.UNAUTHORIZED_TO_DELETE_SPRINT.code,
       errors.UNAUTHORIZED_TO_DELETE_SPRINT.errorCode,
-      errors.UNAUTHORIZED_TO_DELETE_SPRINT.suggestion
+      errors.UNAUTHORIZED_TO_DELETE_SPRINT.suggestion,
     );
   }
 
@@ -296,12 +341,29 @@ export const deleteSprint = async (sprintId, user) => {
           sprintId: null,
           status: "Backlog",
         },
-      }
+      },
     );
   }
 
   // Delete the sprint
   await Sprint.findByIdAndDelete(sprintId);
+
+  // Notify the active project members about the deleted sprint
+  try {
+    await notifyProjectMembers({
+      projectId: project._id,
+      excludedUserIds: [userId],
+      type: "SPRINT",
+      title: "Sprint Deleted",
+      message: `The sprint "${sprint.name}" has been deleted for the project "${project.name}".`,
+      data: {
+        entityType: "SPRINT",
+        entityId: sprint._id,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to notify team members about sprint deletion:", err);
+  }
 
   return {
     status: "Success",
@@ -327,7 +389,7 @@ export const startSprint = async (sprintId, user) => {
       errors.SPRINT_ALREADY_STARTED_OR_COMPLETED.message,
       errors.SPRINT_ALREADY_STARTED_OR_COMPLETED.code,
       errors.SPRINT_ALREADY_STARTED_OR_COMPLETED.errorCode,
-      errors.SPRINT_ALREADY_STARTED_OR_COMPLETED.suggestion
+      errors.SPRINT_ALREADY_STARTED_OR_COMPLETED.suggestion,
     );
   }
 
@@ -337,7 +399,7 @@ export const startSprint = async (sprintId, user) => {
       errors.UNAUTHORIZED_TO_START_SPRINT.message,
       errors.UNAUTHORIZED_TO_START_SPRINT.code,
       errors.UNAUTHORIZED_TO_START_SPRINT.errorCode,
-      errors.UNAUTHORIZED_TO_START_SPRINT.suggestion
+      errors.UNAUTHORIZED_TO_START_SPRINT.suggestion,
     );
   }
 
@@ -351,7 +413,7 @@ export const startSprint = async (sprintId, user) => {
       errors.ACTIVE_SPRINT_ALREADY_EXISTS.message,
       errors.ACTIVE_SPRINT_ALREADY_EXISTS.code,
       errors.ACTIVE_SPRINT_ALREADY_EXISTS.errorCode,
-      errors.ACTIVE_SPRINT_ALREADY_EXISTS.suggestion
+      errors.ACTIVE_SPRINT_ALREADY_EXISTS.suggestion,
     );
   }
 
@@ -383,8 +445,25 @@ export const startSprint = async (sprintId, user) => {
     },
     {
       $set: { status: "To Do" },
-    }
+    },
   );
+
+  // Notify the active project members about the started sprint
+  try {
+    await notifyProjectMembers({
+      projectId: project._id,
+      excludedUserIds: [userId],
+      type: "SPRINT",
+      title: "Sprint Started",
+      message: `The sprint "${sprint.name}" is now active for the project "${project.name}".`,
+      data: {
+        entityType: "SPRINT",
+        entityId: sprint._id,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to notify team members about sprint start:", err);
+  }
 
   return {
     status: "Success",
@@ -396,7 +475,7 @@ export const startSprint = async (sprintId, user) => {
 
 // Complete a sprint
 export const completeSprint = async (sprintId, user) => {
-  const { id: userId} = user;
+  const { id: userId } = user;
 
   // Check the sprint and project existence
   const { sprint, project } = await checkSprintAndProjectExistence(sprintId);
@@ -410,7 +489,7 @@ export const completeSprint = async (sprintId, user) => {
       errors.SPRINT_NOT_ACTIVE.message,
       errors.SPRINT_NOT_ACTIVE.code,
       errors.SPRINT_NOT_ACTIVE.errorCode,
-      errors.SPRINT_NOT_ACTIVE.suggestion
+      errors.SPRINT_NOT_ACTIVE.suggestion,
     );
   }
 
@@ -420,7 +499,7 @@ export const completeSprint = async (sprintId, user) => {
       errors.UNAUTHORIZED_TO_COMPLETE_SPRINT.message,
       errors.UNAUTHORIZED_TO_COMPLETE_SPRINT.code,
       errors.UNAUTHORIZED_TO_COMPLETE_SPRINT.errorCode,
-      errors.UNAUTHORIZED_TO_COMPLETE_SPRINT.suggestion
+      errors.UNAUTHORIZED_TO_COMPLETE_SPRINT.suggestion,
     );
   }
 
@@ -440,7 +519,7 @@ export const completeSprint = async (sprintId, user) => {
           sprintId: null,
           status: "Backlog",
         },
-      }
+      },
     );
   }
 
@@ -448,6 +527,26 @@ export const completeSprint = async (sprintId, user) => {
   sprint.status = "Completed";
   sprint.completedAt = new Date();
   await sprint.save();
+
+  // Notify the active project members about the completed sprint
+  try {
+    await notifyProjectMembers({
+      projectId: project._id,
+      excludedUserIds: [userId],
+      type: "SPRINT",
+      title: "Sprint Completed",
+      message: `The sprint "${sprint.name}" has been completed for the project "${project.name}".`,
+      data: {
+        entityType: "SPRINT",
+        entityId: sprint._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to notify team members about sprint completion:",
+      err,
+    );
+  }
 
   return {
     status: "Success",

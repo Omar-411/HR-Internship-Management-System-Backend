@@ -166,7 +166,7 @@ export const deleteProject = async (req, res, next) => {
     });
     if (!project) return res.status(404).json({ message: "Project not found" });
 
-    const result = await projectService.deleteProject(project._id);
+    const result = await projectService.deleteProject(project._id, req.user);
     res.status(result.code).json(result);
   } catch (err) {
     next(err);

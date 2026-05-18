@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Meeting from "../models/Meeting.js";
 import Project from "../models/Project.js";
 import Team from "../models/Team.js";
@@ -7,13 +8,14 @@ import { errors } from "../errors/meetingErrors.js";
 import { errors as projectErrors } from "../errors/projectErrors.js";
 import { getOne, getAll } from "./handlersFactory.js";
 import { resolveId } from "../utils/idResolver.js";
-import mongoose from "mongoose";
+import { notifyMeetingAttendees } from "../utils/notificationHelpers.js";
+import { createNotification } from "./notificationService.js";
 
 // Get all meetings by project
 export const getAllMeetingsOfProject = async (
   projectId,
   currentUser,
-  queryParams
+  queryParams,
 ) => {
   // Check project existence
   const projectMatch = resolveId(projectId);
@@ -23,7 +25,7 @@ export const getAllMeetingsOfProject = async (
       projectErrors.PROJECT_NOT_FOUND.message,
       projectErrors.PROJECT_NOT_FOUND.code,
       projectErrors.PROJECT_NOT_FOUND.errorCode,
-      projectErrors.PROJECT_NOT_FOUND.suggestion
+      projectErrors.PROJECT_NOT_FOUND.suggestion,
     );
   }
 
@@ -48,7 +50,7 @@ export const getAllMeetingsOfProject = async (
       { path: "attendees.userId", select: "name email" },
     ],
     null,
-    ["title", "description"]
+    ["title", "description"],
   )(enhancedQueryParams);
 };
 
@@ -62,7 +64,7 @@ export const getMeetingById = async (meetingId, currentUser) => {
       errors.MEETING_NOT_FOUND.message,
       errors.MEETING_NOT_FOUND.code,
       errors.MEETING_NOT_FOUND.errorCode,
-      errors.MEETING_NOT_FOUND.suggestion
+      errors.MEETING_NOT_FOUND.suggestion,
     );
   }
 
@@ -73,16 +75,15 @@ export const getMeetingById = async (meetingId, currentUser) => {
       projectErrors.PROJECT_NOT_FOUND.message,
       projectErrors.PROJECT_NOT_FOUND.code,
       projectErrors.PROJECT_NOT_FOUND.errorCode,
-      projectErrors.PROJECT_NOT_FOUND.suggestion
+      projectErrors.PROJECT_NOT_FOUND.suggestion,
     );
   }
 
   // Check if the user is the Product Owner or an attendee of the meeting
-  const isProductOwner =
-    project.productOwnerId?.toString() === currentUser.id;
+  const isProductOwner = project.productOwnerId?.toString() === currentUser.id;
 
   const isAttendee = meeting.attendees.some(
-    (att) => att.userId?.toString() === currentUser.id
+    (att) => att.userId?.toString() === currentUser.id,
   );
 
   // Authorization check
@@ -91,18 +92,14 @@ export const getMeetingById = async (meetingId, currentUser) => {
       errors.UNAUTHORIZED_TO_ACCESS_MEETING.message,
       errors.UNAUTHORIZED_TO_ACCESS_MEETING.code,
       errors.UNAUTHORIZED_TO_ACCESS_MEETING.errorCode,
-      errors.UNAUTHORIZED_TO_ACCESS_MEETING.suggestion
+      errors.UNAUTHORIZED_TO_ACCESS_MEETING.suggestion,
     );
   }
 
-  return await getOne(
-    Meeting,
-    errors.MEETING_NOT_FOUND,
-    [
-      { path: "projectId", select: "name" },
-      { path: "attendees.userId", select: "name email" },
-    ]
-  )(meeting._id);
+  return await getOne(Meeting, errors.MEETING_NOT_FOUND, [
+    { path: "projectId", select: "name" },
+    { path: "attendees.userId", select: "name email" },
+  ])(meeting._id);
 };
 
 // Plan a new meeting (Product owner only)
@@ -155,7 +152,9 @@ export const createMeeting = async (data, currentUser) => {
   }
 
   // Validate the reminder time
-  const allowedReminders = Meeting.schema.path("reminderMinutesBefore").enumValues;
+  const allowedReminders = Meeting.schema.path(
+    "reminderMinutesBefore",
+  ).enumValues;
   if (reminder && !allowedReminders.includes(reminder)) {
     throw new AppError(
       errors.INVALID_REMINDER.message,
@@ -237,12 +236,27 @@ export const createMeeting = async (data, currentUser) => {
     address: locationType === "Physical" ? address : null,
     priority,
     reminderMinutesBefore: reminder,
+    // The product owner automatically accepts the meeting invitation
     attendees: uniqueAttendees.map((userId) => ({
       userId,
-      status: "Pending",
+      status: userId === currentUser.id.toString() ? "Accepted" : "Pending", 
+      respondedAt: userId === currentUser.id.toString() ? new Date() : null,
+      responseReason: null,
     })),
     createdBy: currentUser.id,
   });
+
+  // Notify all attendees except the product owner (who created the meeting)
+  try {
+    await notifyMeetingAttendees({
+      meeting,
+      project,
+      title: "New meeting scheduled",
+      message: `A new meeting "${meeting.title}" has been scheduled for project "${project.name}".`,
+    });
+  } catch (err) {
+    console.error("Failed to send meeting creation notifications:", err);
+  }
 
   return {
     status: "Success",
@@ -360,6 +374,11 @@ export const updateMeeting = async (meetingId, data, currentUser) => {
     meeting.meetingLink = null;
   }
 
+  // Store the original attendee IDs before any modifications
+  const previousAttendeeIds = meeting.attendees.map((att) =>
+    att.userId.toString(),
+  );
+
   // Attendees validation
   if (attendees) {
     // Get the project team
@@ -417,7 +436,7 @@ export const updateMeeting = async (meetingId, data, currentUser) => {
     }
 
     // Add the meeting creator (product owner) to the attendees list if not already included
-    const attendeeUserIds = updatedAttendees.map(a => a.userId?.toString());
+    const attendeeUserIds = updatedAttendees.map((a) => a.userId?.toString());
     if (!attendeeUserIds.includes(currentUser.id.toString())) {
       updatedAttendees.push({
         userId: currentUser.id,
@@ -443,6 +462,81 @@ export const updateMeeting = async (meetingId, data, currentUser) => {
 
   await meeting.save();
 
+  // Notify attendees about meeting updates and attendee changes
+  try {
+    if (attendees) {
+      const currentAttendeeIds = meeting.attendees.map((att) =>
+        att.userId.toString(),
+      );
+
+      // Get the newly added attendees
+      const addedAttendees = currentAttendeeIds.filter(
+        (id) => !previousAttendeeIds.includes(id),
+      );
+
+      // Get the removed attendees
+      const removedAttendees = previousAttendeeIds.filter(
+        (id) => !currentAttendeeIds.includes(id),
+      );
+
+      // Exclude the users who should NOT receive the generic "Meeting updated" notification
+      const excludedUserIds = [
+        ...new Set([...addedAttendees, ...removedAttendees]),
+      ];
+
+      // Notify existing attendees only (Pending or Accepted),
+      await notifyMeetingAttendees({
+        meeting,
+        project,
+        title: "Meeting updated",
+        message: `The meeting "${meeting.title}" in project "${project.name}" has been updated.`,
+        excludedUserIds,
+      });
+
+      // Notify the newly added attendees
+      for (const userId of addedAttendees) {
+        if (userId === currentUser.id.toString()) continue;
+
+        await createNotification({
+          recipientId: userId,
+          type: "MEETING",
+          title: "Added to meeting",
+          message: `You have been added to the meeting "${meeting.title}" in project "${project.name}".`,
+          data: {
+            entityType: "MEETING",
+            entityId: meeting._id,
+          },
+        });
+      }
+
+      // Notify the removed attendees
+      for (const userId of removedAttendees) {
+        if (userId === currentUser.id.toString()) continue;
+
+        await createNotification({
+          recipientId: userId,
+          type: "MEETING",
+          title: "Removed from meeting",
+          message: `You have been removed from the meeting "${meeting.title}" in project "${project.name}".`,
+          data: {
+            entityType: "MEETING",
+            entityId: meeting._id,
+          },
+        });
+      }
+    } else {
+      // If, No attendee list change: generic update meeting notification
+      await notifyMeetingAttendees({
+        meeting,
+        project,
+        title: "Meeting updated",
+        message: `The meeting "${meeting.title}" in project "${project.name}" has been updated.`,
+      });
+    }
+  } catch (err) {
+    console.error("Failed to send meeting update notifications:", err);
+  }
+
   return {
     status: "Success",
     code: 200,
@@ -461,7 +555,7 @@ export const cancelMeeting = async (meetingId, currentUser) => {
       errors.MEETING_NOT_FOUND.message,
       errors.MEETING_NOT_FOUND.code,
       errors.MEETING_NOT_FOUND.errorCode,
-      errors.MEETING_NOT_FOUND.suggestion
+      errors.MEETING_NOT_FOUND.suggestion,
     );
   }
 
@@ -472,7 +566,7 @@ export const cancelMeeting = async (meetingId, currentUser) => {
       projectErrors.PROJECT_NOT_FOUND.message,
       projectErrors.PROJECT_NOT_FOUND.code,
       projectErrors.PROJECT_NOT_FOUND.errorCode,
-      projectErrors.PROJECT_NOT_FOUND.suggestion
+      projectErrors.PROJECT_NOT_FOUND.suggestion,
     );
   }
 
@@ -482,7 +576,7 @@ export const cancelMeeting = async (meetingId, currentUser) => {
       errors.UNAUTHORIZED_TO_CANCEL_MEETING.message,
       errors.UNAUTHORIZED_TO_CANCEL_MEETING.code,
       errors.UNAUTHORIZED_TO_CANCEL_MEETING.errorCode,
-      errors.UNAUTHORIZED_TO_CANCEL_MEETING.suggestion
+      errors.UNAUTHORIZED_TO_CANCEL_MEETING.suggestion,
     );
   }
 
@@ -492,7 +586,7 @@ export const cancelMeeting = async (meetingId, currentUser) => {
       errors.MEETING_ALREADY_CANCELLED.message,
       errors.MEETING_ALREADY_CANCELLED.code,
       errors.MEETING_ALREADY_CANCELLED.errorCode,
-      errors.MEETING_ALREADY_CANCELLED.suggestion
+      errors.MEETING_ALREADY_CANCELLED.suggestion,
     );
   }
 
@@ -516,6 +610,18 @@ export const cancelMeeting = async (meetingId, currentUser) => {
   meeting.status = "Cancelled";
   await meeting.save();
 
+  // Notify attendees who accepted or have not responded yet
+  try {
+    await notifyMeetingAttendees({
+      meeting,
+      project,
+      title: "Meeting cancelled",
+      message: `The meeting "${meeting.title}" in project "${project.name}" has been cancelled.`,
+    });
+  } catch (err) {
+    console.error("Failed to send meeting cancellation notifications:", err);
+  }
+
   return {
     status: "Success",
     code: 200,
@@ -529,7 +635,7 @@ export const respondToMeeting = async (
   meetingId,
   currentUser,
   status,
-  reason
+  reason,
 ) => {
   // Validate the status value
   const allowedStatuses = ["Accepted", "Rejected"];
@@ -548,7 +654,7 @@ export const respondToMeeting = async (
       errors.REJECTION_REASON_REQUIRED.message,
       errors.REJECTION_REASON_REQUIRED.code,
       errors.REJECTION_REASON_REQUIRED.errorCode,
-      errors.REJECTION_REASON_REQUIRED.suggestion
+      errors.REJECTION_REASON_REQUIRED.suggestion,
     );
   }
 
@@ -563,7 +669,7 @@ export const respondToMeeting = async (
       errors.MEETING_OR_ATTENDEE_NOT_FOUND.message,
       errors.MEETING_OR_ATTENDEE_NOT_FOUND.code,
       errors.MEETING_OR_ATTENDEE_NOT_FOUND.errorCode,
-      errors.MEETING_OR_ATTENDEE_NOT_FOUND.suggestion
+      errors.MEETING_OR_ATTENDEE_NOT_FOUND.suggestion,
     );
   }
 
@@ -574,7 +680,7 @@ export const respondToMeeting = async (
   const [hours, minutes] = meeting.startTime.split(":");
   meetingStart.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
-  if (meetingStart <= now) {
+  if (meetingStart <= now || meeting.status === "Cancelled") {
     throw new AppError(
       errors.PAST_MEETING_RESPONSE.message,
       errors.PAST_MEETING_RESPONSE.code,
@@ -583,16 +689,16 @@ export const respondToMeeting = async (
     );
   }
 
-  // Prevent the double response 
+  // Prevent the double response
   const attendee = meeting.attendees.find(
-    (a) => a.userId?.toString() === currentUser.id.toString()
+    (a) => a.userId?.toString() === currentUser.id.toString(),
   );
   if (attendee.status !== "Pending") {
     throw new AppError(
       errors.ALREADY_RESPONDED.message,
       errors.ALREADY_RESPONDED.code,
       errors.ALREADY_RESPONDED.errorCode,
-      errors.ALREADY_RESPONDED.suggestion
+      errors.ALREADY_RESPONDED.suggestion,
     );
   }
 
@@ -605,12 +711,43 @@ export const respondToMeeting = async (
     {
       $set: {
         "attendees.$.status": status,
-        "attendees.$.responseReason": reason? reason : null,
+        "attendees.$.responseReason": reason ? reason : null,
         "attendees.$.respondedAt": new Date(),
       },
     },
-    { returnDocument: 'after' }
+    { returnDocument: "after" },
   );
+
+  // Get the project to retrieve its product owner
+  const project = await Project.findById(updatedMeeting.projectId);
+
+  if (project) {
+    // Get the user details for notification
+    const user = await TeamMember.findOne({
+      teamId: project.team_id,
+      userId: currentUser.id,
+    }).populate("userId", "name lastName");
+
+    if (user) {
+      try {
+        await createNotification({
+          recipientId: project.productOwnerId,
+          type: "MEETING",
+          title: "Meeting response received",
+          message:
+            status === "Accepted"
+              ? `${user.userId.name} ${user.userId.lastName} has accepted the invitation to "${updatedMeeting.title}".`
+              : `${user.userId.name} ${user.userId.lastName} has declined the invitation to "${updatedMeeting.title}".`,
+          data: {
+            entityType: "MEETING",
+            entityId: updatedMeeting._id,
+          },
+        });
+      } catch (err) {
+        console.error("Failed to send meeting response notification:", err);
+      }
+    }
+  }
 
   return {
     status: "Success",

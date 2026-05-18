@@ -1,3 +1,4 @@
+import User from "../models/User.js";
 import Document from "../models/Document.js";
 import DocumentRequest from "../models/DocumentRequest.js";
 import Project from "../models/Project.js";
@@ -6,6 +7,7 @@ import Task from "../models/Task.js";
 import Team from "../models/Team.js";
 import TeamMember from "../models/TeamMember.js";
 import crypto from "crypto";
+import path from "path"; // For determining file extensions when deleting from Cloudinary
 import { errors } from "../errors/documentRequestErrors.js";
 import { errors as projectErrors } from "../errors/projectErrors.js";
 import { errors as documentTypeErrors } from "../errors/documentTypeErrors.js";
@@ -14,6 +16,9 @@ import { getOne, getAll } from "./handlersFactory.js";
 import { validateDocumentRequestScope } from "../utils/documentRequestHelpers.js";
 import { isTeamMemberOrProductOwnerOrAdmin } from "../utils/projectHelpers.js";
 import { getIO } from "../socket.js";
+import { notifyProjectMembers } from "../utils/notificationHelpers.js";
+import { createNotification } from "./notificationService.js";
+import { deleteFromCloudinary } from "../utils/cloudinaryHelper.js";
 
 // Get all document requests for a project
 export const getAllDocumentRequests = async (projectId, queryParams, user) => {
@@ -29,7 +34,11 @@ export const getAllDocumentRequests = async (projectId, queryParams, user) => {
   }
 
   // Access control: Only Admin + project members can view document requests
-  await isTeamMemberOrProductOwnerOrAdmin(project, user, errors.UNAUTHORIZED_TO_VIEW_DOCUMENT_REQUESTS);
+  await isTeamMemberOrProductOwnerOrAdmin(
+    project,
+    user,
+    errors.UNAUTHORIZED_TO_VIEW_DOCUMENT_REQUESTS,
+  );
 
   // Filter by project (To view only document requests related to the project)
   const filters = {
@@ -75,7 +84,11 @@ export const getDocumentRequestById = async (requestId, user) => {
   }
 
   // Access control: Only Admin + project members can view document requests
-  await isTeamMemberOrProductOwnerOrAdmin(project, user, errors.UNAUTHORIZED_TO_VIEW_DOCUMENT_REQUESTS);
+  await isTeamMemberOrProductOwnerOrAdmin(
+    project,
+    user,
+    errors.UNAUTHORIZED_TO_VIEW_DOCUMENT_REQUESTS,
+  );
 
   return await getOne(DocumentRequest, errors.DOCUMENT_REQUEST_NOT_FOUND, [
     { path: "requestedBy", select: "name email" },
@@ -113,7 +126,8 @@ export const createDocumentRequest = async (data, currentUser) => {
   }
 
   // Check if the user is a member of the project
-  const isProductOwner = project.productOwnerId.toString() === currentUser.id.toString();
+  const isProductOwner =
+    project.productOwnerId.toString() === currentUser.id.toString();
   const isMember = await TeamMember.exists({
     teamId: team._id,
     userId: currentUser.id,
@@ -136,9 +150,9 @@ export const createDocumentRequest = async (data, currentUser) => {
     description,
     projectId,
     scope,
-    sprintId: sprintId? sprintId : null,
-    taskId: taskId? taskId : null,
-    dueDate: dueDate? dueDate : null,
+    sprintId: sprintId ? sprintId : null,
+    taskId: taskId ? taskId : null,
+    dueDate: dueDate ? dueDate : null,
     requestedBy: currentUser.id,
   });
 
@@ -146,7 +160,7 @@ export const createDocumentRequest = async (data, currentUser) => {
   await request.populate([
     { path: "requestedBy", select: "name email" },
     { path: "sprintId", select: "name" },
-    { path: "taskId", select: "title" }
+    { path: "taskId", select: "title" },
   ]);
 
   // Emit socket event for real-time update
@@ -156,11 +170,58 @@ export const createDocumentRequest = async (data, currentUser) => {
       const projectRoom = `project:${request.projectId}`;
       io.to(projectRoom).emit("documentRequestUpdated", {
         projectId: String(request.projectId),
-        document: request
+        document: request,
       });
     }
   } catch (socketErr) {
-    console.error("[Socket] Failed to emit documentRequestUpdated (Create):", socketErr);
+    console.error(
+      "[Socket] Failed to emit documentRequestUpdated (Create):",
+      socketErr,
+    );
+  }
+
+  // Get the requester details for the notification message
+  const requester = await User.findById(currentUser.id).select("name lastName");
+
+  // Notify all project members except the requester
+  try {
+    await notifyProjectMembers({
+      projectId: request.projectId,
+      excludedUserIds: [currentUser.id],
+      type: "DOCUMENT_REQUEST",
+      title: "New document request",
+      message: `${requester.name} ${requester.lastName} created a new document request: "${request.title}".`,
+      data: {
+        entityType: "DOCUMENT_REQUEST",
+        entityId: request._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send document request creation notifications:",
+      err,
+    );
+  }
+
+  // Notify the product owner about the new document request if the requester is not the product owner
+  if (!isProductOwner) {
+    try {
+      await createNotification({
+        recipientId: project.productOwnerId,
+        type: "DOCUMENT_REQUEST",
+        title: "New document request",
+        message: `${requester.name} ${requester.lastName} created a new document request: "${request.title}".`,
+        data: {
+          entityType: "DOCUMENT_REQUEST",
+          entityId: request._id,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to send document request creation notification to product owner:",
+        err,
+      );
+    }
   }
 
   return {
@@ -232,6 +293,45 @@ export const editDocumentRequest = async (requestId, data, user) => {
   // Save the changes
   await request.save();
 
+  // Notify all project members except the document requester about the update
+  try {
+    await notifyProjectMembers({
+      projectId: request.projectId,
+      excludedUserIds: [user.id],
+      type: "DOCUMENT_REQUEST",
+      title: "Document request updated",
+      message: `The document request "${request.title}" has been updated.`,
+      data: {
+        entityType: "DOCUMENT_REQUEST",
+        entityId: request._id,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to send document request update notifications:", err);
+  }
+
+  // Notify the product owner about the document request update if the requester is not the product owner
+  const project = await Project.findById(request.projectId);
+  if (project && project.productOwnerId.toString() !== user.id.toString()) {
+    try {
+      await createNotification({
+        recipientId: project.productOwnerId,
+        type: "DOCUMENT_REQUEST",
+        title: "Document request updated",
+        message: `The document request "${request.title}" has been updated.`,
+        data: {
+          entityType: "DOCUMENT_REQUEST",
+          entityId: request._id,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to send document request update notification to product owner:",
+        err,
+      );
+    }
+  }
+
   return {
     status: "Success",
     code: 200,
@@ -273,10 +373,76 @@ export const deleteDocumentRequest = async (requestId, user) => {
     );
   }
 
+  // If there is an uploaded file for the document request, delete it from Cloudinary
+  if (request.public_id) {
+    try {
+      console.log(
+        `[DOC-REQUEST-DELETION] Deleting document request file from Cloudinary (public_id: ${request.public_id})...`,
+      );
+
+      // Determine Cloudinary resource type based on the file extension
+      const imageExtensions = [
+        ".jpg",
+        ".png",
+        ".webp"
+      ];
+      const ext = path.extname(request.fileName || "").toLowerCase();
+
+      const resourceType = imageExtensions.includes(ext) ? "image" : "raw";
+
+      await deleteFromCloudinary(request.public_id, resourceType);
+    } catch (err) {
+      console.log(
+        `[DOC-REQUEST-DELETION] Failed to delete document request file from Cloudinary (public_id: ${request.public_id}):`,
+        err,
+      );
+    }
+  }
+
   // Delete the document request
   await request.deleteOne();
 
-  // Later, delete the docs related to the request
+  // Notify all project members except the deleter
+  try {
+    await notifyProjectMembers({
+      projectId: request.projectId,
+      excludedUserIds: [user.id],
+      type: "DOCUMENT_REQUEST",
+      title: "Document request deleted",
+      message: `The document request "${request.title}" has been deleted.`,
+      data: {
+        entityType: null,
+        entityId: null,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send document request deletion notifications:",
+      err,
+    );
+  }
+
+  // Notify the product owner about the document request deletion if the deleter is not the product owner
+  const project = await Project.findById(request.projectId);
+  if (project && project.productOwnerId.toString() !== user.id.toString()) {
+    try {
+      await createNotification({
+        recipientId: project.productOwnerId,
+        type: "DOCUMENT_REQUEST",
+        title: "Document request deleted",
+        message: `The document request "${request.title}" has been deleted.`,
+        data: {
+          entityType: null,
+          entityId: null,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to send document request deletion notification to product owner:",
+        err,
+      );
+    }
+  }
 
   return {
     status: "Success",
@@ -286,7 +452,10 @@ export const deleteDocumentRequest = async (requestId, user) => {
 };
 
 // Mark a document request as fulfilled (Approve)
-export const markDocumentRequestAsFulfilled = async (requestId, user) => {
+export const markDocumentRequestAsFulfilled = async (
+  requestId,
+  user,
+) => {
   // Check the document request existence
   const request = await DocumentRequest.findById(requestId);
   if (!request) {
@@ -322,20 +491,18 @@ export const markDocumentRequestAsFulfilled = async (requestId, user) => {
   request.status = "Fulfilled";
   request.rejectionComment = null; // Clear any previous rejection comment
   request.fulfilledAt = new Date();
-  request.fulfilledBy = user.id;
 
-  console.log(`[DocumentRequestService] Approving request ${requestId}. Setting fulfilledBy to: ${user.id}`);
+  console.log(
+    `[DocumentRequestService] Approving request ${requestId}. Setting fulfilledBy to: ${user.id}`,
+  );
   await request.save();
 
   // Populate for real-time frontend display
   await request.populate([
     { path: "requestedBy", select: "name email" },
-    { path: "fulfilledBy", select: "name email" },
     { path: "sprintId", select: "name" },
-    { path: "taskId", select: "title" }
+    { path: "taskId", select: "title" },
   ]);
-
-  console.log(`[DocumentRequestService] Populated request fulfilledBy:`, request.fulfilledBy);
 
   // Emit socket event for real-time update
   try {
@@ -344,11 +511,56 @@ export const markDocumentRequestAsFulfilled = async (requestId, user) => {
       const projectRoom = `project:${request.projectId}`;
       io.to(projectRoom).emit("documentRequestUpdated", {
         projectId: String(request.projectId),
-        document: request
+        document: request,
       });
     }
   } catch (socketErr) {
-    console.error("[Socket] Failed to emit documentRequestUpdated (Approve):", socketErr);
+    console.error(
+      "[Socket] Failed to emit documentRequestUpdated (Approve):",
+      socketErr,
+    );
+  }
+
+  // Notify all project members except the approver about the document request fulfillment
+  try {
+    await notifyProjectMembers({
+      projectId: request.projectId,
+      excludedUserIds: [user.id],
+      type: "DOCUMENT_REQUEST",
+      title: "Document request fulfilled",
+      message: `The document request "${request.title}" has been fulfilled.`,
+      data: {
+        entityType: null,
+        entityId: null,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send document request fulfillment notifications:",
+      err,
+    );
+  }
+
+  // Notify the product owner about the document request fulfillment if the fulfiller is not the product owner
+  const project = await Project.findById(request.projectId);
+  if (project && project.productOwnerId.toString() !== user.id.toString()) {
+    try {
+      await createNotification({
+        recipientId: project.productOwnerId,
+        type: "DOCUMENT_REQUEST",
+        title: "Document request fulfilled",
+        message: `The document request "${request.title}" has been fulfilled.`,
+        data: {
+          entityType: null,
+          entityId: null,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to send document request fulfillment notification to product owner:",
+        err,
+      );
+    }
   }
 
   return {
@@ -381,21 +593,35 @@ export const rejectDocumentRequest = async (requestId, comment, user) => {
     );
   }
 
+  // Delete the uploaded document from Cloudinary since it was rejected
+  if (request.public_id) {
+    try {
+      console.log(
+        `[DOC-REQUEST-REJECTION] Deleting document request file from Cloudinary (public_id: ${request.public_id}) due to rejection...`,
+      );
+      await deleteFromCloudinary(request.public_id, "raw");
+    } catch (err) {
+      console.log(
+        `[DOC-REQUEST-REJECTION] Failed to delete document request file from Cloudinary (public_id: ${request.public_id}) during rejection:`,
+        err,
+      );
+    }
+  }
+
   // Reset status to Pending (which is 'requested' in frontend)
   request.status = "Pending";
   request.rejectionComment = comment;
-  request.fileURL = null; // Clear the uploader's file since it was rejected
+  request.fileURL = null;
   request.fileName = null;
   request.public_id = null;
-  
+
   await request.save();
 
   // Populate for real-time frontend display
   await request.populate([
     { path: "requestedBy", select: "name email" },
-    { path: "fulfilledBy", select: "name email" },
     { path: "sprintId", select: "name" },
-    { path: "taskId", select: "title" }
+    { path: "taskId", select: "title" },
   ]);
 
   // Emit socket event for real-time update
@@ -405,11 +631,14 @@ export const rejectDocumentRequest = async (requestId, comment, user) => {
       const projectRoom = `project:${request.projectId}`;
       io.to(projectRoom).emit("documentRequestUpdated", {
         projectId: String(request.projectId),
-        document: request
+        document: request,
       });
     }
   } catch (socketErr) {
-    console.error("[Socket] Failed to emit documentRequestUpdated (Reject):", socketErr);
+    console.error(
+      "[Socket] Failed to emit documentRequestUpdated (Reject):",
+      socketErr,
+    );
   }
 
   return {

@@ -6,6 +6,7 @@ import TeamMember from "../models/TeamMember.js";
 import AppError from "./AppError.js";
 import { errors as projectErrors } from "../errors/projectErrors.js";
 import { errors as sprintErrors } from "../errors/sprintErrors.js";
+import { notifyMeetingAttendees } from "./notificationHelpers.js";
 
 // Check if a sprint or the project exists
 export const checkSprintAndProjectExistence = async (sprintId) => {
@@ -36,9 +37,16 @@ export const checkSprintAndProjectExistence = async (sprintId) => {
 
 // Update or create the sprint review meeting based on the sprint schedule changes
 export const upsertSprintReviewMeeting = async (sprint, project) => {
+  // Check if a sprint review meeting already exists
+  const existingMeeting = await Meeting.findOne({
+    sprintId: sprint._id,
+  });
+
+  const isNewMeeting = !existingMeeting;
+
   // Get the project team
   const team = await Team.findOne({ projectId: project._id });
-  if (!team){
+  if (!team) {
     throw new AppError(
       projectErrors.TEAM_NOT_FOUND.message,
       projectErrors.TEAM_NOT_FOUND.code,
@@ -49,7 +57,7 @@ export const upsertSprintReviewMeeting = async (sprint, project) => {
 
   // Get all team members
   const teamMembers = await TeamMember.find({ teamId: team._id });
-  if(!teamMembers || teamMembers.length === 0){
+  if (!teamMembers || teamMembers.length === 0) {
     return null; // No team members, so we can't create a sprint review meeting automatically
   }
 
@@ -59,11 +67,19 @@ export const upsertSprintReviewMeeting = async (sprint, project) => {
     status: "Pending",
   }));
 
-  // Add the product owner to the attendees list if not already included
-  if (!attendees.some(att => att.userId.toString() === project.productOwnerId.toString())) {
+  // Add the product owner as automatically accepted
+  const existingPO = attendees.find(
+    (att) => att.userId.toString() === project.productOwnerId.toString(),
+  );
+
+  if (existingPO) {
+    existingPO.status = "Accepted";
+    existingPO.respondedAt = new Date();
+  } else {
     attendees.push({
       userId: project.productOwnerId,
-      status: "Pending",
+      status: "Accepted",
+      respondedAt: new Date(),
     });
   }
 
@@ -75,7 +91,7 @@ export const upsertSprintReviewMeeting = async (sprint, project) => {
   // Upsert (create OR update existing meeting)
   const meeting = await Meeting.findOneAndUpdate(
     {
-      sprintId: sprint._id, 
+      sprintId: sprint._id,
     },
     {
       title: `Sprint ${sprint.number} Review`,
@@ -94,8 +110,25 @@ export const upsertSprintReviewMeeting = async (sprint, project) => {
       createdBy: project.productOwnerId,
     },
     {
-      returnDocument: 'after',
+      returnDocument: "after",
       upsert: true,
-    }
+    },
   );
+
+  // Send notifications to attendees (including the product owner)
+  try {
+    await notifyMeetingAttendees({
+      meeting,
+      project,
+      title: isNewMeeting
+        ? "Sprint review meeting scheduled"
+        : "Sprint review meeting updated",
+      message: isNewMeeting
+        ? `A sprint review meeting for Sprint ${sprint.number} has been scheduled in project "${project.name}".`
+        : `The sprint review meeting for Sprint ${sprint.number} has been updated in project "${project.name}".`,
+      excludeProductOwner: false,
+    });
+  } catch (err) {
+    console.error("Failed to send sprint review meeting notifications:", err);
+  }
 };

@@ -40,7 +40,7 @@ const documentRequestSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Pending", "in_review", "Fulfilled"],
+      enum: ["Pending", "Under Review", "Fulfilled"],
       default: "Pending",
     },
     fileURL: {
@@ -61,11 +61,6 @@ const documentRequestSchema = new mongoose.Schema(
     },
     fulfilledAt: {
       type: Date,
-      default: null,
-    },
-    fulfilledBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
       default: null,
     },
     requestedBy: {

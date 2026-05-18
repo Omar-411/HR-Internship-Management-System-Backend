@@ -46,7 +46,7 @@ router.patch(
 );
 
 // Reject a document request
-router.post(
+router.patch(
   "/document-requests/:id/reject",
   authenticate,
   rejectDocumentRequest,

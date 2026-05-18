@@ -13,6 +13,7 @@ import { isTeamMemberOrProductOwnerOrAdmin } from "../utils/projectHelpers.js";
 import { isUserAvailable } from "../validators/userValidators.js";
 import { getUserTaskStats } from "./analytics/taskStatsService.js";
 import { resolveId } from "../utils/idResolver.js";
+import { createNotification } from "../services/notificationService.js";
 
 // Get the list of team roles
 export const getTeamRoles = async () => {
@@ -29,12 +30,15 @@ export const getTeamRoles = async () => {
 // Get all team members added to a team
 export const getProjectTeamMembers = async (queryParams, teamId, user) => {
   console.log("TEAM FETCH TRACE - ID RECEIVED:", teamId);
-  
+
   // Resolve projectId (teamId here is the projectId from the route)
   const projectMatch = resolveId(teamId);
   const Project = mongoose.model("Project");
   const projectExists = await Project.findOne(projectMatch);
-  console.log("TEAM FETCH TRACE - PROJECT EXISTS:", projectExists ? "YES" : "NO");
+  console.log(
+    "TEAM FETCH TRACE - PROJECT EXISTS:",
+    projectExists ? "YES" : "NO",
+  );
 
   if (!projectExists) {
     throw new AppError(
@@ -46,7 +50,9 @@ export const getProjectTeamMembers = async (queryParams, teamId, user) => {
   }
 
   // Check the team existence by the found project's ObjectId
-  let team = await Team.findOne({ projectId: projectExists._id }).populate("projectId");
+  let team = await Team.findOne({ projectId: projectExists._id }).populate(
+    "projectId",
+  );
 
   if (!team) {
     const projObjectId = projectExists._id;
@@ -59,7 +65,9 @@ export const getProjectTeamMembers = async (queryParams, teamId, user) => {
     });
 
     // CRITICAL: Update the project with the new team_id
-    console.log(`⚠️ TEAM FETCH TRACE - Linking team ${team._id} to project ${projObjectId}`);
+    console.log(
+      `⚠️ TEAM FETCH TRACE - Linking team ${team._id} to project ${projObjectId}`,
+    );
     await Project.findByIdAndUpdate(projObjectId, { team_id: team._id });
 
     // Populate the newly created team
@@ -68,7 +76,7 @@ export const getProjectTeamMembers = async (queryParams, teamId, user) => {
 
   console.log("TEAM FETCH TRACE - FINAL TEAM OBJECT:", {
     teamId: team?._id,
-    projectId: team?.projectId?._id || team?.projectId
+    projectId: team?.projectId?._id || team?.projectId,
   });
 
   const project = team.projectId;
@@ -86,7 +94,13 @@ export const getProjectTeamMembers = async (queryParams, teamId, user) => {
   // Get the list of team members with full user info
   const result = await getAll(
     TeamMember,
-    [{ path: "userId", populate: { path: "role_id", select: "name" }, select: "name lastName email profileImageURL role_id" }],
+    [
+      {
+        path: "userId",
+        populate: { path: "role_id", select: "name" },
+        select: "name lastName email profileImageURL role_id",
+      },
+    ],
     "--v -teamId",
   )(finalQuery);
 
@@ -106,7 +120,17 @@ export const getProjectTeamMembers = async (queryParams, teamId, user) => {
           userId: null,
           role: member.role,
           isActiveInProject: member.isActiveInProject,
-          stats: { tasksByStatus: { totalTasks: 0, backlog: 0, todo: 0, inProgress: 0, review: 0, done: 0, completionRate: 0 } },
+          stats: {
+            tasksByStatus: {
+              totalTasks: 0,
+              backlog: 0,
+              todo: 0,
+              inProgress: 0,
+              review: 0,
+              done: 0,
+              completionRate: 0,
+            },
+          },
         };
       }
 
@@ -124,7 +148,7 @@ export const getProjectTeamMembers = async (queryParams, teamId, user) => {
         role: member.role,
         isActiveInProject: member.isActiveInProject,
         stats: {
-          tasksByStatus: stats
+          tasksByStatus: stats,
         },
       };
     }),
@@ -212,16 +236,20 @@ export const addTeamMember = async (teamId, userId, role, currentUser) => {
     );
   }
 
-  let team = await Team.findOne({ projectId: projectExists._id }).populate("projectId");
+  let team = await Team.findOne({ projectId: projectExists._id }).populate(
+    "projectId",
+  );
   console.log("TEAM FOUND:", team);
 
   if (!team) {
+    console.log("No team found, creating one...");
+    team = await Team.create({
+      name: `${projectExists.name} Team`,
+      projectId: projectExists._id,
+    });
 
-    console.log("⚠️ No team found, creating one...");
-    team = await Team.create({ name: `${projectExists.name} Team`, projectId: projectExists._id });
-    
     // CRITICAL: Link the new team back to the project
-    console.log(`⚠️ LINKING NEW TEAM ${team._id} TO PROJECT ${projectExists._id}`);
+    console.log(`LINKING NEW TEAM ${team._id} TO PROJECT ${projectExists._id}`);
     await Project.findByIdAndUpdate(projectExists._id, { team_id: team._id });
 
     // Populate it for the downstream authorization check
@@ -255,7 +283,10 @@ export const addTeamMember = async (teamId, userId, role, currentUser) => {
   }
 
   // Check if the user is already a member of the team
-  const existingMember = await TeamMember.findOne({ teamId: team._id, userId: teamMember._id });
+  const existingMember = await TeamMember.findOne({
+    teamId: team._id,
+    userId: teamMember._id,
+  });
   if (existingMember) {
     throw new AppError(
       projectErrors.DUPLICATE_USERS.message,
@@ -330,6 +361,25 @@ export const addTeamMember = async (teamId, userId, role, currentUser) => {
         "User already has 2 active projects and therefore is not available to be added to another Active project.",
       );
     }
+  }
+
+  // Notify the new team member about being added to the team
+  try {
+    await createNotification({
+      recipientId: newMember._id,
+      type: "TEAM_MEMBER",
+      title: "Project team addition",
+      message: `You have been added to the team for the project "${projectExists.name}".`,
+      data: {
+        entityType: "Project",
+        entityId: projectExists._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for the team member addition:",
+      err,
+    );
   }
 
   return {
@@ -460,6 +510,25 @@ export const updateTeamMember = async (
   // Save the changes
   await member.save();
 
+  // Notify the new team member about being added to the team
+  try {
+    await createNotification({
+      recipientId: member._id,
+      type: "TEAM_MEMBER",
+      title: "Project team update",
+      message: `You have been updated in the team for the project "${project.name}".`,
+      data: {
+        entityType: "Project",
+        entityId: project._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for the team member update:",
+      err,
+    );
+  }
+
   return {
     status: "Success",
     message: "Team member updated successfully",
@@ -526,6 +595,25 @@ export const removeTeamMember = async (teamMemberId, currentUser) => {
   }
 
   await member.deleteOne();
+
+  // Notify the removed team member about being removed from the team
+  try {
+    await createNotification({
+      recipientId: member._id,
+      type: "TEAM_MEMBER",
+      title: "Project team removal",
+      message: `You have been removed from the team for the project "${project.name}".`,
+      data: {
+        entityType: "Project",
+        entityId: project._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for the team member removal:",
+      err,
+    );
+  }
 
   return {
     status: "Success",
@@ -644,6 +732,44 @@ export const replaceTeamMember = async (
   // Deactivate the old team member
   oldMember.isActiveInProject = false;
   await oldMember.save();
+
+  // Notify the deactivated team member
+  try {
+    await createNotification({
+      recipientId: oldMember.userId,
+      type: "TEAM_MEMBER",
+      title: "Deactivation from project team",
+      message: `You have been deactivated for the moment from the team for the project "${project.name}".`,
+      data: {
+        entityType: "Project",
+        entityId: project._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for the team member deactivation:",
+      err,
+    );
+  }
+
+  // Notify the new team member
+  try {
+    await createNotification({
+      recipientId: newUser._id,
+      type: "TEAM_MEMBER",
+      title: "Added to project team",
+      message: `You have been added to the team for the project "${project.name}".`,
+      data: {
+        entityType: "Project",
+        entityId: project._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to send notification for the team member addition:",
+      err,
+    );
+  }
 
   return {
     status: "Success",

@@ -1,4 +1,3 @@
-// STILL NEED REFACTORING, JUST UNIFIED THE RESPONSE //
 import mongoose from "mongoose";
 import Project from "../models/Project.js";
 import Sprint from "../models/Sprint.js";
@@ -17,6 +16,7 @@ import {
 import { isProjectInactive } from "../validators/projectValidators.js";
 import { isTeamMemberOrProductOwnerOrAdmin } from "../utils/projectHelpers.js";
 import { normalizeStatus } from "../utils/taskHelpers.js";
+import { createNotification } from "../services/notificationService.js";
 
 // Get all the statuses of a task
 export const getAllTaskStatuses = async (req, res, next) => {
@@ -70,8 +70,7 @@ export const getAllTaskTypes = async (req, res, next) => {
 export const getProjectTasks = async (req, res, next) => {
   try {
     const { projectId } = req.params;
-    
-    // Explicitly cast to ObjectId to avoid CastError if frontend sends string
+
     const objectId = new mongoose.Types.ObjectId(projectId);
     const { sprintId, page = 1, type, status } = req.query;
 
@@ -541,11 +540,13 @@ export const addTask = async (req, res, next) => {
     // User Assignment validation
     let validAssignedTo = null;
     if (assignees && Array.isArray(assignees) && assignees.length > 0) {
-      // 1. Verify all selected users exist in DB
-      const users = await mongoose.model("User").find({ _id: { $in: assignees } });
+      // Verify all selected users exist in DB
+      const users = await mongoose
+        .model("User")
+        .find({ _id: { $in: assignees } });
       console.log("FOUND USERS:", users);
       if (users.length !== assignees.length) {
-        console.log("❌ FAIL REASON: users not found in DB");
+        console.log("FAIL REASON: users not found in DB");
         throw new AppError(
           commonErrors.USER_NOT_FOUND.message,
           commonErrors.USER_NOT_FOUND.code,
@@ -554,7 +555,7 @@ export const addTask = async (req, res, next) => {
         );
       }
 
-      // 2. Ensure the selected user is a team member of the project
+      // Ensure the selected user is a team member of the project
       validAssignedTo = assignees[0];
       const membership = await TeamMember.findOne({
         userId: validAssignedTo,
@@ -562,7 +563,7 @@ export const addTask = async (req, res, next) => {
       });
 
       if (!membership) {
-        console.log("❌ FAIL REASON: user is not a member of project team");
+        console.log("FAIL REASON: user is not a member of project team");
         throw new AppError(
           commonErrors.USER_NOT_FOUND.message,
           commonErrors.USER_NOT_FOUND.code,
@@ -592,6 +593,27 @@ export const addTask = async (req, res, next) => {
     const io = req.app.get("io");
     if (io) {
       io.emit("taskCreated", { projectId: id, task });
+    }
+
+    // Send a notification to the employee assigned to the task if there is an assignment
+    if (validAssignedTo !== null) {
+      try {
+        await createNotification({
+          recipientId: validAssignedTo,
+          type: "TASK",
+          title: "New task created",
+          message: `A task: "${task.title}" has been created and assigned to you in the project "${project.name}".`,
+          data: {
+            entityType: "Project",
+            entityId: project._id,
+          },
+        });
+      } catch (err) {
+        console.error(
+          "Failed to send notification for the task creation:",
+          err,
+        );
+      }
     }
 
     res.status(201).json({
@@ -764,6 +786,11 @@ export const updateTask = async (req, res, next) => {
       }
     }
 
+    // Store the previous assignee before applying updates
+    const previousAssignedTo = task.assignedTo
+      ? task.assignedTo.toString()
+      : null;
+
     // Assignment of a task to a user validation
     if (updates.assignedTo) {
       // Check the user existence and if the user is a team member of the project
@@ -810,8 +837,63 @@ export const updateTask = async (req, res, next) => {
       io.emit("taskUpdated", { projectId: task.projectId, task });
     }
 
+    // Notify the task assignees
+    try {
+      const currentAssignedTo = task.assignedTo
+        ? task.assignedTo.toString()
+        : null;
+
+      // Case 1: The Assignee changed
+      if (
+        previousAssignedTo &&
+        currentAssignedTo &&
+        previousAssignedTo !== currentAssignedTo
+      ) {
+        // Notify the old assignee
+        await createNotification({
+          recipientId: previousAssignedTo,
+          type: "TASK",
+          title: "Task re-assigned",
+          message: `The task "${task.title}" is no longer assigned to you for the project "${project.name}".`,
+          data: {
+            entityType: "Project",
+            entityId: task.projectId,
+          },
+        });
+
+        // Notify the new assignee
+        await createNotification({
+          recipientId: currentAssignedTo,
+          type: "TASK",
+          title: "Task assigned to you",
+          message: `The task "${task.title}" has been assigned to you in the project "${project.name}".`,
+          data: {
+            entityType: "Project",
+            entityId: task.projectId,
+          },
+        });
+      }
+
+      // Case 2: Same assignee, but task details were updated
+      else if (currentAssignedTo) {
+        await createNotification({
+          recipientId: currentAssignedTo,
+          type: "TASK",
+          title: "Task updated",
+          message: `The task "${task.title}" assigned to you in the project "${project.name}" has been updated.`,
+          data: {
+            entityType: "Project",
+            entityId: task.projectId,
+          },
+        });
+      }
+    } catch (err) {
+      console.error("Failed to send task update notifications:", err);
+    }
+
     res.status(200).json({
       status: "Success",
+      code: 200,
       message: "Task updated successfully!",
       task,
     });
@@ -895,6 +977,27 @@ export const deleteTask = async (req, res, next) => {
     const io = req.app.get("io");
     if (io) {
       io.emit("taskDeleted", { projectId: task.projectId, taskId });
+    }
+
+    // Notify the task assignee that the task has been deleted
+    if (task.assignedTo !== undefined) {
+      try {
+        await createNotification({
+          recipientId: task.assignedTo,
+          type: "TASK",
+          title: "Task Deleted",
+          message: `The task "${task.title}" assigned to you in the project "${project.name}" has been deleted.`,
+          data: {
+            entityType: "Project",
+            entityId: task.projectId,
+          },
+        });
+      } catch (err) {
+        console.error(
+          "Failed to send notification for the task deletion:",
+          err,
+        );
+      }
     }
 
     res.status(200).json({
@@ -989,6 +1092,25 @@ export const moveTask = async (req, res, next) => {
       io.emit("taskUpdated", { projectId: String(task.projectId), task });
     }
 
+    // Notify the task assignee about the status change
+    try {
+      await createNotification({
+        recipientId: project.productOwnerId,
+        type: "TASK",
+        title: "Task Moved in the Kanban Board",
+        message: `The task "${task.title}" assigned to you in the project "${project.name}" has been moved to the "${status}" status.`,
+        data: {
+          entityType: "Project",
+          entityId: task.projectId,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to send notification for the task moving in the kanban board:",
+        err,
+      );
+    }
+
     res.status(200).json({
       status: "Success",
       code: 200,
@@ -1007,12 +1129,14 @@ export const submitTask = async (req, res, next) => {
     const { type, linkUrl, comment, summary, completionRate, hoursSpent } =
       req.body;
 
-    const parsedCompletionRate = completionRate !== undefined && completionRate !== "" 
-      ? Number(completionRate) 
-      : undefined;
-    const parsedHoursSpent = hoursSpent !== undefined && hoursSpent !== "" 
-      ? Number(hoursSpent) 
-      : undefined;
+    const parsedCompletionRate =
+      completionRate !== undefined && completionRate !== ""
+        ? Number(completionRate)
+        : undefined;
+    const parsedHoursSpent =
+      hoursSpent !== undefined && hoursSpent !== ""
+        ? Number(hoursSpent)
+        : undefined;
 
     // Check the task existence
     const task = await Task.findById(taskId);
@@ -1129,12 +1253,12 @@ export const submitTask = async (req, res, next) => {
     }
 
     // Validate the completion rate
-    if ( parsedCompletionRate !== undefined &&
+    if (
+      parsedCompletionRate !== undefined &&
       (typeof parsedCompletionRate !== "number" ||
-      isNaN(parsedCompletionRate) ||
-      parsedCompletionRate < 0 ||
-      parsedCompletionRate > 100
-      )
+        isNaN(parsedCompletionRate) ||
+        parsedCompletionRate < 0 ||
+        parsedCompletionRate > 100)
     ) {
       throw new AppError(
         errors.INVALID_COMPLETION_RATE.message,
@@ -1145,7 +1269,12 @@ export const submitTask = async (req, res, next) => {
     }
 
     // Validate the hours spent
-    if (parsedHoursSpent !== undefined && (typeof parsedHoursSpent !== "number" || isNaN(parsedHoursSpent) || parsedHoursSpent < 0)) {
+    if (
+      parsedHoursSpent !== undefined &&
+      (typeof parsedHoursSpent !== "number" ||
+        isNaN(parsedHoursSpent) ||
+        parsedHoursSpent < 0)
+    ) {
       throw new AppError(
         errors.INVALID_HOURS_SPENT.message,
         errors.INVALID_HOURS_SPENT.code,
@@ -1184,10 +1313,29 @@ export const submitTask = async (req, res, next) => {
     // Emit socket event for real-time update
     const io = req.app.get("io");
     if (io) {
-      io.emit("taskUpdated", { 
-        projectId: String(savedTask.projectId), 
-        task: { ...savedTask, id: savedTask._id } 
+      io.emit("taskUpdated", {
+        projectId: String(savedTask.projectId),
+        task: { ...savedTask, id: savedTask._id },
       });
+    }
+
+    // Notify the product owner about the task submission
+    try {
+      await createNotification({
+        recipientId: project.productOwnerId,
+        type: "TASK",
+        title: "Task Submitted",
+        message: `The task "${task.title}" in the project "${project.name}" has been submitted.`,
+        data: {
+          entityType: "Project",
+          entityId: task.projectId,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to send notification for the task submission:",
+        err,
+      );
     }
 
     res.status(200).json({
@@ -1235,7 +1383,7 @@ export const unSubmitTask = async (req, res, next) => {
     }
 
     // Check if the project is archived, completed or on hold
-    isProjectInactive(project)
+    isProjectInactive(project);
 
     // Only the assigned user can remove his submission
     const { id: userId } = req.user;
@@ -1285,6 +1433,25 @@ export const unSubmitTask = async (req, res, next) => {
     // Save the changes
     await task.save();
 
+    // Notify the product owner about the task submission
+    try {
+      await createNotification({
+        recipientId: project.productOwnerId,
+        type: "TASK",
+        title: "Task Submission Removed",
+        message: `The task "${task.title}" in the project "${project.name}" has been un-submitted.`,
+        data: {
+          entityType: "Project",
+          entityId: task.projectId,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to send notification for the task un-submission:",
+        err,
+      );
+    }
+
     res.status(200).json({
       status: "Success",
       code: 200,
@@ -1322,6 +1489,8 @@ export const assignTask = async (req, res, next) => {
       );
     }
 
+    const oldAssignee = task.assignedTo ? task.assignedTo.toString() : null;
+
     // Check project existence
     const project = await Project.findById(task.projectId);
     if (!project) {
@@ -1334,7 +1503,7 @@ export const assignTask = async (req, res, next) => {
     }
 
     // Check if the project is archived, completed or on hold
-    isProjectInactive(project)
+    isProjectInactive(project);
 
     // Check if the assigned user is in team
     const isMember = await TeamMember.findOne({
@@ -1364,6 +1533,54 @@ export const assignTask = async (req, res, next) => {
       );
     }
 
+    // Send notifications
+    try {
+      const newAssignee = assignedTo.toString();
+
+      // Case 1: Task is reassigned to a different user
+      if (oldAssignee && oldAssignee !== newAssignee) {
+        // Notify previous assignee
+        await createNotification({
+          recipientId: oldAssignee,
+          type: "TASK",
+          title: "Task un-assigned",
+          message: `The task "${task.title}" is no longer assigned to you.`,
+          data: {
+            entityType: "Project",
+            entityId: task.projectId,
+          },
+        });
+
+        // Notify new assignee
+        await createNotification({
+          recipientId: newAssignee,
+          type: "TASK",
+          title: "Task assigned to you",
+          message: `The task "${task.title}" has been assigned to you in the project "${project.name}".`,
+          data: {
+            entityType: "Project",
+            entityId: task.projectId,
+          },
+        });
+      }
+
+      // Case 2: First assignment (task had no previous assignee)
+      else if (!oldAssignee) {
+        await createNotification({
+          recipientId: newAssignee,
+          type: "TASK",
+          title: "Task assigned to you",
+          message: `The task "${task.title}" has been assigned to you in the project "${project.name}".`,
+          data: {
+            entityType: "Project",
+            entityId: task.projectId,
+          },
+        });
+      }
+    } catch (err) {
+      console.error("Failed to send task assignment notifications:", err);
+    }
+
     res.status(200).json({
       status: "Success",
       code: 200,
@@ -1373,7 +1590,7 @@ export const assignTask = async (req, res, next) => {
       data: {
         task,
         updatedSubTasks: updatedSubTasks.modifiedCount || 0,
-      }
+      },
     });
   } catch (err) {
     next(err);
@@ -1418,7 +1635,7 @@ export const reviewTask = async (req, res, next) => {
     }
 
     // Check if the project is archived, completed or on hold
-    isProjectInactive(project)
+    isProjectInactive(project);
 
     // The Task must be in Review
     if (task.status !== "Review") {
@@ -1475,6 +1692,27 @@ export const reviewTask = async (req, res, next) => {
     // Save the changes
     await task.save();
 
+    // Notify the task assignee about the review result
+    if (task.assignedTo) {
+      try {
+        await createNotification({
+          recipientId: task.assignedTo,
+          type: "TASK",
+          title: `Task ${action === "approve" ? "Approved" : "Rejected"}`,
+          message: `Your submission for the task "${task.title}" in the project "${project.name}" has been ${action === "approve" ? "approved" : "rejected"}.`,
+          data: {
+            entityType: "Project",
+            entityId: task.projectId,
+          },
+        });
+      } catch (err) {
+        console.error(
+          "Failed to send notification for the task review result:",
+          err,
+        );
+      }
+    }
+
     // Emit socket event for real-time update
     const io = req.app.get("io");
     if (io) {
@@ -1507,7 +1745,7 @@ export const getTaskSubmission = async (req, res, next) => {
         errors.TASK_NOT_FOUND.message,
         errors.TASK_NOT_FOUND.code,
         errors.TASK_NOT_FOUND.errorCode,
-        errors.TASK_NOT_FOUND.suggestion
+        errors.TASK_NOT_FOUND.suggestion,
       );
     }
 
@@ -1518,7 +1756,7 @@ export const getTaskSubmission = async (req, res, next) => {
         projectErrors.PROJECT_NOT_FOUND.message,
         projectErrors.PROJECT_NOT_FOUND.code,
         projectErrors.PROJECT_NOT_FOUND.errorCode,
-        projectErrors.PROJECT_NOT_FOUND.suggestion
+        projectErrors.PROJECT_NOT_FOUND.suggestion,
       );
     }
 
@@ -1532,7 +1770,7 @@ export const getTaskSubmission = async (req, res, next) => {
         errors.UNAUTHORIZED_TO_VIEW_SUBMISSION.message,
         errors.UNAUTHORIZED_TO_VIEW_SUBMISSION.code,
         errors.UNAUTHORIZED_TO_VIEW_SUBMISSION.errorCode,
-        errors.UNAUTHORIZED_TO_VIEW_SUBMISSION.suggestion
+        errors.UNAUTHORIZED_TO_VIEW_SUBMISSION.suggestion,
       );
     }
 
@@ -1541,7 +1779,7 @@ export const getTaskSubmission = async (req, res, next) => {
         errors.NO_TASK_SUBMISSION_FOUND.message,
         errors.NO_TASK_SUBMISSION_FOUND.code,
         errors.NO_TASK_SUBMISSION_FOUND.errorCode,
-        errors.NO_TASK_SUBMISSION_FOUND.suggestion
+        errors.NO_TASK_SUBMISSION_FOUND.suggestion,
       );
     }
 
@@ -1569,7 +1807,7 @@ export const downloadTaskSubmission = async (req, res, next) => {
         errors.TASK_NOT_FOUND.message,
         errors.TASK_NOT_FOUND.code,
         errors.TASK_NOT_FOUND.errorCode,
-        errors.TASK_NOT_FOUND.suggestion
+        errors.TASK_NOT_FOUND.suggestion,
       );
     }
 
@@ -1580,23 +1818,21 @@ export const downloadTaskSubmission = async (req, res, next) => {
         projectErrors.PROJECT_NOT_FOUND.message,
         projectErrors.PROJECT_NOT_FOUND.code,
         projectErrors.PROJECT_NOT_FOUND.errorCode,
-        projectErrors.PROJECT_NOT_FOUND.suggestion
+        projectErrors.PROJECT_NOT_FOUND.suggestion,
       );
     }
 
     // Authorization
-    const isAssigned =
-      task.assignedTo?.toString() === userId.toString();
+    const isAssigned = task.assignedTo?.toString() === userId.toString();
 
-    const isPO =
-      project.productOwnerId?.toString() === userId.toString();
+    const isPO = project.productOwnerId?.toString() === userId.toString();
 
     if (!isAssigned && !isPO) {
       throw new AppError(
         errors.UNAUTHORIZED_TO_DOWNLOAD_SUBMISSION.message,
         errors.UNAUTHORIZED_TO_DOWNLOAD_SUBMISSION.code,
         errors.UNAUTHORIZED_TO_DOWNLOAD_SUBMISSION.errorCode,
-        errors.UNAUTHORIZED_TO_DOWNLOAD_SUBMISSION.suggestion
+        errors.UNAUTHORIZED_TO_DOWNLOAD_SUBMISSION.suggestion,
       );
     }
 
@@ -1606,7 +1842,7 @@ export const downloadTaskSubmission = async (req, res, next) => {
         errors.NO_TASK_SUBMISSION_FOUND.message,
         errors.NO_TASK_SUBMISSION_FOUND.code,
         errors.NO_TASK_SUBMISSION_FOUND.errorCode,
-        errors.NO_TASK_SUBMISSION_FOUND.suggestion
+        errors.NO_TASK_SUBMISSION_FOUND.suggestion,
       );
     }
 
@@ -1632,7 +1868,7 @@ export const downloadTaskSubmission = async (req, res, next) => {
       errors.INVALID_SUBMISSION_TYPE.message,
       errors.INVALID_SUBMISSION_TYPE.code,
       errors.INVALID_SUBMISSION_TYPE.errorCode,
-      errors.INVALID_SUBMISSION_TYPE.suggestion
+      errors.INVALID_SUBMISSION_TYPE.suggestion,
     );
   } catch (err) {
     next(err);

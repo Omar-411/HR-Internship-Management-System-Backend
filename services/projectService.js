@@ -10,21 +10,25 @@ import { errors } from "../errors/projectErrors.js";
 import { errors as commonErrors } from "../errors/commonErrors.js";
 import AppError from "../utils/AppError.js";
 import { deleteFromCloudinary } from "../utils/cloudinaryHelper.js";
-import { 
+import {
   isTeamMemberOrProductOwnerOrAdmin,
-  buildProjectMatchFilter,  
-  buildProjectAccessMatch, 
-  validateCreateProject, 
+  buildProjectMatchFilter,
+  buildProjectAccessMatch,
+  validateCreateProject,
   validateTeamMembers,
   applyProjectUpdates,
 } from "../utils/projectHelpers.js";
-import { 
-  isProjectCompletedOrOnHold, 
+import {
+  isProjectCompletedOrOnHold,
   isProjectInactive,
   ensureCanUpdateProject,
 } from "../validators/projectValidators.js";
 import { decrementUsersProjectCount } from "../utils/projectCountHelper.js";
 import { resolveId } from "../utils/idResolver.js";
+import {
+  notifyProjectMembers,
+  notifyProjectDeletion,
+} from "../utils/notificationHelpers.js";
 
 // Get the list of the sectors (For the dropdown in the project filters)
 export const getAllSectors = async () => {
@@ -408,7 +412,7 @@ export const createProject = async (data, user) => {
     } = data;
 
     // Take the product owner ID from the token
-    const productOwnerId = user.id; 
+    const productOwnerId = user.id;
 
     // Validate the input data
     await validateCreateProject(data, productOwnerId);
@@ -427,7 +431,7 @@ export const createProject = async (data, user) => {
           scrumMasterId: scrumMasterId || null,
         },
       ],
-      { session }
+      { session },
     );
 
     const createdProject = project[0];
@@ -440,7 +444,7 @@ export const createProject = async (data, user) => {
           projectId: createdProject._id,
         },
       ],
-      { session }
+      { session },
     );
 
     const createdTeam = team[0];
@@ -479,6 +483,27 @@ export const createProject = async (data, user) => {
 
     // Commit the transaction
     await session.commitTransaction();
+
+    // Notify the assigned members (If any)
+    try {
+      await notifyProjectMembers({
+        projectId: createdProject._id,
+        excludedUserIds: [productOwnerId],
+        type: "PROJECT",
+        title: "New Project Assignment",
+        message: `You have been assigned to the project "${createdProject.name}".`,
+        data: {
+          entityType: "PROJECT",
+          entityId: createdProject._id,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "Failed to notify project members of the project creation:",
+        err,
+      );
+    }
+
     session.endSession();
 
     return {
@@ -500,7 +525,7 @@ export const createProject = async (data, user) => {
   }
 };
 
-// Update a project 
+// Update a project
 export const updateProject = async (projectId, data, userId) => {
   // Check the project existence
   const project = await Project.findOne(resolveId(projectId));
@@ -523,6 +548,26 @@ export const updateProject = async (projectId, data, userId) => {
 
   await project.save();
 
+  // Notify the assigned members (If any)
+  try {
+    await notifyProjectMembers({
+      projectId: project._id,
+      excludedUserIds: [project.productOwnerId],
+      type: "PROJECT",
+      title: "Project Updated",
+      message: `The project "${project.name}" has been updated.`,
+      data: {
+        entityType: "PROJECT",
+        entityId: project._id,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "Failed to notify project members of the project creation:",
+      err,
+    );
+  }
+
   return {
     status: "Success",
     code: 200,
@@ -540,7 +585,7 @@ export const archiveProject = async (projectId, userId) => {
       errors.PROJECT_NOT_FOUND.message,
       errors.PROJECT_NOT_FOUND.code,
       errors.PROJECT_NOT_FOUND.errorCode,
-      errors.PROJECT_NOT_FOUND.suggestion
+      errors.PROJECT_NOT_FOUND.suggestion,
     );
   }
 
@@ -550,7 +595,7 @@ export const archiveProject = async (projectId, userId) => {
       errors.PROJECT_FORBIDDEN_ACTION.message,
       errors.PROJECT_FORBIDDEN_ACTION.code,
       errors.PROJECT_FORBIDDEN_ACTION.errorCode,
-      errors.PROJECT_FORBIDDEN_ACTION.suggestion
+      errors.PROJECT_FORBIDDEN_ACTION.suggestion,
     );
   }
 
@@ -560,7 +605,7 @@ export const archiveProject = async (projectId, userId) => {
       errors.PROJECT_ALREADY_ARCHIVED.message,
       errors.PROJECT_ALREADY_ARCHIVED.code,
       errors.PROJECT_ALREADY_ARCHIVED.errorCode,
-      errors.PROJECT_ALREADY_ARCHIVED.suggestion
+      errors.PROJECT_ALREADY_ARCHIVED.suggestion,
     );
   }
 
@@ -568,8 +613,8 @@ export const archiveProject = async (projectId, userId) => {
   const members = await TeamMember.find({ teamId: project.team_id });
 
   const activeMembers = members
-    .filter(m => m.isActiveInProject !== false)
-    .map(m => m.userId);
+    .filter((m) => m.isActiveInProject !== false)
+    .map((m) => m.userId);
 
   // If project was Active, decrement the projectsCount of the active members
   if (project.status === "Active") {
@@ -581,6 +626,23 @@ export const archiveProject = async (projectId, userId) => {
   project.onHoldReason = null;
 
   await project.save();
+
+  // Notify the active project members about the project being archived
+  try {
+    await notifyProjectMembers({
+      projectId: project._id,
+      excludedUserIds: [userId],
+      type: "PROJECT",
+      title: "Project Archived",
+      message: `The project "${project.name}" has been archived.`,
+      data: {
+        entityType: "PROJECT",
+        entityId: project._id,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to notify project members:", err);
+  }
 
   return {
     status: "Success",
@@ -598,7 +660,7 @@ export const restoreProject = async (projectId, userId) => {
       errors.PROJECT_NOT_FOUND.message,
       errors.PROJECT_NOT_FOUND.code,
       errors.PROJECT_NOT_FOUND.errorCode,
-      errors.PROJECT_NOT_FOUND.suggestion
+      errors.PROJECT_NOT_FOUND.suggestion,
     );
   }
 
@@ -608,7 +670,7 @@ export const restoreProject = async (projectId, userId) => {
       errors.PROJECT_FORBIDDEN_ACTION.message,
       errors.PROJECT_FORBIDDEN_ACTION.code,
       errors.PROJECT_FORBIDDEN_ACTION.errorCode,
-      errors.PROJECT_FORBIDDEN_ACTION.suggestion
+      errors.PROJECT_FORBIDDEN_ACTION.suggestion,
     );
   }
 
@@ -618,13 +680,30 @@ export const restoreProject = async (projectId, userId) => {
       errors.INVALID_RESTORE_STATE.message,
       errors.INVALID_RESTORE_STATE.code,
       errors.INVALID_RESTORE_STATE.errorCode,
-      errors.INVALID_RESTORE_STATE.suggestion
+      errors.INVALID_RESTORE_STATE.suggestion,
     );
   }
 
   // Restore project
   project.status = "Planning";
   await project.save();
+
+  // Notify the project members about the project restoration
+  try {
+    await notifyProjectMembers({
+      projectId: project._id,
+      excludedUserIds: [userId],
+      type: "PROJECT",
+      title: "Project Restored",
+      message: `The project "${project.name}" has been restored and is now in the Planning stage.`,
+      data: {
+        entityType: "PROJECT",
+        entityId: project._id,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to notify project members:", err);
+  }
 
   return {
     status: "Success",
@@ -635,32 +714,37 @@ export const restoreProject = async (projectId, userId) => {
 };
 
 // Delete a project (Admin only)
-export const deleteProject = async (projectId) => {
+export const deleteProject = async (projectId, currentUser) => {
   const session = await mongoose.startSession();
 
   try {
     session.startTransaction();
 
     // Check project existence
-    const project = await Project.findOne(resolveId(projectId)).session(session);
+    const project = await Project.findOne(resolveId(projectId)).session(
+      session,
+    );
     if (!project) {
       throw new AppError(
         errors.PROJECT_NOT_FOUND.message,
         errors.PROJECT_NOT_FOUND.code,
         errors.PROJECT_NOT_FOUND.errorCode,
-        errors.PROJECT_NOT_FOUND.suggestion
+        errors.PROJECT_NOT_FOUND.suggestion,
       );
     }
 
     // Get active team members to update their projectsCount if the project is active
     const members = await TeamMember.find({ teamId: project.team_id });
     const activeMembers = members
-      .filter(m => m.isActiveInProject !== false)
-      .map(m => m.userId);
+      .filter((m) => m.isActiveInProject !== false)
+      .map((m) => m.userId);
 
     if (project.status === "Active") {
       await decrementUsersProjectCount(activeMembers, session);
     }
+
+    // Store the team member ids before deleting them to use in the notification after deletion
+    const teamMemberIds = [...activeMembers];
 
     const projectIdObj = project._id;
 
@@ -677,8 +761,23 @@ export const deleteProject = async (projectId) => {
 
     await Project.findByIdAndDelete(projectIdObj).session(session);
 
-    // Commit DB changes 
+    // Commit DB changes
     await session.commitTransaction();
+
+    // Notify about the notification deletion
+    try {
+      await notifyProjectDeletion({
+        project,
+        deletedByUserId: currentUser.id,
+        teamMemberIds,
+      });
+    } catch (err) {
+      console.error(
+        "Failed to notify stakeholders about project deletion:",
+        err,
+      );
+    }
+
     session.endSession();
 
     // Delete the project documents from cloudinary
