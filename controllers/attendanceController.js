@@ -448,11 +448,11 @@ export const getAttendance = async (req, res, next) => {
       department,
       search,
       page = 1,
-      limit: queryLimit, // [PAGINATION-FIX]
+      limit: queryLimit,
     } = req.query;
 
     const parsedPage = Math.max(parseInt(page) || 1, 1);
-    const limit = Math.min(parseInt(queryLimit) || 10, 9999); // [PAGINATION-FIX] Respect requested limit up to 9999
+    const limit = parseInt(queryLimit) || 20;
     const skip = (parsedPage - 1) * limit;
 
     const filter = {}; // Allow filtering
@@ -596,12 +596,14 @@ export const getAttendance = async (req, res, next) => {
 
       return res.status(200).json({
         status: "Success",
-        page: parsedPage,
-        limit: limit,
-        totalRecords: totalUsers, // Total pages based on USER count
-        totalPages: Math.ceil(totalUsers / limit),
-        results: finalResults.length,
-        result: finalResults,
+        code: 200,
+        data: finalResults,
+        pagination: {
+          currentPage: parsedPage,
+          totalPages: Math.ceil(totalUsers / limit),
+          limitPerPage: limit,
+          totalCount: finalResults.length,
+        },
       });
     }
 
@@ -617,10 +619,14 @@ export const getAttendance = async (req, res, next) => {
       if (userIds.length === 0) {
         return res.status(200).json({
           status: "Success",
-          page: parsedPage,
-          totalPages: 0,
-          totalRecords: 0,
-          result: [],
+          code: 200,
+          data: [],
+          pagination: {
+            currentPage: parsedPage,
+            totalPages: 0,
+            limitPerPage: limit,
+            totalCount: 0,
+          },
         });
       }
 
@@ -631,10 +637,14 @@ export const getAttendance = async (req, res, next) => {
         if (!inSet) {
           return res.status(200).json({
             status: "Success",
-            page: parsedPage,
-            totalPages: 0,
-            totalRecords: 0,
-            result: [],
+            code: 200,
+            data: [],
+            pagination: {
+              currentPage: parsedPage,
+              totalPages: 0,
+              limitPerPage: limit,
+              totalCount: 0,
+            },
           });
         }
         // else: keep filter.userId as the specific ID (more precise than $in)
@@ -665,14 +675,16 @@ export const getAttendance = async (req, res, next) => {
       `[PAGINATION] Module: Attendance | Page: ${parsedPage || 1} | Limit: ${limit || 10} | Returned: ${attendanceRecords?.length || 0} records`,
     );
 
-    res.status(200).json({
+    return res.status(200).json({
       status: "Success",
-      page: parsedPage,
-      limit: limit,
-      totalRecords,
-      totalPages: Math.ceil(totalRecords / limit),
-      results: attendanceRecords.length,
-      result: attendanceRecords,
+      code: 200,
+      data: attendanceRecords,
+      pagination: {
+        currentPage: parsedPage,
+        totalPages: Math.ceil(totalRecords / limit),
+        limitPerPage: limit,
+        totalCount: attendanceRecords.length,
+      },
     });
   } catch (error) {
     next(error);
