@@ -181,5 +181,10 @@ export const errors = {
     errorCode: "INVALID_SALARY",
     suggestion: "Please enter a valid salary value.",
   },
+  INVALID_PASSWORD: {
+    message: "Invalid password",
+    code: 400,
+    errorCode: "INVALID_PASSWORD",
+    suggestion: "Please provide a valid password to be reset your face ID.",
+  },
 };
-

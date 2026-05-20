@@ -9,6 +9,7 @@ import {
   getAccountReactivationContent,
   getAccountDeactivationContent,
   getPositionUpdateContent,
+  getFaceResetContent,
 } from "./emailContent.js";
 
 export const sendEmail = async ({
@@ -57,6 +58,9 @@ export const sendEmail = async ({
       break;
     case "positionUpdate":
       bodyHtml = getPositionUpdateContent({ name, newPosition });
+      break;
+    case "faceIdReset":
+      bodyHtml = getFaceResetContent({ name });
       break;
     default:
       bodyHtml = `<p>Default message</p>`;

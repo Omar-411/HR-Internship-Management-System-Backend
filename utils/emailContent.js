@@ -188,3 +188,17 @@ export const getPositionUpdateContent = ({ name, newPosition }) => {
     </p>
   `;
 };
+
+// Email of the face reset
+export const getFaceResetContent = ({ name }) => {
+  return `
+    <h2 style="color: #232ED1;">Face Data Reset Notification!</h2>
+    <p>Dear ${name},</p>
+    <p>
+      Your face ID was just reset.
+    </p>
+    <p>
+      If this wasn't you, please contact HR immediately.
+    </p>
+  `;
+};

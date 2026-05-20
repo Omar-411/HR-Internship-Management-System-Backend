@@ -1362,9 +1362,9 @@ export const enrollFaceService = async (userId, descriptors) => {
 };
 
 // Reset the face descriptors (Custom not generic)
-export const resetFaceService = async (userId) => {
+export const resetFaceService = async (userId, password) => {
+  // Check the user existence
   const user = await User.findById(userId);
-
   if (!user) {
     throw new AppError(
       commonErrors.USER_NOT_FOUND.message,
@@ -1374,9 +1374,32 @@ export const resetFaceService = async (userId) => {
     );
   }
 
+  // Check the password validity
+  const isPasswordValid = await bcrypt.compare(password, user.password);
+  if (!isPasswordValid) {
+    throw new AppError(
+      errors.INVALID_PASSWORD.message,
+      errors.INVALID_PASSWORD.code,
+      errors.INVALID_PASSWORD.errorCode,
+      errors.INVALID_PASSWORD.suggestion,
+    );
+  }
+
   user.faceDescriptors = [];
   user.faceEnrolled = false;
   user.faceEnrollmentPromptRequired = true;
+
+  // Send an email to the user to notify him about the face ID reset
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: "HRcoM! - Face ID Reset Notification",
+      type: "faceIdReset",
+      name: user.name,
+    });
+  } catch (e) {
+    console.log("Email failed:", e.message);
+  }
 
   await user.save();
 

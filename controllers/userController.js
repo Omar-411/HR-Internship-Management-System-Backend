@@ -21,7 +21,7 @@ export const getUserById = async (req, res, next) => {
 
     const dbUserId = result.data?._id.toString();
     const currentUserId = requesterId?.toString();
-    
+
     const isSelf = currentUserId && dbUserId && currentUserId === dbUserId;
 
     // If not requester = user, we remove the faceDescriptors for privacy
@@ -46,7 +46,7 @@ export const getAllUsers = async (req, res, next) => {
     // If the requester is a Supervisor, restrict results to their team only
     if (role === "Supervisor") {
       req.query.supervisorId = userId;
-      
+
       // Also exclude other Supervisors from the list
       const supervisorRoleId = await resolveRoleId("Supervisor");
       req.query.role_id = { ne: supervisorRoleId };
@@ -56,11 +56,11 @@ export const getAllUsers = async (req, res, next) => {
 
     // Map the query parameters (For ex: role -> role_id and department -> department_id)
     const queryParams = await transformUserFilters(req.query);
-    
+
     console.log("USER FETCH DEBUG - Transformed Query:", queryParams);
 
     const result = await userService.getUsers(queryParams);
-    
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -114,7 +114,12 @@ export const updateUser = async (req, res, next) => {
     let { id } = req.params;
     if (id === "current") id = req.user.id;
 
-    const result = await userService.updateUserService(id, req.body, req.user, req.ip);
+    const result = await userService.updateUserService(
+      id,
+      req.body,
+      req.user,
+      req.ip,
+    );
 
     res.status(result.code).json(result);
   } catch (err) {
@@ -138,7 +143,11 @@ export const deleteUser = async (req, res, next) => {
 // Toggle User Status(Active/Inactive) (Only for Admins)
 export const toggleUserStatus = async (req, res, next) => {
   try {
-    const result = await userService.toggleUserStatusService(req.params.id, req.user, req.ip);
+    const result = await userService.toggleUserStatusService(
+      req.params.id,
+      req.user,
+      req.ip,
+    );
 
     res.status(result.code).json(result);
   } catch (err) {
@@ -175,7 +184,7 @@ export const uploadProfileImage = async (req, res, next) => {
       req.params.id,
       req.file,
       req.user,
-      req.ip
+      req.ip,
     );
 
     res.status(result.code).json(result);
@@ -190,7 +199,7 @@ export const removeProfileImage = async (req, res, next) => {
     const result = await userService.removeProfileImageService(
       req.params.id,
       req.user,
-      req.ip
+      req.ip,
     );
 
     res.status(result.code).json(result);
@@ -206,7 +215,7 @@ export const uploadCv = async (req, res, next) => {
       req.params.id,
       req.file,
       req.user,
-      req.ip
+      req.ip,
     );
 
     res.status(result.code).json(result);
@@ -220,7 +229,7 @@ export const enrollFace = async (req, res, next) => {
   try {
     const result = await userService.enrollFaceService(
       req.params.id,
-      req.body.descriptors
+      req.body.descriptors,
     );
 
     res.status(result.code).json(result);
@@ -232,7 +241,8 @@ export const enrollFace = async (req, res, next) => {
 // Face reset functionality
 export const resetFace = async (req, res, next) => {
   try {
-    const result = await userService.resetFaceService(req.params.id);
+    const password = req.body.password;
+    const result = await userService.resetFaceService(req.params.id, password);
 
     res.status(result.code).json(result);
   } catch (err) {
