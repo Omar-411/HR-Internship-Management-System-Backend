@@ -1,22 +1,11 @@
 import * as payrollService from "../services/payrollService.js";
 import * as payrollStatsService from "../services/analytics/payrollStatsService.js";
 
-// --------------------- KPIS -------------------------------- //
-
-// Get payroll KPIs for the current month and year
-export const getPayrollKPIs = async (req, res, next) => {
-  try {
-    const result = await payrollStatsService.getPayrollKPIs();
-    res.status(result.code).json(result);
-  } catch (err) {
-    next(err);
-  }
-};
-
 // Get monthly net payout trend (last 6 months)
 export const getPayrollTrend = async (req, res, next) => {
   try {
-    const result = await payrollService.getPayrollTrend();
+    const result = await payrollStatsService.getPayrollTrend();
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -26,28 +15,30 @@ export const getPayrollTrend = async (req, res, next) => {
 // Get net payout by department for a given month/year
 export const getPayrollByDepartment = async (req, res, next) => {
   try {
-    const result = await payrollService.getPayrollByDepartment(req.query);
+    const result = await payrollStatsService.getPayrollByDepartment(req.query);
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
   }
 };
 
-// ----------------------------------------------------------- //
-
 // Calculate payroll for an employee for a given month and year
-export const calculatePayroll = async (req, res, next) => {
+export const generatePayrollForEmployee = async (req, res, next) => {
   try {
     const { employeeId, month, year } = req.params;
-
-    const result = await payrollService.calculatePayroll(
+    
+    const result = await payrollService.generatePayrollForEmployee(
       employeeId,
       parseInt(month),
       parseInt(year),
+      req.user,
+      req.ip,
     );
 
     res.status(result.code).json(result);
-  } catch (error) {
+  }
+    catch (error) {
     next(error);
   }
 };
@@ -147,23 +138,5 @@ export const exportPayrollToExcel = async (req, res, next) => {
 
     } catch (err) {
     next(err);
-  }
-};
-
-// Bulk calculate payroll for all eligible employees for a given month and year
-export const bulkCalculatePayroll = async (req, res, next) => {
-  try {
-    const { month, year } = req.params;
-
-    const result = await payrollService.calculateBulkPayroll(
-      parseInt(month),
-      parseInt(year),
-      req.user,
-      req.ip,
-    );
-
-    res.status(result.code).json(result);
-  } catch (error) {
-    next(error);
   }
 };

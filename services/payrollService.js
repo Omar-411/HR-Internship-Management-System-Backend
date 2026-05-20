@@ -33,7 +33,7 @@ import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.
 import { uploadDocToCloudinary } from "../utils/cloudinaryHelper.js";
 
 // Payroll calculation for an employee for a given month and year
-export const calculatePayroll = async (employeeId, month, year) => {
+export const calculatePayroll = async (employeeId, month, year, configDoc) => {
   // Check the employee existence and status
   const user = await User.findById(employeeId);
   if (!user) {
@@ -55,17 +55,6 @@ export const calculatePayroll = async (employeeId, month, year) => {
       errors.PAYROLL_ALREADY_EXISTS.code,
       errors.PAYROLL_ALREADY_EXISTS.errorCode,
       errors.PAYROLL_ALREADY_EXISTS.suggestion,
-    );
-  }
-
-  // Get the active config
-  const configDoc = await PayrollConfig.findOne({ year, isActive: true });
-  if (!configDoc) {
-    throw new AppError(
-      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.message,
-      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.code,
-      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.errorCode,
-      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.suggestion,
     );
   }
 
@@ -101,6 +90,91 @@ export const calculatePayroll = async (employeeId, month, year) => {
   };
 };
 
+// Wrapper service function to generate payroll for an employee with audit logging and notifications
+export const generatePayrollForEmployee = async (
+  employeeId,
+  month,
+  year,
+  user,
+  ip,
+) => {
+  // Get the active payroll configuration for the year
+  const configDoc = await PayrollConfig.findOne({ year, isActive: true });
+  if (!configDoc) {
+    throw new AppError(
+      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.message,
+      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.code,
+      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.errorCode,
+      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.suggestion,
+    );
+  }
+
+  // Calculate the employee's payroll for the given month and year
+  const result = await calculatePayroll(employeeId, month, year, configDoc);
+
+  const payroll = result.data;
+
+  // Populate employee for notifications
+  await payroll.populate({
+    path: "employeeId",
+    select: "name lastName",
+  });
+
+  const employee = payroll.employeeId;
+
+  // Audit log the action of generating payroll for an employee
+  await logAuditAction({
+    adminId: user.id,
+    action: "GENERATE_PAYROLL",
+    targetType: "Payroll",
+    targetId: payroll._id,
+    targetName: `${employee.name} ${employee.lastName}`,
+    details: {
+      payroll,
+    },
+    ipAddress: ip,
+  });
+
+  // Notify the employee about the generated payroll
+  try {
+    await createNotification({
+      recipientId: employee._id,
+      type: "PAYROLL",
+      title: "Payroll Generated",
+      message: `Your ${month}/${year} payroll has been generated.`,
+      data: {
+        entityType: null,
+        entityId: null,
+      },
+    });
+  } catch (err) {
+    console.error("Payroll generation notification failed:", err.message);
+  }
+
+  // Notify all admins except the one who generated the payroll
+  try {
+    await createNotificationForAdminsExcept({
+      excludedUserId: user.id,
+      type: "PAYROLL",
+      title: "Payroll Generated",
+      message: `The payroll for ${employee.name} ${employee.lastName} for ${month}/${year} has been generated.`,
+      data: {
+        entityType: null,
+        entityId: null,
+      },
+    });
+  } catch (err) {
+    console.error("Payroll generation admin notification failed:", err.message);
+  }
+
+  return {
+    status: "Success",
+    code: 201,
+    message: `Payroll generated for ${employee.name} ${employee.lastName} successfully!`,
+    data: payroll,
+  };
+};
+
 // Get a payroll record by ID
 export const getPayrollById = async (id, user) => {
   // Get the payroll record with the employee details populated
@@ -122,92 +196,6 @@ export const getAllPayrolls = getAll(Payroll, {
   path: "employeeId",
   select: "name lastName email position",
 });
-
-// Get monthly net payout trend for the last 6 months
-export const getPayrollTrend = async () => {
-  const MONTH_NAMES = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  const now = new Date();
-
-  // Build the last 6 months (inclusive of current)
-  const months = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
-  }
-
-  const trend = await Promise.all(
-    months.map(async ({ year, month }) => {
-      const result = await Payroll.aggregate([
-        { $match: { year, month } },
-        { $group: { _id: null, netPayout: { $sum: "$netSalary" } } },
-      ]);
-      return {
-        month: MONTH_NAMES[month - 1],
-        netPayout: result[0]?.netPayout ?? 0,
-      };
-    }),
-  );
-
-  return { status: "Success", code: 200, data: trend };
-};
-
-// Get net payout aggregated by department for a given month/year
-export const getPayrollByDepartment = async (queryParams) => {
-  const now = new Date();
-  const month = parseInt(queryParams?.month) || now.getMonth() + 1;
-  const year = parseInt(queryParams?.year) || now.getFullYear();
-
-  const result = await Payroll.aggregate([
-    { $match: { month, year } },
-    {
-      $lookup: {
-        from: "users",
-        localField: "employeeId",
-        foreignField: "_id",
-        as: "employee",
-      },
-    },
-    { $unwind: { path: "$employee", preserveNullAndEmptyArrays: true } },
-    {
-      $lookup: {
-        from: "departments",
-        localField: "employee.department_id",
-        foreignField: "_id",
-        as: "department",
-      },
-    },
-    { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
-    {
-      $group: {
-        _id: { $ifNull: ["$department.name", "Unknown"] },
-        netPayout: { $sum: "$netSalary" },
-      },
-    },
-    {
-      $project: {
-        _id: 0,
-        department: "$_id",
-        netPayout: 1,
-      },
-    },
-    { $sort: { netPayout: -1 } },
-  ]);
-
-  return { status: "Success", code: 200, data: result };
-};
 
 // Get an employee's payroll history
 export const getEmployeePayrolls = async (user, queryParams) => {
@@ -369,11 +357,12 @@ export const markPayrollAsPaid = async (payrollId, user, file, ip) => {
   }
 
   // Upload the payment proof attachment and get the URL and public ID
-  const { secure_url : paidAttachmentURL, public_id : paidAttachementPublicId } = await uploadDocToCloudinary(
-    file.buffer,
-    file.originalname,
-    "hrcom/payroll_payment_proofs",
-  );
+  const { secure_url: paidAttachmentURL, public_id: paidAttachementPublicId } =
+    await uploadDocToCloudinary(
+      file.buffer,
+      file.originalname,
+      "hrcom/payroll_payment_proofs",
+    );
 
   try {
     const payroll = await Payroll.findOneAndUpdate(
@@ -480,6 +469,7 @@ export const markPayrollAsPaid = async (payrollId, user, file, ip) => {
 
 // Recompute a payroll (Admin only)
 export const recomputePayroll = async (payrollId, user, ip) => {
+  // Check the payroll existence
   const payroll = await Payroll.findById(payrollId);
   if (!payroll) {
     throw new AppError(
@@ -490,6 +480,7 @@ export const recomputePayroll = async (payrollId, user, ip) => {
     );
   }
 
+  // Check the employee existence
   const employee = await User.findById(payroll.employeeId);
   if (!employee) {
     throw new AppError(
@@ -613,137 +604,4 @@ export const exportPayrollToExcel = async (payrollId, currentUser, res) => {
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
   res.send(buffer);
-};
-
-// Bulk calculation for all eligible employees for a given month and year
-export const calculateBulkPayroll = async (month, year, user, ip) => {
-  // Get the active payroll config for the year
-  const configDoc = await PayrollConfig.findOne({ year, isActive: true });
-  if (!configDoc) {
-    throw new AppError(
-      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.message,
-      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.code,
-      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.errorCode,
-      payrollConfigErrors.PAYROLL_CONFIG_NOT_FOUND.suggestion,
-    );
-  }
-
-  // Find all active employees who are NOT interns
-  const roles = await UserRole.find({ name: { $nin: ["Intern", "intern"] } });
-  const roleIds = roles.map((r) => r._id);
-
-  const users = await User.find({
-    status: "Active",
-    role_id: { $in: roleIds },
-  });
-
-  const results = {
-    created: 0,
-    skipped: 0,
-    errors: 0,
-  };
-
-  for (const employee of users) {
-    try {
-      // Check if the payroll already exists
-      const existing = await Payroll.findOne({
-        employeeId: employee._id,
-        month,
-        year,
-      });
-      if (existing) {
-        results.skipped++;
-        continue;
-      }
-
-      // Compute the payroll
-      const computed = await computePayroll(employee, month, year, configDoc);
-
-      // Create payroll
-      const payroll = await Payroll.create({
-        employeeId: employee._id,
-        month,
-        year,
-        ...computed,
-        configSnapshot: {
-          year,
-          cnss: configDoc.cnss,
-          css: configDoc.css,
-          irpp: configDoc.irpp,
-          payroll: {
-            standardMonthlyHours: configDoc.payroll.standardMonthlyHours,
-          },
-        },
-        status: "draft",
-      });
-
-      results.created++;
-
-      // Send notification to the employee about the new payroll
-      try {
-        await createNotification({
-          recipientId: employee._id,
-          type: "PAYROLL",
-          title: "New Payroll Generated",
-          message: `Your ${payroll.month}/${payroll.year} payroll has been generated. Check the payroll section for details.`,
-          data: {
-            entityType: null,
-            entityId: null,
-          },
-        });
-      } catch (err) {
-        console.error(
-          "Failed to send notification for new payroll generation:",
-          err,
-        );
-      }
-    } catch (err) {
-      console.error(`Error calculating payroll for ${employee.name}:`, err);
-      results.errors++;
-    }
-  }
-
-  // Audit log
-  await logAuditAction({
-    adminId: user.id,
-    action: "BULK_CALCULATE_PAYROLL",
-    targetType: "Payroll",
-    targetId: null,
-    details: {
-      month,
-      year,
-      results,
-      affectedEmployees: users.map((u) => ({
-        employeeId: u._id,
-        name: `${u.name} ${u.lastName}`,
-      })),
-    },
-    ipAddress: ip,
-  });
-
-  // Notify all admins except the one who bulk calculated payrolls
-  try {
-    await createNotificationForAdminsExcept({
-      excludedUserId: user.id,
-      type: "PAYROLL",
-      title: "Payroll Generation Completed",
-      message: `Payroll calculations ${month}/${year} completed for ${results.created} employee${results.created !== 1 ? "s" : ""}.`,
-      data: {
-        entityType: null,
-        entityId: null,
-      },
-    });
-  } catch (err) {
-    console.error(
-      "Failed to send admin notification for bulk payroll calculation:",
-      err,
-    );
-  }
-
-  return {
-    status: "Success",
-    code: 200,
-    message: `Bulk payroll calculation completed: ${results.created} created, ${results.skipped} skipped, ${results.errors} errors.`,
-    data: results,
-  };
 };

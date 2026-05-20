@@ -162,6 +162,9 @@ const formatAuditLog = (log) => {
     case "BULK_CALCULATE_PAYROLL":
       description = `Performed Bulk Payroll Calculation for ${log.target_name || "employees"}`;
       break;
+    case "GENERATE_PAYROLL":
+      description = `Generated Payroll for ${log.target_name || ""}`;
+      break;
     default:
       description = `Performed ${log.action} on ${log.target_type || "Target"}`;
   }

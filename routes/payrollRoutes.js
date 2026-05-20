@@ -1,6 +1,6 @@
 import express from "express";
 import {
-  calculatePayroll,
+  generatePayrollForEmployee,
   getPayrollById,
   getAllPayrolls,
   getPayrollTrend,
@@ -9,8 +9,6 @@ import {
   validatePayroll,
   markPayrollAsPaid,
   recomputePayroll,
-  bulkCalculatePayroll,
-  getPayrollKPIs,
   exportPayrollToExcel,
 } from "../controllers/payrollController.js";
 import authenticate from "../middleware/authenticate.js";
@@ -19,12 +17,20 @@ import { upload } from "../middleware/upload.js";
 
 const router = express.Router();
 
-// Route to get payroll KPIs for the current month and year
+// Route to get the 6-month net payout trend (Admin only)
 router.get(
-  "/payroll/kpis",
+  "/payrolls/trend",
   authenticate,
   authorize(["Admin"]),
-  getPayrollKPIs,
+  getPayrollTrend,
+);
+
+// Route to get net payout breakdown by department for a given month/year (Admin only)
+router.get(
+  "/payrolls/by-department",
+  authenticate,
+  authorize(["Admin"]),
+  getPayrollByDepartment,
 );
 
 // Route to calculate payroll for an employee for a given month and year
@@ -32,7 +38,7 @@ router.post(
   "/payroll/calculate/:employeeId/:month/:year",
   authenticate,
   authorize(["Admin"]),
-  calculatePayroll,
+  generatePayrollForEmployee,
 );
 
 // Route to get a payroll record by ID
@@ -43,12 +49,6 @@ router.get("/payrolls", authenticate, authorize(["Admin"]), getAllPayrolls);
 
 // Route to get an employee's payroll history
 router.get("/payrolls/employee", authenticate, getEmployeePayrolls);
-
-// Route to get the 6-month net payout trend (Admin only)
-router.get("/payrolls/trend", authenticate, authorize(["Admin"]), getPayrollTrend);
-
-// Route to get net payout breakdown by department for a given month/year (Admin only)
-router.get("/payrolls/by-department", authenticate, authorize(["Admin"]), getPayrollByDepartment);
 
 // Route to validate a payroll (Admin only)
 router.patch(
@@ -81,14 +81,6 @@ router.get(
   authenticate,
   authorize(["Admin"]),
   exportPayrollToExcel,
-);
-
-// Route to bulk calculate payroll for all eligible employees for a given month and year
-router.post(
-  "/payrolls/bulk-calculate/:month/:year",
-  authenticate,
-  authorize(["Admin"]),
-  bulkCalculatePayroll,
 );
 
 export default router;

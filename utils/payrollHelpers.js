@@ -181,7 +181,7 @@ const calculateFamilySnapshot = (user, config) => {
   const now = new Date();
 
   // Spouse deduction (Only for married employees)
-  if (user.socialStatus === "Married") {
+  if (user.socialStatus === "Married" && user.isHeadOfFamily === true) {
     const amount = config.irpp.family?.spouse || 300;
 
     spouse = {
