@@ -10,6 +10,8 @@ import {
   getAccountDeactivationContent,
   getPositionUpdateContent,
   getFaceResetContent,
+  getPayslipGenerationRequestContent,
+  getPayslipGenerationConfirmationContent,
 } from "./emailContent.js";
 
 export const sendEmail = async ({
@@ -17,6 +19,9 @@ export const sendEmail = async ({
   subject,
   type,
   name,
+  email,
+  month,
+  year,
   password,
   code,
   resetLink,
@@ -27,7 +32,7 @@ export const sendEmail = async ({
 }) => {
   let bodyHtml;
 
-  // Decide the content based on type
+  // Decide the email content based on type
   switch (type) {
     case "addUser":
       bodyHtml = getAddUserContent({ name, password, code });
@@ -44,24 +49,38 @@ export const sendEmail = async ({
     case "forgetPasswordRequest":
       bodyHtml = getForgetPasswordValidationContent({ name, resetLink });
       break;
+
     case "document":
       bodyHtml = getDocumentEmailContent({
         name,
         documentTitle,
       });
       break;
+
     case "accountReactivation":
       bodyHtml = getAccountReactivationContent({ name });
       break;
+
     case "accountDeactivation":
       bodyHtml = getAccountDeactivationContent({ name });
       break;
+
     case "positionUpdate":
       bodyHtml = getPositionUpdateContent({ name, newPosition });
       break;
+
     case "faceIdReset":
       bodyHtml = getFaceResetContent({ name });
       break;
+
+    case "payslipGenerationRequest":
+      bodyHtml = getPayslipGenerationRequestContent({ name, email, month, year });
+      break;
+
+    case "payslipGenerationConfirmation":
+      bodyHtml = getPayslipGenerationConfirmationContent({ name, month, year });
+      break;
+
     default:
       bodyHtml = `<p>Default message</p>`;
   }

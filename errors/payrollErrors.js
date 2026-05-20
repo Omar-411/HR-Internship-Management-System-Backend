@@ -47,4 +47,28 @@ export const errors = {
     errorCode: "PAYMENT_PROOF_REQUIRED",
     suggestion: "Please attach a payment proof document when marking the payroll as paid."
   },
+  UNAUTHORIZED_ACTION: {
+    message: "You are not authorized to perform this payroll action.",
+    code: 403,
+    errorCode: "UNAUTHORIZED_ACTION",
+    suggestion: "Only authorized users can perform this action."
+  },
+  PAYSLIP_NOT_AVAILABLE: {
+    message: "Payslip is not available for this payroll for the moment.",
+    code: 400,
+    errorCode: "PAYSLIP_NOT_AVAILABLE",
+    suggestion: "You can only request a payslip once the payroll has been marked as validated or paid."
+  },
+  PAYSLIP_ALREADY_REQUESTED: {
+    message: "You have already requested this payslip recently.",
+    code: 400,
+    errorCode: "PAYSLIP_ALREADY_REQUESTED",
+    suggestion: "You have already requested this payslip recently. Please wait for HR to process your request."
+  },
+  NO_ACTIVE_ADMIN_FOUND: {
+    message: "No active admin user found in the system.",
+    code: 500,
+    errorCode: "NO_ACTIVE_ADMIN_FOUND",
+    suggestion: "The system requires at least one active admin user to function properly. Please contact support."
+  },
 };

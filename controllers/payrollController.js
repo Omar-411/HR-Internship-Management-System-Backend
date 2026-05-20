@@ -140,3 +140,20 @@ export const exportPayrollToExcel = async (req, res, next) => {
     next(err);
   }
 };
+
+// Request payslip generation (Employee only)
+export const requestPayslip = async (req, res, next) => {
+  try {
+    const { payrollId } = req.params;
+    const user = req.user;
+
+    const result = await payrollService.requestPayslip(
+      payrollId,
+      user,
+    );
+
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};

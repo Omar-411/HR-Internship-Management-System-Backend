@@ -159,9 +159,6 @@ const formatAuditLog = (log) => {
     case "DISMISS_ALERT":
       description = `Dismissed Alert of ${log.target_name || ""}`;
       break;
-    case "BULK_CALCULATE_PAYROLL":
-      description = `Performed Bulk Payroll Calculation for ${log.target_name || "employees"}`;
-      break;
     case "GENERATE_PAYROLL":
       description = `Generated Payroll for ${log.target_name || ""}`;
       break;

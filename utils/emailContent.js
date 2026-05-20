@@ -189,7 +189,7 @@ export const getPositionUpdateContent = ({ name, newPosition }) => {
   `;
 };
 
-// Email of the face reset
+// Email of the face ID reset
 export const getFaceResetContent = ({ name }) => {
   return `
     <h2 style="color: #232ED1;">Face Data Reset Notification!</h2>
@@ -199,6 +199,37 @@ export const getFaceResetContent = ({ name }) => {
     </p>
     <p>
       If this wasn't you, please contact HR immediately.
+    </p>
+  `;
+};
+
+// Email of the payslip generation request
+export const getPayslipGenerationRequestContent = ({ name, email, month, year }) => {
+  return `
+    <h2 style="color: #232ED1;">Payslip Request!</h2>
+    <p>Dear HR Team,</p>
+    <p>
+      Employee <strong>${name}</strong> has requested their payslip for <strong>${month}/${year}</strong>.
+    </p>
+    <p>
+      Please prepare and send the payslip at your earliest convenience.
+    </p>
+    <p>
+      Employee Email: <strong>${email}</strong>
+    </p>
+  `;
+};
+
+// Email of automatic confirmation email of the payslip generation request 
+export const getPayslipGenerationConfirmationContent = ({ name, month, year }) => {
+  return `
+    <h2 style="color: #232ED1;">Payslip Request Email Received!</h2>
+    <p>Dear ${name},</p>
+    <p>
+      Your request for the payslip of <strong>${month}/${year}</strong> has been received.
+    </p>
+    <p>
+      The HR department will process your request and send the document to you as soon as possible.
     </p>
   `;
 };

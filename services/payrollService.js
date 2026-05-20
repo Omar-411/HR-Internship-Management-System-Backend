@@ -6,6 +6,7 @@ import UserRole from "../models/UserRole.js";
 import { errors } from "../errors/payrollErrors.js";
 import { errors as commonErrors } from "../errors/commonErrors.js";
 import { errors as payrollConfigErrors } from "../errors/payrollConfigErrors.js";
+import { errors as userRoleErrors } from "../errors/userRoleErrors.js";
 import AppError from "../utils/AppError.js";
 import {
   calculateProratedSalary,
@@ -31,6 +32,7 @@ import { validateUserStatus } from "../validators/authValidators.js";
 import { createNotification } from "../services/notificationService.js";
 import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
 import { uploadDocToCloudinary } from "../utils/cloudinaryHelper.js";
+import { sendEmail } from "../utils/sendEmail.js";
 
 // Payroll calculation for an employee for a given month and year
 export const calculatePayroll = async (employeeId, month, year, configDoc) => {
@@ -604,4 +606,123 @@ export const exportPayrollToExcel = async (payrollId, currentUser, res) => {
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
   res.send(buffer);
+};
+
+// Request payslip (the payslip's owner = employee)
+export const requestPayslip = async (payrollId, currentUser) => {
+  // Check payroll existence
+  const payroll = await Payroll.findById(payrollId).populate(
+    "employeeId",
+    "name lastName email",
+  );
+
+  if (!payroll) {
+    throw new AppError(
+      errors.PAYROLL_NOT_FOUND.message,
+      errors.PAYROLL_NOT_FOUND.code,
+      errors.PAYROLL_NOT_FOUND.errorCode,
+      errors.PAYROLL_NOT_FOUND.suggestion,
+    );
+  }
+
+  // Ensure the payroll belongs to the connected employee
+  if (payroll.employeeId._id.toString() !== currentUser.id.toString()) {
+    throw new AppError(
+      errors.UNAUTHORIZED_ACTION.message,
+      errors.UNAUTHORIZED_ACTION.code,
+      errors.UNAUTHORIZED_ACTION.errorCode,
+      errors.UNAUTHORIZED_ACTION.suggestion,
+    );
+  }
+
+  // Only validated and paid payrolls can be requested
+  if (payroll.status !== "validated" && payroll.status !== "paid") {
+    throw new AppError(
+      errors.PAYSLIP_NOT_AVAILABLE.message,
+      errors.PAYSLIP_NOT_AVAILABLE.code,
+      errors.PAYSLIP_NOT_AVAILABLE.errorCode,
+      errors.PAYSLIP_NOT_AVAILABLE.suggestion,
+    );
+  }
+
+  // Allow only one payslip request per day to avoid unnecessary spams
+  if (
+    payroll.lastPayslipRequestAt &&
+    Date.now() - new Date(payroll.lastPayslipRequestAt).getTime() <
+      24 * 60 * 60 * 1000
+  ) {
+    throw new AppError(
+      errors.PAYSLIP_ALREADY_REQUESTED.message,
+      errors.PAYSLIP_ALREADY_REQUESTED.code,
+      errors.PAYSLIP_ALREADY_REQUESTED.errorCode,
+      errors.PAYSLIP_ALREADY_REQUESTED.suggestion,
+    );
+  }
+
+  const employee = payroll.employeeId;
+
+  // Get the admin role
+  const adminRole = await UserRole.findOne({ name: "Admin" });
+  if (!adminRole) {
+    throw new AppError(
+      "Admin role not found.",
+      userRoleErrors.USER_ROLE_NOT_FOUND.code,
+      userRoleErrors.USER_ROLE_NOT_FOUND.errorCode,
+      "The system requires an Admin role to function properly. Please contact support.",
+    );
+  }
+
+  // Get all active admins' emails
+  const admins = await User.find({
+    role_id: adminRole._id,
+    status: "Active",
+  }).select("email");
+
+  if (!admins.length) {
+    throw new AppError(
+      errors.NO_ACTIVE_ADMIN_FOUND.message,
+      errors.NO_ACTIVE_ADMIN_FOUND.code,
+      errors.NO_ACTIVE_ADMIN_FOUND.errorCode,
+      errors.NO_ACTIVE_ADMIN_FOUND.suggestion,
+    );
+  }
+
+  const adminEmails = admins.map((admin) => admin.email);
+
+  // Send notification email to all admins about the payslip request
+  for (const email of adminEmails) {
+    // Send email to all admins
+    await sendEmail({
+      to: email,
+      subject: `Payslip Request - ${employee.name} ${employee.lastName} (${payroll.month + 1}/${payroll.year})`,
+      type: "payslipGenerationRequest",
+      name: `${employee.name} ${employee.lastName}`,
+      email: employee.email,
+      month: payroll.month + 1,
+      year: payroll.year,
+    });
+  }
+
+  // Send confirmation email to the employee
+  await sendEmail({
+    to: employee.email,
+    subject: `Payslip Request Received - ${payroll.month + 1}/${payroll.year}`,
+    type: "payslipGenerationConfirmation",
+    name: employee.name,
+    month: payroll.month + 1,
+    year: payroll.year,
+  });
+
+  // Update the last request timestamp
+  payroll.lastPayslipRequestAt = new Date();
+  await payroll.save();
+
+  return {
+    status: "Success",
+    code: 200,
+    message: "Payslip request sent successfully. HR has been notified.",
+    data: {
+      requestedAt: payroll.lastPayslipRequestAt,
+    },
+  };
 };

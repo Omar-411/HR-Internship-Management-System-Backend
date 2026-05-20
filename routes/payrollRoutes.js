@@ -10,6 +10,7 @@ import {
   markPayrollAsPaid,
   recomputePayroll,
   exportPayrollToExcel,
+  requestPayslip,
 } from "../controllers/payrollController.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
@@ -81,6 +82,13 @@ router.get(
   authenticate,
   authorize(["Admin"]),
   exportPayrollToExcel,
+);
+
+// Route to request payslip (Employee only)
+router.post(
+  "/payroll/:payrollId/request-payslip",
+  authenticate,
+  requestPayslip,
 );
 
 export default router;

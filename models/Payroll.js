@@ -268,6 +268,10 @@ const payrollSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    lastPayslipRequestAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true },
 );

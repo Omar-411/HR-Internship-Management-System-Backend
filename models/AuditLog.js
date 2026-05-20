@@ -63,7 +63,6 @@ const auditLogSchema = mongoose.Schema(
         "MARK_ALERT_UNDER_REVIEW",
         "RESOLVE_ALERT",
         "DISMISS_ALERT",
-        "BULK_CALCULATE_PAYROLL",
         "GENERATE_PAYROLL",
       ],
     },
