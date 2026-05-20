@@ -33,6 +33,8 @@ import { buildQuery } from "../utils/queryBuilder.js";
 import {
   SENSITIVE_FIELDS,
   ROLE_SALARY_DEFAULTS,
+  INTERN_ALLOWED,
+  INTERN_DEFAULTS,
 } from "../constants/userConstants.js";
 import { createNotification } from "./notificationService.js";
 import { resolveId } from "../utils/idResolver.js";
@@ -130,6 +132,7 @@ export const addUserService = async (data, currentUser, ip) => {
     supervisor_email, // Pass the supervisor email instead of the full name for avoiding duplicate issues
     supervisor_id,
     profileImageURL,
+    cvURL,
     contractJoinDate,
     contractEndDate,
     contractType,
@@ -168,6 +171,7 @@ export const addUserService = async (data, currentUser, ip) => {
     gender,
     dateOfBirth,
     placeOfBirth,
+    contractType,
     contractJoinDate,
     contractEndDate,
     salary,
@@ -224,6 +228,16 @@ export const addUserService = async (data, currentUser, ip) => {
 
   const finalProfileImageURL =
     typeof profileImageURL === "string" ? profileImageURL : "";
+  
+  // Enforce the cv
+  if (!cvURL || typeof cvURL !== "string") {
+    throw new AppError(
+      errors.CV_REQUIRED.message,
+      errors.CV_REQUIRED.code,
+      errors.CV_REQUIRED.errorCode,
+      errors.CV_REQUIRED.suggestion,
+    );
+  }
 
   // Handle salary defaults
   const roleLower = (role || "").toLowerCase();
@@ -268,10 +282,11 @@ export const addUserService = async (data, currentUser, ip) => {
     department_id: departmentId,
     supervisor_id: resolvedSupervisorId,
     profileImageURL: finalProfileImageURL,
+    cvURL,
     employment: {
+      contractType: contractType,
       contractJoinDate,
-      contractEndDate,
-      contractType: contractType || "CDI", // Default value, will be updated later
+      contractEndDate: contractType === "CDI" ? null : contractEndDate,
     },
     salary:
       roleLower === "intern"
@@ -281,14 +296,6 @@ export const addUserService = async (data, currentUser, ip) => {
 
   // Initialize the leave balances for the user based on role
   const leaveTypes = await LeaveType.find({ status: "Active" });
-
-  // Intern-specific leave policy
-  const INTERN_ALLOWED = ["Annual Leave", "Sick Leave", "Personal"];
-  const INTERN_DEFAULTS = {
-    "Annual Leave": 13,
-    "Sick Leave": 8,
-    Personal: 3,
-  };
 
   const leaveBalances =
     role === "Intern"
@@ -431,12 +438,15 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     gender: updateData.gender,
     dateOfBirth: updateData.dateOfBirth,
     placeOfBirth: updateData.placeOfBirth,
+    contractType: updateData.employment?.contractType,
     contractJoinDate: updateData.employment?.contractJoinDate,
     contractEndDate: updateData.employment?.contractEndDate,
     salary: updateData.salary,
-    isAvailable: updateData.isAvailable,
-    leaveBalance: updateData.leaveBalance,
   });
+
+  if (updateData.employment?.contractType) {
+    updateData.employment.contractEndDate = updateData.employment?.contractType === "CDI" ? null : updateData.employment?.contractEndDate;
+  }
 
   // Check the phone number validity + uniqueness in case of an update
   if (updateData.phoneNumber) {
@@ -623,13 +633,15 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     delete updateData.isActive;
   }
 
-  if (updateData.contractType) {
-    if (updateData.employment) {
-      updateData.employment.contractType = updateData.contractType;
-    } else {
-      updateData["employment.contractType"] = updateData.contractType;
+  if(updateData.cvURL){
+    if (updateData.cvURL === "" || typeof updateData.cvURL !== "string") {
+      throw new AppError(
+        errors.CV_REQUIRED.message,
+        errors.CV_REQUIRED.code,
+        errors.CV_REQUIRED.errorCode,
+        errors.CV_REQUIRED.suggestion,
+      );
     }
-    delete updateData.contractType;
   }
 
   // Update the user

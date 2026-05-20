@@ -5,6 +5,7 @@ import AppError from "../utils/AppError.js";
 import { errors } from "../errors/userErrors.js";
 import { errors as leaveTypeErrors } from "../errors/leaveTypeErrors.js";
 import pkg from "google-libphonenumber";
+import User from "../models/User.js";
 const { PhoneNumberUtil, PhoneNumberFormat } = pkg;
 
 const phoneUtil = PhoneNumberUtil.getInstance();
@@ -113,9 +114,10 @@ export const validateUserData = (data) => {
     gender,
     dateOfBirth,
     placeOfBirth,
+    contractType,
     contractJoinDate,
     contractEndDate,
-    contractType,
+    salary,
   } = data;
 
   // Validate the input fields
@@ -191,12 +193,12 @@ export const validateUserData = (data) => {
       errors.INVALID_BONUS.suggestion,
     );
 
-  if (data.salary && data.salary.base !== undefined && data.salary.base < 0) {
+  if (salary && salary.base !== undefined && salary.base < 0) {
     throw new AppError(
-      "Invalid base salary. It must be a non-negative number.",
-      400,
-      "INVALID_BASE_SALARY",
-      "Please provide a valid base salary."
+      errors.INVALID_SALARY.message,
+      errors.INVALID_SALARY.code,
+      errors.INVALID_SALARY.errorCode,
+      errors.INVALID_SALARY.suggestion,
     );
   }
 
@@ -254,74 +256,88 @@ export const validateUserData = (data) => {
       errors.PLACE_OF_BIRTH_REQUIRED.suggestion,
     );
 
-  // Validate the contract dates (join date should not be in the future, end date should be after join date)
-  if (contractJoinDate !== undefined || contractEndDate !== undefined) {
-    if (!contractJoinDate)
+  // Validate the contract type
+  if (
+    contractType !== undefined &&
+    !User.schema
+      .path("employment.contractType")
+      .enumValues.includes(contractType)
+  ) {
+    throw new AppError(
+      errors.INVALID_CONTRACT_TYPE.message,
+      errors.INVALID_CONTRACT_TYPE.code,
+      errors.INVALID_CONTRACT_TYPE.errorCode,
+      errors.INVALID_CONTRACT_TYPE.suggestion,
+    );
+  }
+
+  // Validate the contract dates
+  if (
+    contractType !== undefined ||
+    contractJoinDate !== undefined ||
+    contractEndDate !== undefined
+  ) {
+    // Validate contract join date (required for all contract types)
+    if (!contractJoinDate) {
       throw new AppError(
         errors.CONTRACT_JOIN_DATE_REQUIRED.message,
         errors.CONTRACT_JOIN_DATE_REQUIRED.code,
         errors.CONTRACT_JOIN_DATE_REQUIRED.errorCode,
         errors.CONTRACT_JOIN_DATE_REQUIRED.suggestion,
       );
-    else {
-      const joinDate = new Date(contractJoinDate);
+    }
 
-      if (isNaN(joinDate.getTime())) {
-        throw new AppError(
-          "Invalid Contract Join Date",
-          errors.INVALID_CONTRACT_DATE.code,
-          errors.INVALID_CONTRACT_DATE.errorCode,
-          "Contract join date is required and must be a valid date.",
-        );
-      }
+    const joinDate = new Date(contractJoinDate);
 
-      if (joinDate > today) {
-        throw new AppError(
-          "Invalid Contract Join Date",
-          errors.INVALID_CONTRACT_DATE.code,
-          errors.INVALID_CONTRACT_DATE.errorCode,
-          "Contract join date cannot be in the future. Please provide a valid contract join date.",
-        );
-      }
+    if (isNaN(joinDate.getTime())) {
+      throw new AppError(
+        "Invalid Contract Join Date",
+        errors.INVALID_CONTRACT_DATE.code,
+        errors.INVALID_CONTRACT_DATE.errorCode,
+        "Contract join date is required and must be a valid date.",
+      );
+    }
 
+    if (joinDate > today) {
+      throw new AppError(
+        "Invalid Contract Join Date",
+        errors.INVALID_CONTRACT_DATE.code,
+        errors.INVALID_CONTRACT_DATE.errorCode,
+        "Contract join date cannot be in the future. Please provide a valid contract join date.",
+      );
+    }
+
+    // For CDD and INTERNSHIP contract types, contractEndDate is required
+    if (["CDD", "INTERNSHIP"].includes(contractType)) {
       if (!contractEndDate) {
         throw new AppError(
           "Invalid Contract End Date",
           errors.INVALID_CONTRACT_DATE.code,
           errors.INVALID_CONTRACT_DATE.errorCode,
-          "Contract end date is required. Please provide a valid contract end date.",
+          "Contract end date is required for CDD and internship contracts.",
         );
       }
-      else {
-        const endDate = new Date(contractEndDate);
-        if (isNaN(endDate.getTime())) {
-          throw new AppError(
-            "Invalid Contract End Date",
-            errors.INVALID_CONTRACT_DATE.code,
-            errors.INVALID_CONTRACT_DATE.errorCode,
-            "Contract end date is required and must be a valid date.",
-          );
-        }
 
-        if (endDate <= joinDate) {
-          throw new AppError(
-            "Invalid Contract End Date",
-            errors.INVALID_CONTRACT_DATE.code,
-            errors.INVALID_CONTRACT_DATE.errorCode,
-            "Contract end date must be after the join date. Please provide a valid contract end date.",
-          );
-        }
+      const endDate = new Date(contractEndDate);
+
+      if (isNaN(endDate.getTime())) {
+        throw new AppError(
+          "Invalid Contract End Date",
+          errors.INVALID_CONTRACT_DATE.code,
+          errors.INVALID_CONTRACT_DATE.errorCode,
+          "Contract end date must be a valid date.",
+        );
+      }
+
+      if (endDate <= joinDate) {
+        throw new AppError(
+          "Invalid Contract End Date",
+          errors.INVALID_CONTRACT_DATE.code,
+          errors.INVALID_CONTRACT_DATE.errorCode,
+          "Contract end date must be after the contract join date.",
+        );
       }
     }
-  }
-
-  if (contractType && !["CDI", "INTERNSHIP"].includes(contractType)) {
-    throw new AppError(
-      "Invalid Contract Type",
-      400,
-      "INVALID_CONTRACT_TYPE",
-      "Contract Type must be 'CDI' or 'INTERNSHIP'."
-    );
   }
 };
 

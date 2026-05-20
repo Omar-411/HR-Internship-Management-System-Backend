@@ -6,3 +6,12 @@ export const ROLE_SALARY_DEFAULTS = {
   supervisor: 3500,
   admin: 5500,
 };
+
+// Intern-specific leave balances and allowed leave types
+export const INTERN_ALLOWED = ["Annual Leave", "Sick Leave", "Personal"];
+
+export const INTERN_DEFAULTS = {
+  "Annual Leave": 13,
+  "Sick Leave": 8,
+  Personal: 3,
+};

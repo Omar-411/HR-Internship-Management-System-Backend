@@ -162,6 +162,24 @@ export const errors = {
     code: 400,
     errorCode: "INVALID_FILE_TYPE",
     suggestion: "Please upload a file of the correct type.",
-  }
+  },
+  CV_REQUIRED: {
+    message: "CV file is required",
+    code: 400,
+    errorCode: "CV_REQUIRED",
+    suggestion: "Please upload a CV file for the user.",
+  },
+  INVALID_CONTRACT_TYPE: {
+    message: "Invalid contract type",
+    code: 400,
+    errorCode: "INVALID_CONTRACT_TYPE",
+    suggestion: "Please specify a valid contract type.",
+  },
+  INVALID_SALARY: {
+    message: "Invalid salary value",
+    code: 400,
+    errorCode: "INVALID_SALARY",
+    suggestion: "Please enter a valid salary value.",
+  },
 };
 
