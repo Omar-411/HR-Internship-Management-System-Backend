@@ -764,15 +764,25 @@ export const deleteUserService = async (userId, currentUser, ip) => {
   // Get the user's personal documents
   const documents = await Document.find({ user_id: userId });
 
-  // Delete files from Cloudinary
+  // Delete the user's personal docs from Cloudinary
   for (const doc of documents) {
     if (doc.filePublicId) {
       await deleteFromCloudinary(doc.filePublicId);
     }
   }
 
-  // Delete documents from DB
+  // Delete the user's personal docs from DB
   await Document.deleteMany({ user_id: actualId });
+
+  // Delete the user's profile image from Cloudinary if exists
+  if (user.profileImagePublicId) {
+    await deleteFromCloudinary(user.profileImagePublicId, "image");
+  }
+
+  // Delete the user's CV from Cloudinary if exists
+  if (user.cvPublicId) {
+    await deleteFromCloudinary(user.cvPublicId, "raw");
+  }
 
   // Store the supervisor ID before deleting the user (for supervisor notification after deletion)
   const supervisorId = user.supervisor_id;
