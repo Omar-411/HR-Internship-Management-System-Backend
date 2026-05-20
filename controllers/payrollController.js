@@ -107,6 +107,7 @@ export const markPayrollAsPaid = async (req, res, next) => {
     const result = await payrollService.markPayrollAsPaid(
       req.params.id,
       req.user,
+      req.file,
       req.ip,
     );
     res.status(result.code).json(result);

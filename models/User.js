@@ -125,7 +125,6 @@ const userSchema = mongoose.Schema(
         type: String,
         enum: ["CDI", "CDD", "INTERNSHIP"],
         required: true,
-        default: "CDI",
       },
       contractJoinDate: {
         type: Date,
@@ -284,6 +283,7 @@ userSchema.index(
   { unique: true, sparse: true },
 );
 
+// Pre-save hook to generate a unique slug based on the user's full name
 userSchema.pre("save", async function () {
   if (!this.slug) {
     // First save only: generate slug from full name
@@ -292,7 +292,6 @@ userSchema.pre("save", async function () {
       `${this.name}-${this.lastName}`,
     );
   }
-  // Slug is immutable after first assignment.
 });
 
 export default mongoose.model("User", userSchema);

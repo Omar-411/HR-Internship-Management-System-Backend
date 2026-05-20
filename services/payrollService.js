@@ -30,6 +30,7 @@ import { generateDocumentService } from "./documentService.js";
 import { validateUserStatus } from "../validators/authValidators.js";
 import { createNotification } from "../services/notificationService.js";
 import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
+import { uploadDocToCloudinary } from "../utils/cloudinaryHelper.js";
 
 // Payroll calculation for an employee for a given month and year
 export const calculatePayroll = async (employeeId, month, year) => {
@@ -353,9 +354,26 @@ export const validatePayroll = async (payrollId, user, ip) => {
 };
 
 // Mark a payroll as paid (Admin only)
-export const markPayrollAsPaid = async (payrollId, user, ip) => {
+export const markPayrollAsPaid = async (payrollId, user, file, ip) => {
   const session = await mongoose.startSession();
   session.startTransaction();
+
+  // Check the payment proof attachment existence
+  if (!file) {
+    throw new AppError(
+      errors.PAYMENT_PROOF_REQUIRED.message,
+      errors.PAYMENT_PROOF_REQUIRED.code,
+      errors.PAYMENT_PROOF_REQUIRED.errorCode,
+      errors.PAYMENT_PROOF_REQUIRED.suggestion,
+    );
+  }
+
+  // Upload the payment proof attachment and get the URL and public ID
+  const { secure_url : paidAttachmentURL, public_id : paidAttachementPublicId } = await uploadDocToCloudinary(
+    file.buffer,
+    file.originalname,
+    "hrcom/payroll_payment_proofs",
+  );
 
   try {
     const payroll = await Payroll.findOneAndUpdate(
@@ -368,6 +386,8 @@ export const markPayrollAsPaid = async (payrollId, user, ip) => {
           status: "paid",
           paidBy: user.id,
           paidAt: new Date(),
+          paidAttachmentURL,
+          paidAttachementPublicId,
         },
       },
       {

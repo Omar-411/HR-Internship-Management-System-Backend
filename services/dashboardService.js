@@ -82,11 +82,10 @@ export const getSupervisorDashboard = async (user) => {
 
 // Get Dashboard data for Admins
 export const getAdminDashboard = async (user) => {
-  // 1. User Roles lookup
-  const employeeRole = await UserRole.findOne({ name: { $regex: /^employee$/i } });
+  // User Roles lookup
   const internRole = await UserRole.findOne({ name: { $regex: /^intern$/i } });
 
-  // 2. Counts
+  // Counts
   const [
     totalEmployees,
     totalInterns,
@@ -94,7 +93,7 @@ export const getAdminDashboard = async (user) => {
     inactiveUsers,
     ongoingProjects
   ] = await Promise.all([
-    User.countDocuments({ role_id: employeeRole?._id }),
+    User.countDocuments({ role_id: { $ne: internRole?._id } }),
     User.countDocuments({ role_id: internRole?._id }),
     User.countDocuments({ status: "Active" }),
     User.countDocuments({ status: { $ne: "Active" } }),

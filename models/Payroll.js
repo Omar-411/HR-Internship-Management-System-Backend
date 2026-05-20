@@ -238,6 +238,16 @@ const payrollSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    paidAttachmentURL: {
+      // Payment proof attachment
+      type: String,
+      default: null,
+    },
+    paidAttachementPublicId: {
+      // Public ID for the attachment in the cloud storage (e.g., Cloudinary) to facilitate deletion if needed
+      type: String,
+      default: null,
+    },
     recalculationRequired: {
       // Flag to indicate if the payroll needs to be recalculated due to changes in attendance, shifts, bonuses/allowances
       type: Boolean,

@@ -41,4 +41,10 @@ export const errors = {
     errorCode: "PAYROLL_NOT_DRAFT",
     suggestion: "Only payroll records that are in draft status can be modified. Please check the payroll status and try again."
   },
+  PAYMENT_PROOF_REQUIRED: {
+    message: "Payment proof attachment is required to mark payroll as paid.",
+    code: 400,
+    errorCode: "PAYMENT_PROOF_REQUIRED",
+    suggestion: "Please attach a payment proof document when marking the payroll as paid."
+  },
 };
