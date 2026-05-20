@@ -1,4 +1,3 @@
-// User expected errors
 export const errors = {
   // USER_NOT_FOUND is in commonErrors.js (Reason: Used in multiple services)
   USER_ALREADY_EXISTS: {
@@ -158,5 +157,11 @@ export const errors = {
     errorCode: "CONTRACT_JOIN_DATE_REQUIRED",
     suggestion: "Please provide the contract join date.",
   },
+  INVALID_FILE_TYPE: {
+    message: "Invalid file type",
+    code: 400,
+    errorCode: "INVALID_FILE_TYPE",
+    suggestion: "Please upload a file of the correct type.",
+  }
 };
 

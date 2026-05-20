@@ -154,6 +154,17 @@ const userSchema = mongoose.Schema(
       type: String,
       default: "",
     },
+    cvURL: {
+      // URL of the uploaded CV file
+      type: String,
+      default: "",
+      // required: true,
+    },
+    cvPublicId: {
+      // Cloudinary public ID (for deletion later)
+      type: String,
+      default: "",
+    },
     bio: {
       type: String,
     },
@@ -278,7 +289,7 @@ userSchema.pre("save", async function () {
     // First save only: generate slug from full name
     this.slug = await generateUniqueSlug(
       this.constructor,
-      `${this.name}-${this.lastName}`
+      `${this.name}-${this.lastName}`,
     );
   }
   // Slug is immutable after first assignment.

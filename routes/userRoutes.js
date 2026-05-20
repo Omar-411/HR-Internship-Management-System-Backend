@@ -11,6 +11,7 @@ import {
   exportUsersToCSV,
   exportUsersToExcel,
   uploadProfileImage,
+  uploadCv,
   removeProfileImage,
   enrollFace,
   resetFace,
@@ -432,6 +433,15 @@ router.delete(
   authenticate,
   authorize(["Admin"], { allowSelf: true }),
   removeProfileImage
+);
+
+// Route to upload a cv for a user (Admin only)
+router.post(
+  "/users/:id/upload-cv",
+  authenticate,
+  authorize(["Admin"], { allowSelf: true }),
+  upload("doc").single("cv"),
+  uploadCv
 );
 
 // Route to enroll face descriptors

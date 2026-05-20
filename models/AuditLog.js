@@ -23,6 +23,7 @@ const auditLogSchema = mongoose.Schema(
         "DELETE_ROLE",
         "UPLOAD_IMAGE",
         "REMOVE_IMAGE",
+        "UPLOAD_CV",
         "CREATE_LEAVE_TYPE",
         "UPDATE_LEAVE_TYPE",
         "ARCHIVE_LEAVE_TYPE",

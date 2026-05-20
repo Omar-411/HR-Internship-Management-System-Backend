@@ -18,6 +18,7 @@ import {
 import { generateRandomCode } from "../utils/generateCode.js";
 import {
   uploadImageToCloudinary,
+  uploadDocToCloudinary,
   deleteFromCloudinary,
 } from "../utils/cloudinaryHelper.js";
 import {
@@ -29,15 +30,13 @@ import {
 import { sendEmail } from "../utils/sendEmail.js";
 import { logAuditAction } from "../utils/logger.js";
 import { buildQuery } from "../utils/queryBuilder.js";
-import { SENSITIVE_FIELDS } from "../constants/userConstants.js";
+import {
+  SENSITIVE_FIELDS,
+  ROLE_SALARY_DEFAULTS,
+} from "../constants/userConstants.js";
 import { createNotification } from "./notificationService.js";
 import { resolveId } from "../utils/idResolver.js";
-
-const ROLE_SALARY_DEFAULTS = {
-  employee: 1800,
-  supervisor: 3500,
-  admin: 5500,
-};
+import { uploadDocumentCore } from "./documentCoreService.js";
 
 // Get a single user by Id
 export const getUser = getOne(
@@ -229,7 +228,10 @@ export const addUserService = async (data, currentUser, ip) => {
   // Handle salary defaults
   const roleLower = (role || "").toLowerCase();
   let baseSalary = salary?.base;
-  if (roleLower !== "intern" && (baseSalary === undefined || baseSalary === null)) {
+  if (
+    roleLower !== "intern" &&
+    (baseSalary === undefined || baseSalary === null)
+  ) {
     baseSalary = ROLE_SALARY_DEFAULTS[roleLower] || 0;
   }
 
@@ -271,7 +273,10 @@ export const addUserService = async (data, currentUser, ip) => {
       contractEndDate,
       contractType: contractType || "CDI", // Default value, will be updated later
     },
-    salary: roleLower === "intern" ? undefined : { base: baseSalary || 0, currency: "DT" },
+    salary:
+      roleLower === "intern"
+        ? undefined
+        : { base: baseSalary || 0, currency: "DT" },
   });
 
   // Initialize the leave balances for the user based on role
@@ -381,7 +386,7 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     ? existingUser.supervisor_id.toString()
     : null;
 
-  // Get the actual ID string for comparison in uniqueness checks 
+  // Get the actual ID string for comparison in uniqueness checks
   const actualId = existingUser._id.toString();
 
   // Check the email validity and the user existence
@@ -534,7 +539,9 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
   }
 
   // Handle salary updates and defaults
-  const roleToUse = (roleChanged ? newRoleName : existingUser.role_id?.name || "").toLowerCase();
+  const roleToUse = (
+    roleChanged ? newRoleName : existingUser.role_id?.name || ""
+  ).toLowerCase();
 
   if (roleToUse === "intern") {
     // Remove salary if user is or becomes an intern
@@ -549,7 +556,10 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
       updateData.salary = { base: updateData.salary.base, currency: "DT" };
     } else if (roleChanged) {
       // Role changed to non-intern and no explicit salary provided -> apply default
-      updateData.salary = { base: ROLE_SALARY_DEFAULTS[roleToUse] || 0, currency: "DT" };
+      updateData.salary = {
+        base: ROLE_SALARY_DEFAULTS[roleToUse] || 0,
+        currency: "DT",
+      };
     }
   }
 
@@ -1047,7 +1057,8 @@ export const uploadProfileImageService = async (
   // Notify the user only if an admin modified someone else's profile
   if (
     currentUser.role === "Admin" &&
-    currentUser.id.toString() !== user._id.toString()
+    currentUser.id.toString() !== user._id.toString() &&
+    user.status !== "Pending"
   ) {
     try {
       await createNotification({
@@ -1118,7 +1129,8 @@ export const removeProfileImageService = async (userId, currentUser, ip) => {
   // Notify the user only if an admin modified someone else's profile
   if (
     currentUser.role === "Admin" &&
-    currentUser.id.toString() !== user._id.toString()
+    currentUser.id.toString() !== user._id.toString() &&
+    user.status !== "Pending"
   ) {
     try {
       await createNotification({
@@ -1154,6 +1166,115 @@ export const removeProfileImageService = async (userId, currentUser, ip) => {
   };
 };
 
+// Upload a cv for a user (Admin only)
+export const uploadCvService = async (userId, cvFile, currentUser, ip) => {
+  // Check user existence
+  const existingUser = await User.findById(userId);
+  if (!existingUser) {
+    throw new AppError(
+      commonErrors.USER_NOT_FOUND.message,
+      commonErrors.USER_NOT_FOUND.code,
+      commonErrors.USER_NOT_FOUND.errorCode,
+      commonErrors.USER_NOT_FOUND.suggestion,
+    );
+  }
+
+  // Check if a file is uploaded
+  if (!cvFile) {
+    throw new AppError(
+      commonErrors.NO_FILE_UPLOADED.message,
+      commonErrors.NO_FILE_UPLOADED.code,
+      commonErrors.NO_FILE_UPLOADED.errorCode,
+      commonErrors.NO_FILE_UPLOADED.suggestion,
+    );
+  }
+
+  // Enforce the PDF mime type for CV uploads
+  if (cvFile.mimetype !== "application/pdf") {
+    throw new AppError(
+      "Not a PDF file. Please upload a valid PDF document.",
+      errors.INVALID_FILE_TYPE.code,
+      errors.INVALID_FILE_TYPE.errorCode,
+      errors.INVALID_FILE_TYPE.suggestion,
+      "Please upload a valid PDF cv document.",
+    );
+  }
+
+  // Delete old CV if exists (To replace it with the new one)
+  if (existingUser.cvPublicId) {
+    // Check if any other user is using the same CV file (in case of duplicate CVs for multiple users)
+    const count = await User.countDocuments({
+      cvPublicId: existingUser.cvPublicId,
+      _id: { $ne: existingUser._id },
+    });
+
+    // If no other user is using the same CV file, we can safely delete it from Cloudinary
+    if (count === 0) {
+      await deleteFromCloudinary(existingUser.cvPublicId, "raw");
+    }
+  }
+
+  // Upload the new CV
+  const result = await uploadDocToCloudinary(
+    cvFile.buffer,
+    cvFile.originalname,
+    "hrcom/cvs",
+  );
+
+  // Update the user
+  const user = await User.findByIdAndUpdate(
+    userId,
+    {
+      cvURL: result.secure_url,
+      cvPublicId: result.public_id,
+    },
+    { returnDocument: "after" },
+  );
+
+  // Notify the user only if the admin uploaded/re-uploaded the CV
+  if (
+    currentUser.role === "Admin" &&
+    currentUser.id.toString() !== user._id.toString() &&
+    user.status !== "Pending"
+  ) {
+    try {
+      await createNotification({
+        recipientId: user._id,
+        type: "ACCOUNT",
+        title: "CV Updated",
+        message: "Your CV has been updated by HR.",
+        data: {
+          entityType: "USER",
+          entityId: user._id,
+        },
+      });
+    } catch (err) {
+      console.log("CV update notification failed:", err.message);
+    }
+  }
+
+  // Audit log
+  await logAuditAction({
+    adminId: currentUser.id,
+    action: "UPLOAD_CV",
+    targetType: "User",
+    targetId: user._id,
+    targetName: `${user.name} ${user.lastName}`,
+    details: {
+      cvURL: result.secure_url,
+      cvPublicId: result.public_id,
+    },
+    ipAddress: ip,
+  });
+
+  return {
+    status: "Success",
+    code: 200,
+    message: "CV uploaded successfully!",
+    data: await User.findById(userId).select(SENSITIVE_FIELDS),
+  };
+};
+
 // Enroll the face descriptors for face recognition (Custom not generic)
 export const enrollFaceService = async (userId, descriptors) => {
   if (!descriptors || !Array.isArray(descriptors) || descriptors.length === 0) {
@@ -1167,7 +1288,7 @@ export const enrollFaceService = async (userId, descriptors) => {
 
   // Find the user first to avoid strict Mongoose cast errors on slugs
   const user = await User.findOne(resolveId(userId));
-  
+
   if (!user) {
     throw new AppError(
       commonErrors.USER_NOT_FOUND.message,
@@ -1180,9 +1301,8 @@ export const enrollFaceService = async (userId, descriptors) => {
   user.faceDescriptors = descriptors;
   user.faceEnrolled = true;
   user.faceEnrollmentPromptRequired = false;
-  
-  await user.save();
 
+  await user.save();
 
   return {
     status: "Success",

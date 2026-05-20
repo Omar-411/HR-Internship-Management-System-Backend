@@ -4,7 +4,6 @@ import * as internService from "../services/internService.js";
 import { transformUserFilters } from "../utils/userQueryTransformer.js";
 import { resolveRoleId } from "../utils/userResolvers.js";
 
-
 // Get User by ID
 export const getUserById = async (req, res, next) => {
   try {
@@ -17,12 +16,10 @@ export const getUserById = async (req, res, next) => {
       Check if the requester is trying to access their own data or is it another user 
       (For ex: An admin or the user's supervisor accessing a user's profile data)
     */
-    const requesterId = req.user?.id || req.user?._id;
+    const requesterId = req.user?.id;
     const result = await userService.getUser(id);
 
-    // Robust self-check: compare the requester's ID from the token 
-    // against the database ID of the user we just found.
-    const dbUserId = result.data?._id?.toString() || result.data?.id?.toString();
+    const dbUserId = result.data?._id.toString();
     const currentUserId = requesterId?.toString();
     
     const isSelf = currentUserId && dbUserId && currentUserId === dbUserId;
@@ -192,6 +189,22 @@ export const removeProfileImage = async (req, res, next) => {
   try {
     const result = await userService.removeProfileImageService(
       req.params.id,
+      req.user,
+      req.ip
+    );
+
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Upload a cv for a user (Admin only)
+export const uploadCv = async (req, res, next) => {
+  try {
+    const result = await userService.uploadCvService(
+      req.params.id,
+      req.file,
       req.user,
       req.ip
     );
