@@ -8,6 +8,7 @@ import {
   getDocumentEmailContent,
   getAccountReactivationContent,
   getAccountDeactivationContent,
+  getPositionUpdateContent,
 } from "./emailContent.js";
 
 export const sendEmail = async ({
@@ -19,6 +20,7 @@ export const sendEmail = async ({
   code,
   resetLink,
   newRole,
+  newPosition,
   documentTitle,
   attachments = [],
 }) => {
@@ -52,6 +54,9 @@ export const sendEmail = async ({
       break;
     case "accountDeactivation":
       bodyHtml = getAccountDeactivationContent({ name });
+      break;
+    case "positionUpdate":
+      bodyHtml = getPositionUpdateContent({ name, newPosition });
       break;
     default:
       bodyHtml = `<p>Default message</p>`;

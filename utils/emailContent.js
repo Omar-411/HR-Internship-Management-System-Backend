@@ -47,7 +47,7 @@ export const getUpdateUserContent = ({ name, newRole }) => {
     <p>Dear ${name},</p>
     <p>
       We are pleased to inform you that you have been promoted to 
-      <strong>${newRole}</strong>.
+      <strong>${newRole.toLowerCase()}</strong> among our team.
     </p>
     <p>
       Congratulations on this achievement! This reflects your hard work and contributions to our team.
@@ -167,6 +167,24 @@ export const getAccountDeactivationContent = ({ name }) => {
     <p>
       If you believe this is an error or if you have any questions, please do not hesitate 
       to contact our support team.
+    </p>
+  `;
+};
+
+// Email of position update
+export const getPositionUpdateContent = ({ name, newPosition }) => {
+  return `
+    <h2 style="color: #232ED1;">Position Update Notification!</h2>
+    <p>Dear ${name},</p>
+    <p>
+      We are pleased to inform you that you have been promoted to 
+      <strong>${newPosition}</strong> among our team.
+    </p>
+    <p>
+      Congratulations on this achievement! This reflects your hard work and contributions to our team.
+    </p>
+    <p>
+      We are truly excited to see you grow further with us!
     </p>
   `;
 };

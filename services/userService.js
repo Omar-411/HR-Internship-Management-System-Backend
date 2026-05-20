@@ -228,7 +228,7 @@ export const addUserService = async (data, currentUser, ip) => {
 
   const finalProfileImageURL =
     typeof profileImageURL === "string" ? profileImageURL : "";
-  
+
   // Enforce the cv
   if (!cvURL || typeof cvURL !== "string") {
     throw new AppError(
@@ -445,7 +445,10 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
   });
 
   if (updateData.employment?.contractType) {
-    updateData.employment.contractEndDate = updateData.employment?.contractType === "CDI" ? null : updateData.employment?.contractEndDate;
+    updateData.employment.contractEndDate =
+      updateData.employment?.contractType === "CDI"
+        ? null
+        : updateData.employment?.contractEndDate;
   }
 
   // Check the phone number validity + uniqueness in case of an update
@@ -633,7 +636,7 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     delete updateData.isActive;
   }
 
-  if(updateData.cvURL){
+  if (updateData.cvURL) {
     if (updateData.cvURL === "" || typeof updateData.cvURL !== "string") {
       throw new AppError(
         errors.CV_REQUIRED.message,
@@ -736,6 +739,30 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
         `[UPDATE-USER-DEBUG] PROMOTION EMAIL FAILED:`,
         emailErr.message,
       );
+    }
+  }
+
+  // If the position is updated, we send an email to the user to notify him about his new position
+  if (updateData.position !== undefined) {
+    if (updateData.position !== existingUser.position) {
+      try {
+        console.log(
+          `[UPDATE-USER-DEBUG] Sending Position Update email to: ${user.email}`,
+        );
+
+        await sendEmail({
+          to: user.email,
+          subject: "HRcoM! - Congratulations! Your Position Has Been Updated",
+          type: "positionUpdate",
+          name: user.name,
+          newPosition: updateData.position,
+        });
+      } catch (emailErr) {
+        console.log(
+          `[UPDATE-USER-DEBUG] POSITION UPDATE EMAIL FAILED:`,
+          emailErr.message,
+        );
+      }
     }
   }
 
