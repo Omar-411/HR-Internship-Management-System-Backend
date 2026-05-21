@@ -121,6 +121,7 @@ export const respondToClarification = async (req, res, next) => {
       resignationId,
       employeeId,
       req.body,
+      req.ip,
     );
 
     res.status(result.code).json(result);
@@ -133,11 +134,12 @@ export const respondToClarification = async (req, res, next) => {
 export const approveResignation = async (req, res, next) => {
   try {
     const resignationId = req.params.id;
-    const adminId = req.user.id;
+    const { weeksNotice } = req.body; // Allow the admin to specify a custom notice period (in days)
 
     const result = await resignationService.approveResignation(
       resignationId,
-      adminId,
+      weeksNotice || 14,
+      req.user,
       req.ip,
     );
 
@@ -151,11 +153,10 @@ export const approveResignation = async (req, res, next) => {
 export const startExitProcess = async (req, res, next) => {
   try {
     const resignationId = req.params.id;
-    const adminId = req.user.id;
 
     const result = await resignationService.startExitProcess(
       resignationId,
-      adminId,
+      req.user,
       req.ip,
     );
 

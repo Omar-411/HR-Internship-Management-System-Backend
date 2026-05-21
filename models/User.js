@@ -169,7 +169,10 @@ const userSchema = mongoose.Schema(
     },
     leaveBalances: [
       {
-        typeId: mongoose.Schema.Types.ObjectId,
+        typeId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "LeaveType",
+        },
         remainingDays: {
           // Represents the remaining leave days for this leave type
           type: Number,
@@ -265,10 +268,12 @@ const userSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // To be removed later: Replaced by the children array and the nbOfChildren field
     nbOfChildren: {
       type: Number,
       default: 0,
     },
+    // To be removed later: Replaced by the leaveBalances array
     leaveBalance: {
       type: Number,
       default: 21,

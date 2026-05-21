@@ -34,25 +34,10 @@ const resignationSchema = new mongoose.Schema(
       default: Date.now,
     },
     noticePeriod: {
-      // 2 weeks notice period
+      // How many weeks notice period (2 weeks notice by default)
       type: Number,
       required: true,
       default: 14,
-    },
-    exitDate: {
-      // The date when the employee's last working day is: approvedDate + 14 days
-      type: Date,
-    },
-    startedExitProcessAt: {
-      // The date when the admin clicks "Start Exit Process"
-      type: Date,
-      default: null,
-    },
-    exitSummary: {
-      finalSalary: { type: Number, default: 0 },
-      pendingTasksCount: { type: Number, default: 0 },
-      remainingLeaveDays: { type: Number, default: 0 },
-      taskPreview: { type: [String], default: [] },
     },
     reason: {
       // The reason for resignation provided by the employee
@@ -75,8 +60,8 @@ const resignationSchema = new mongoose.Schema(
         "submitted",
         "clarification_requested",
         "approved",
-        "scheduled_exit", // The employee has reached their last working day
-        "inactive", // The employee is fully gone from the system
+        "scheduled_exit",
+        "inactive",
       ],
       default: "submitted",
     },
@@ -104,30 +89,31 @@ const resignationSchema = new mongoose.Schema(
         default: null,
       },
     },
-    payrollImpact: {
-      // If the resignation has an impact on payroll (e.g. employee is leaving in the middle of the month), we can track the affected period for payroll calculations
-      from: {
-        type: Date,
-      },
-      to: {
-        type: Date,
-      },
+    exitDate: {
+      // The date when the employee's last working day is: approvedDate + 14 days
+      type: Date,
     },
-    finalSettlement: {
+    startedExitProcessAt: {
+      // The date when the admin clicks "Start Exit Process"
+      type: Date,
+      default: null,
+    },
+    exitSummary: {
       finalSalary: {
-        // Final salary after prorated payroll computation
         type: Number,
         default: 0,
       },
-      remainingLeaveBalance: {
-        // Remaining leave days at the time of resignation
+      pendingTasksCount: {
         type: Number,
         default: 0,
       },
-      pendingTasks: {
-        // Number of pending tasks at the time of resignation
+      remainingLeaveDays: {
         type: Number,
         default: 0,
+      },
+      taskPreview: {
+        type: [String],
+        default: [],
       },
     },
   },

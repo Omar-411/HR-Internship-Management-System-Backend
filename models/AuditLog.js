@@ -64,6 +64,7 @@ const auditLogSchema = mongoose.Schema(
         "RESOLVE_ALERT",
         "DISMISS_ALERT",
         "GENERATE_PAYROLL",
+        "START_EXIT_PROCESS",
       ],
     },
     target_type: {

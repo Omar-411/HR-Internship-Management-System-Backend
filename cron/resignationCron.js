@@ -3,18 +3,18 @@ import Resignation from "../models/Resignation.js";
 import User from "../models/User.js";
 import Task from "../models/Task.js";
 
-// Runs every day at midnight
+// Runs every day at midnight: 00:00
 cron.schedule("0 0 * * *", async () => {
-  console.log("Running resignation cron job...");
+  console.log("[RESIGNATION-CRON] Running resignation cron job...");
 
   // Get the current date and time
   const now = new Date();
 
   try {
-    // Move scheduled_exit → inactive + deactivate user if the exit date has passed
+    // Move scheduled_exit to inactive + deactivate user if the exit date has passed
     const toDeactivate = await Resignation.find({
       status: "scheduled_exit",
-      exitDate: { $lte: now },
+      exitDate: { $lt: now },
     });
 
     for (const resignation of toDeactivate) {
@@ -51,8 +51,8 @@ cron.schedule("0 0 * * *", async () => {
       );
     }
 
-    console.log(`Moved to inactive: ${toDeactivate.length}`);
+    console.log("[RESIGNATION-CRON] Moved to inactive: ${toDeactivate.length}");
   } catch (err) {
-    console.error("Cron job error:", err);
+    console.error("[RESIGNATION-CRON] Cron job error:", err);
   }
 });

@@ -81,6 +81,9 @@ const formatAuditLog = (log) => {
     case "APPROVE_RESIGNATION":
       description = `Approved Resignation of ${log.target_name || ""}`;
       break;
+    case "START_EXIT_PROCESS":
+      description = `Started Exit Process for ${log.target_name || ""}`;
+      break;
     case "VALIDATE_PAYROLL":
       description = `Validated Payroll for ${log.target_name || ""}`;
       break;
