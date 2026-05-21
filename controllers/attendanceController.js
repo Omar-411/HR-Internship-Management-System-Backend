@@ -5,6 +5,9 @@ import Timetable from "../models/Timetable.js";
 import UserRole from "../models/UserRole.js";
 import Alert from "../models/Alert.js";
 import { errors as commonErrors } from "../errors/commonErrors.js";
+import { errors as departmentErrors } from "../errors/departmentErrors.js";
+import { errors as attendanceErrors } from "../errors/attendanceErrors.js";
+import { errors as timetableErrors } from "../errors/timetableErrors.js";
 import AppError from "../utils/AppError.js";
 import { buildDateFilter } from "../utils/dateFilter.js";
 import {
@@ -62,20 +65,19 @@ export const getAllStatuses = async (req, res, next) => {
 export const getMyStatus = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const { 
-      start: today, 
-      end: tomorrow 
-    } = getUtcDayRange(new Date());
+    const { start: today, end: tomorrow } = getUtcDayRange(new Date());
 
     // Check the user's existence
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json(
-        commonErrors.USER_NOT_FOUND.message,
-        commonErrors.USER_NOT_FOUND.code,
-        commonErrors.USER_NOT_FOUND.errorCode,
-        commonErrors.USER_NOT_FOUND.suggestion,
-      );
+      return res
+        .status(404)
+        .json(
+          commonErrors.USER_NOT_FOUND.message,
+          commonErrors.USER_NOT_FOUND.code,
+          commonErrors.USER_NOT_FOUND.errorCode,
+          commonErrors.USER_NOT_FOUND.suggestion,
+        );
     }
 
     // Get today's attendance record for the user
@@ -424,11 +426,11 @@ export const getAttendanceById = async (req, res, next) => {
         .json({ status: "Error", message: "Unauthorized!" });
     }
 
-    res.status(200).json({ 
-      status: "Success", 
-      code: 200, 
+    res.status(200).json({
+      status: "Success",
+      code: 200,
       message: "Attendance record retrieved successfully!",
-      data: record 
+      data: record,
     });
   } catch (error) {
     next(error);
@@ -479,6 +481,7 @@ export const checkIn = async (req, res, next) => {
       if (!faceValidation.ok) {
         return res.status(401).json({
           status: "Error",
+          code: 401,
           message: faceValidation.message,
         });
       }
@@ -490,22 +493,25 @@ export const checkIn = async (req, res, next) => {
     // Get the user's existence
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({
-        status: "Error",
-        message: "User not found!",
-      });
+      throw new AppError(
+        commonErrors.USER_NOT_FOUND.message,
+        commonErrors.USER_NOT_FOUND.code,
+        commonErrors.USER_NOT_FOUND.errorCode,
+        commonErrors.USER_NOT_FOUND.suggestion,
+      );
     }
 
     // Require Face ID enrollment before check-in
     if (!user.faceEnrolled) {
-      return res.status(403).json({
-        status: "Error",
-        message:
-          "Face not enrolled! Please enroll your face before your check-in!",
-      });
+      throw new AppError(
+        attendanceErrors.FACE_NOT_ENROLLED.message,
+        attendanceErrors.FACE_NOT_ENROLLED.code,
+        attendanceErrors.FACE_NOT_ENROLLED.errorCode,
+        attendanceErrors.FACE_NOT_ENROLLED.suggestion,
+      );
     }
 
-    // Try to get today's shift (optional)
+    // Try to get today's shift
     const shift = await Timetable.findOne({
       userId,
       date: { $gte: todayUTC, $lt: tomorrowUTC },
@@ -513,29 +519,31 @@ export const checkIn = async (req, res, next) => {
 
     if (!shift) {
       throw new AppError(
-        "Shift not found for today. Please contact your administrator.",
-        404,
+        timetableErrors.TIMETABLE_NOT_FOUND.message,
+        timetableErrors.TIMETABLE_NOT_FOUND.code,
+        timetableErrors.TIMETABLE_NOT_FOUND.errorCode,
+        timetableErrors.TIMETABLE_NOT_FOUND.suggestion,
       );
     }
 
-    // Work location: prefer explicit client selection; fallback to shift; default Remote.
+    // Determine the work location
     let workLocation = "Remote";
     if (location === "Remote" || location === "Onsite") {
       workLocation = location;
-    } else if (shift?.location === "Remote" || shift?.location === "Onsite") {
+    } else if (shift.location === "Remote" || shift.location === "Onsite") {
       workLocation = shift.location;
     }
 
-    // Determine presence status (late/present)
+    // Determine the presence status (late/present)
     let status = "present";
     const resolvedStartTime =
-      shift?.startTime || shift?.specialShiftData?.periods?.[0]?.startTime;
+      shift.startTime || shift.specialShiftData?.periods?.[0]?.startTime;
 
     if (resolvedStartTime) {
       const [startHour, startMinute] = resolvedStartTime.split(":").map(Number);
       const shiftStart = new Date(todayUTC);
       shiftStart.setUTCHours(startHour, startMinute, 0, 0);
-      const grace = shift.gracePeriod || 15;
+      const grace = shift.gracePeriod || 5;
       const lateThreshold = new Date(shiftStart.getTime() + grace * 60000);
       if (now > lateThreshold) status = "late";
     }
@@ -660,7 +668,7 @@ export const checkIn = async (req, res, next) => {
   }
 };
 
-// Admin updates attendance record directly
+// Attendance record update (Admin only)
 export const updateAttendance = async (req, res, next) => {
   try {
     const { id } = req.params; // Attendance record ID
@@ -671,10 +679,12 @@ export const updateAttendance = async (req, res, next) => {
     });
 
     if (!attendance) {
-      return res.status(404).json({
-        status: "Error",
-        message: "Attendance record not found!",
-      });
+      return res.status(404).json(
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
+      );
     }
 
     // Get the user for notification and payroll purposes
@@ -682,10 +692,12 @@ export const updateAttendance = async (req, res, next) => {
       "name lastName supervisor_id",
     );
     if (!user) {
-      return res.status(404).json({
-        status: "Error",
-        message: "User associated with attendance not found!",
-      });
+      return res.status(404).json(
+        commonErrors.USER_NOT_FOUND.message,
+        commonErrors.USER_NOT_FOUND.code,
+        commonErrors.USER_NOT_FOUND.errorCode,
+        commonErrors.USER_NOT_FOUND.suggestion,
+      );
     }
 
     // Mark related payroll as dirty for recalculation
@@ -734,9 +746,10 @@ export const updateAttendance = async (req, res, next) => {
     }
 
     res.status(200).json({
-      status: "success",
-      result: attendance,
-      message: "Attendance updated successfully!",
+      status: "Success",
+      code: 200,
+      message: "Attendance record updated successfully!",
+      data: attendance,
     });
   } catch (error) {
     next(error);
@@ -747,16 +760,21 @@ export const updateAttendance = async (req, res, next) => {
 export const checkOut = async (req, res, next) => {
   try {
     const userId = req.user.id;
+
     const now = new Date();
     const { start: todayUTC, end: tomorrowUTC } = getUtcDayRange(now);
 
     // Check the user's existance
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({
-        status: "Error",
-        message: "User not found!",
-      });
+      return res
+        .status(404)
+        .json(
+          commonErrors.USER_NOT_FOUND.message,
+          commonErrors.USER_NOT_FOUND.code,
+          commonErrors.USER_NOT_FOUND.errorCode,
+          commonErrors.USER_NOT_FOUND.suggestion,
+        );
     }
 
     const checkOutTime = now.toLocaleTimeString("en-US", {
@@ -765,17 +783,24 @@ export const checkOut = async (req, res, next) => {
       hour12: true,
     });
 
+    // Find today's attendance record and update the check-out time
     const attendance = await Attendance.findOneAndUpdate(
       { userId, date: { $gte: todayUTC, $lt: tomorrowUTC } },
       { $set: { checkOutTime } },
-      { new: true, runValidators: true, sort: { date: -1, updatedAt: -1 } },
+      {
+        returnDocument: "after",
+        runValidators: true,
+        sort: { date: -1, updatedAt: -1 },
+      },
     );
 
     if (!attendance) {
-      return res.status(404).json({
-        status: "Error",
-        message: "No attendance record found for today. Did you check in?",
-      });
+      return res.status(404).json(
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
+      );
     }
 
     await markPayrollDirty(userId, now, "Check-out recorded");
@@ -788,9 +813,10 @@ export const checkOut = async (req, res, next) => {
     });
 
     res.status(200).json({
-      status: "success",
-      result: attendance,
+      status: "Success",
+      code: 200,
       message: "Checked out successfully!",
+      data: attendance,
     });
   } catch (error) {
     next(error);
@@ -820,18 +846,22 @@ export const exportUserAttendance = async (req, res, next) => {
       email: userEmail,
     });
     if (!user) {
-      return res.status(404).json({
-        status: "Error",
-        message: "User not found!",
-      });
+      return res.status(404).json(
+        commonErrors.USER_NOT_FOUND.message,
+        commonErrors.USER_NOT_FOUND.code,
+        commonErrors.USER_NOT_FOUND.errorCode,
+        commonErrors.USER_NOT_FOUND.suggestion,
+      );
     }
 
     // Validate custom
     if (type === "custom" && (!startDate || !endDate)) {
-      return res.status(400).json({
-        status: "Error",
-        message: "StartDate and endDate are required!",
-      });
+      return res.status(400).json(
+        attendanceErrors.START_END_DATE_REQUIRED.message,
+        attendanceErrors.START_END_DATE_REQUIRED.code,
+        attendanceErrors.START_END_DATE_REQUIRED.errorCode,
+        attendanceErrors.START_END_DATE_REQUIRED.suggestion,
+      );
     }
 
     // Build date filter
@@ -851,10 +881,12 @@ export const exportUserAttendance = async (req, res, next) => {
     }).sort({ date: 1 }); // Sort by date ascending for better readability in exports
 
     if (records.length === 0) {
-      return res.status(404).json({
-        status: "Error",
-        message: "No attendance records found for the specified period!",
-      });
+      return res.status(404).json(
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
+      );
     }
 
     // Format data
@@ -866,8 +898,7 @@ export const exportUserAttendance = async (req, res, next) => {
     }));
 
     // Build the filename (The user name included)
-    const fullName = `${user.name}_${user.lastName || ""}`;
-    const cleanName = sanitize(fullName);
+    const cleanName = `${user.slug}`;
     const periodLabel = getPeriodLabel({
       type,
       year,
@@ -891,10 +922,12 @@ export const exportUserAttendance = async (req, res, next) => {
     }
 
     // If the format requested is Invalid
-    return res.status(400).json({
-      status: "Error",
-      message: "Invalid export format!",
-    });
+    return res.status(400).json(
+      attendanceErrors.INVALID_EXPORT_FORMAT.message,
+      attendanceErrors.INVALID_EXPORT_FORMAT.code,
+      attendanceErrors.INVALID_EXPORT_FORMAT.errorCode,
+      attendanceErrors.INVALID_EXPORT_FORMAT.suggestion,
+    );
   } catch (err) {
     next(err);
   }
@@ -920,19 +953,27 @@ export const exportDepartmentAttendance = async (req, res, next) => {
     // Get department and check its existance by name (Because the department names are unique)
     const department = await Department.findOne({ name: departmentName });
     if (!department) {
-      return res.status(404).json({
-        status: "Error",
-        message: "Department not found!",
-      });
+      return res
+        .status(404)
+        .json(
+          departmentErrors.DEPARTMENT_NOT_FOUND.message,
+          departmentErrors.DEPARTMENT_NOT_FOUND.code,
+          departmentErrors.DEPARTMENT_NOT_FOUND.errorCode,
+          departmentErrors.DEPARTMENT_NOT_FOUND.suggestion,
+        );
     }
 
     // Get all the users in that department
     const users = await User.find({ department_id: department._id });
     if (!users.length) {
-      return res.status(404).json({
-        status: "Error",
-        message: "No users found in this department!",
-      });
+      return res
+        .status(404)
+        .json(
+          commonErrors.USER_NOT_FOUND.message,
+          commonErrors.USER_NOT_FOUND.code,
+          commonErrors.USER_NOT_FOUND.errorCode,
+          commonErrors.USER_NOT_FOUND.suggestion,
+        );
     }
 
     // Extract user IDs for attendance query
@@ -955,10 +996,14 @@ export const exportDepartmentAttendance = async (req, res, next) => {
     }).populate("userId", "name lastName");
 
     if (!records.length) {
-      return res.status(404).json({
-        status: "Error",
-        message: "No attendance records found for this department!",
-      });
+      return res
+        .status(404)
+        .json(
+          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
+          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
+          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
+          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
+        );
     }
 
     // Format the return data for export
@@ -999,10 +1044,14 @@ export const exportDepartmentAttendance = async (req, res, next) => {
       return exportExcel(formattedData, res, fileName, includeName);
     }
 
-    res.status(400).json({
-      status: "Error",
-      message: "Invalid export Format!",
-    });
+    res
+      .status(400)
+      .json(
+        attendanceErrors.INVALID_EXPORT_FORMAT.message,
+        attendanceErrors.INVALID_EXPORT_FORMAT.code,
+        attendanceErrors.INVALID_EXPORT_FORMAT.errorCode,
+        attendanceErrors.INVALID_EXPORT_FORMAT.suggestion,
+      );
   } catch (error) {
     next(error);
   }
@@ -1034,10 +1083,14 @@ export const exportAttendanceStatistics = async (req, res, next) => {
         email: userEmail,
       });
       if (!user) {
-        return res.status(404).json({
-          status: "Error",
-          message: "User not found!",
-        });
+        return res
+          .status(404)
+          .json(
+            commonErrors.USER_NOT_FOUND.message,
+            commonErrors.USER_NOT_FOUND.code,
+            commonErrors.USER_NOT_FOUND.errorCode,
+            commonErrors.USER_NOT_FOUND.suggestion,
+          );
       }
 
       userId = user._id;
@@ -1047,10 +1100,14 @@ export const exportAttendanceStatistics = async (req, res, next) => {
     if (departmentName) {
       const department = await Department.findOne({ name: departmentName });
       if (!department) {
-        return res.status(404).json({
-          status: "Error",
-          message: "Department not found!",
-        });
+        return res
+          .status(404)
+          .json(
+            departmentErrors.DEPARTMENT_NOT_FOUND.message,
+            departmentErrors.DEPARTMENT_NOT_FOUND.code,
+            departmentErrors.DEPARTMENT_NOT_FOUND.errorCode,
+            departmentErrors.DEPARTMENT_NOT_FOUND.suggestion,
+          );
       }
       departmentId = department._id;
     }

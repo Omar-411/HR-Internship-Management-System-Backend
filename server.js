@@ -1,4 +1,3 @@
-// Imports
 import express from "express";
 import { createServer } from "http";
 import swaggerUi from "swagger-ui-express";
@@ -6,9 +5,10 @@ import swaggerSpec from "./swagger.js";
 import dotenv from "dotenv";
 import connectMongo from "./config/db.js";
 import { initIO } from "./socket.js";
-import "./cron/attendanceCron.js"; // To calculate the attendance stats automatically
+import "./cron/attendanceCron.js"; // To automatically create day-off attendance records and detect absences
+import "./cron/attendanceStatsCron.js"; // To calculate the attendance stats automatically
 import "./cron/resignationCron.js"; // To automatically update resignation statuses and deactivate users
-import "./cron/payrollCron.js"; // To automatically generate payrolls every month
+import "./cron/payrollCron.js"; // To automatically generate payrolls every month for the previous month
 
 // Creation of an express app
 const app = express();

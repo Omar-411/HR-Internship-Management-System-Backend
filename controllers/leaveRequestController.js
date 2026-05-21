@@ -1,6 +1,7 @@
 import LeaveRequest from "../models/LeaveRequest.js";
 import LeaveType from "../models/LeaveType.js";
 import User from "../models/User.js";
+import Attendance from "../models/Attendance.js";
 import { errors } from "../errors/leaveRequestErrors.js";
 import { errors as tokenErrors } from "../errors/middlewareTokenErrors.js";
 import { errors as commonErrors } from "../errors/commonErrors.js";
@@ -1028,6 +1029,37 @@ export const approveOrRejectLeaveRequest = async (req, res, next) => {
         }
 
         leaveRequest.status = "Approved";
+
+        for (
+          let date = new Date(leaveRequest.startDate);
+          date <= leaveRequest.endDate;
+          date.setDate(date.getDate() + 1)
+        ) {
+          // Normalize the date to midnight
+          const attendanceDate = new Date(date);
+          attendanceDate.setHours(0, 0, 0, 0);
+
+          // Update or create the attendance record for this date to "leave"
+          await Attendance.findOneAndUpdate(
+            {
+              userId: employee._id,
+              date: attendanceDate,
+            },
+            {
+              userId: employee._id,
+              date: attendanceDate,
+              status: "leave",
+            },
+            {
+              upsert: true,
+              returnDocument: "after",
+            },
+          );
+
+          console.log(
+            `Marked attendance for ${employee.name} on ${attendanceDate.toDateString()} as leave due to approved leave request ${leaveRequest._id}`,
+          );
+        }
       }
 
       // The reject case
@@ -1092,8 +1124,7 @@ export const approveOrRejectLeaveRequest = async (req, res, next) => {
         },
         ipAddress: req.ip,
       });
-    }
-    else {
+    } else {
       throw new AppError(
         tokenErrors.UNAUTHORIZED.message,
         tokenErrors.UNAUTHORIZED.code,

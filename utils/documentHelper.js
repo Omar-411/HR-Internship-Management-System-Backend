@@ -70,16 +70,6 @@ export const getValidAdminDocument = async (DocumentId) => {
   return document;
 };
 
-// Fill a html template with data
-// export const fillTemplate = (html, data) => {
-//   return Object.keys(data).reduce((result, key) => {
-//     const value = data[key] ?? "";
-
-//     // Replace all occurrences of {{key}} in the template with the corresponding value from the data object
-//     return result.replaceAll(`{{${key}}}`, value);
-//   }, html);
-// };
-
 export const fillTemplate = (html, data) => {
   const getValue = (obj, path) => {
     return path.split(".").reduce((acc, key) => {
@@ -91,15 +81,6 @@ export const fillTemplate = (html, data) => {
     const value = getValue(data, key.trim());
     return value ?? "";
   });
-};
-
-
-// A slugify function to generate URL-friendly strings from document titles (slugify = convert "My Document Title" to "my-document-title")
-export const slugify = (text) => {
-  return text
-    .toLowerCase()
-    .replace(/\s+/g, "-") // Replace spaces with -
-    .replace(/[^\w-]/g, ""); // Remove all non-word chars except -. Ex: "my-document-title!" becomes "my-document-title"
 };
 
 // Resolve a document request to get the document URL for viewing

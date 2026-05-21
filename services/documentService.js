@@ -25,7 +25,7 @@ import {
 import { getIO } from "../socket.js";
 import { uploadDocToCloudinary } from "../utils/cloudinaryHelper.js";
 import { TEMPLATE_DOCUMENT_TYPES } from "../constants/documentConstants.js";
-import { slugify } from "../utils/documentHelper.js";
+import { slugify } from "../utils/slugify.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { logAuditAction } from "../utils/logger.js";
 import { errors as documentRequestErrors } from "../errors/documentRequestErrors.js";
@@ -220,7 +220,7 @@ export const getPersonalDocumentsService = async ({
   queryParams,
   requester, // To check if we allow seeing the confidential documents or not
 }) => {
-  // Resolve user ID (supports slug, publicId, or _id)
+  // Resolve user ID
   const user = await User.findOne({
     $or: [
       { publicId: userId },

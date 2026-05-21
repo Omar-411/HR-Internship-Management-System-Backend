@@ -1,86 +1,115 @@
 import cron from "node-cron";
-import {
-  generateDailyStats,
-  generateMonthlyStats,
-  generateTrimesterStats,
-  generateYearlyStats,
-} from "../services/attendanceStatsService.js";
+import Attendance from "../models/Attendance.js";
+import Timetable from "../models/Timetable.js";
 
-// DAILY Stats -> Run Every day at 23:59
-cron.schedule("59 23 * * *", async () => {
-  console.log("Running daily attendance stats cron job...");
+// Day-off cron job (Runs daily at 00:00)
+cron.schedule("0 0 * * *", async () => {
+  console.log("[DAY-OFF-CRON-JOB] Running day-off attendance generation...");
 
   try {
-    await generateDailyStats();
-    console.log("Daily attendance stats generated!");
-  } catch (err) {
-    console.error("Daily attendance stats error:", err);
-  }
-});
+    // Create today's UTC boundaries
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
 
-// MONTHLY -> 1st day of month at 00:05 (for previous month)
-cron.schedule("5 0 1 * *", async () => {
-  console.log("Running monthly attendance stats cron job...");
+    const tomorrow = new Date(today);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
-  try {
-    const now = new Date();
+    // Get all timetables marked as "Day Off" for today
+    const dayOffTimetables = await Timetable.find({
+      date: { $gte: today, $lt: tomorrow },
+      type: "Day Off",
+    });
 
-    // Determine previous month and year
-    const year = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-    const month = now.getMonth() === 0 ? 12 : now.getMonth(); // previous month
-
-    await generateMonthlyStats(year, month);
-
-    console.log(`Monthly attendance stats generated for ${month}/${year}`);
-  } catch (err) {
-    console.error("Monthly attendance stats error:", err);
-  }
-});
-
-// TRIMESTER -> Every 3 months (Jan, Apr, Jul, Oct)
-cron.schedule("10 0 1 1,4,7,10 *", async () => {
-  console.log("Running trimester attendance stats job...");
-
-  try {
-    const now = new Date();
-
-    // Determine previous trimester
-    const month = now.getMonth() + 1; // 1 – 12 instead of 0 – 11
-    let year = now.getFullYear();
-    let trimester;
-
-    // Get the previous trimester based on the current month
-    if (month >= 1 && month <= 3) {
-      trimester = 4;
-      year -= 1;
-    } else if (month >= 4 && month <= 6) {
-      trimester = 1;
-    } else if (month >= 7 && month <= 9) {
-      trimester = 2;
-    } else {
-      trimester = 3;
+    for (const timetable of dayOffTimetables) {
+      await Attendance.findOneAndUpdate(
+        {
+          userId: timetable.userId,
+          date: { $gte: today, $lt: tomorrow },
+        },
+        {
+          $setOnInsert: {
+            userId: timetable.userId,
+            date: today,
+            status: "day-off",
+          },
+        },
+        {
+          upsert: true,
+          returnDocument: "after",
+        },
+      );
     }
 
-    // Generate stats for the previous trimester and year
-    await generateTrimesterStats(year, trimester);
-
-    console.log(`Trimester ${trimester} attendance stats generated for ${year}`);
+    console.log(
+      `[DAY-OFF-CRON-JOB] Day-off attendance created: ${dayOffTimetables.length}`,
+    );
+    console.log(
+      `[DAY-OFF-CRON-JOB] Day-off attendance records created: ${dayOffTimetables.length}.`,
+    );
   } catch (err) {
-    console.error("Trimester attendance stats error:", err);
+    console.error("[DAY-OFF-CRON-JOB] Day-off attendance error:", err);
   }
 });
 
-// YEARLY -> Every Jan 1st at 00:15 (for previous year)
-cron.schedule("15 0 1 1 *", async () => {
-  console.log("Running yearly attendance stats job...");
+// Absence cron job (Runs every 15 minutes)
+cron.schedule("*/15 * * * *", async () => {
+  console.log("[ABSENCE-CRON-JOB] Running absence detection...");
 
   try {
-    const year = new Date().getFullYear() - 1;
+    const now = new Date();
 
-    await generateYearlyStats(year);
+    // Today's UTC boundaries
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
 
-    console.log(`Yearly attendance stats generated for ${year}`);
+    const tomorrow = new Date(today);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+
+    // Get all today's working timetables
+    const timetables = await Timetable.find({
+      date: { $gte: today, $lt: tomorrow },
+      type: { $ne: "Day Off" },
+    });
+
+    for (const timetable of timetables) {
+      // Skip public holidays
+      if (timetable.isPublicHoliday) {
+        continue;
+      }
+
+      // Check if an attendance already exists for the employee that day (Check-in, day-off, leave)
+      const existingAttendance = await Attendance.findOne({
+        userId: timetable.userId,
+        date: { $gte: today, $lt: tomorrow },
+      });
+
+      if (existingAttendance) {
+        continue;
+      }
+
+      // Extract the hours and minutes from the timetable's endTime (e.g., "17:00")
+      const [hours, minutes] = timetable.endTime.split(":");
+
+      // Create a Date object for the shift end time on the timetable's date
+      const shiftEnd = new Date(timetable.date);
+
+      // Set the hours and minutes for the shift end time in UTC
+      shiftEnd.setUTCHours(Number(hours), Number(minutes), 0, 0);
+
+      // If shift has ended and employee never checked in
+      if (now > shiftEnd) {
+        await Attendance.create({
+          userId: timetable.userId,
+          date: today,
+          status: "absent",
+        });
+
+        console.log(`[ABSENCE-CRON-JOB] Marked absent: ${timetable.userId}`);
+      }
+    }
+
+    console.log("[ABSENCE-CRON-JOB] Absence detection completed.");
   } catch (err) {
-    console.error("Yearly attendance stats error:", err);
+    console.error("[ABSENCE-CRON-JOB] Absence cron error:", err);
   }
 });
