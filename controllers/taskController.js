@@ -71,7 +71,7 @@ export const getAllTaskTypes = async (req, res, next) => {
 export const getProjectTasks = async (req, res, next) => {
   try {
     const { projectId } = req.params;
-    
+
     const { sprintId, page = 1, type, status } = req.query;
 
     const limit = 10;
@@ -1209,6 +1209,18 @@ export const submitTask = async (req, res, next) => {
           commonErrors.NO_FILE_UPLOADED.errorCode,
           commonErrors.NO_FILE_UPLOADED.suggestion,
         );
+      }
+
+      // Delete the previous uploaded file in case of re-submission
+      if (task.submission.type === "file" && task.submission.linkPublicId) {
+        try {
+          await deleteFromCloudinary(task.submission.linkPublicId, "raw");
+        } catch (err) {
+          console.error(
+            "Failed to delete previous task submission from Cloudinary:",
+            err,
+          );
+        }
       }
 
       const result = await uploadDocToCloudinary(
