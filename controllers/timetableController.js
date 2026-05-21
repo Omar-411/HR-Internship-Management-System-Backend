@@ -7,37 +7,8 @@ import { resolveId } from "../utils/idResolver.js";
 import { createNotification } from "../services/notificationService.js";
 import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
 import { markPayrollDirty } from "../utils/payrollHelpers.js";
-// -------------------------------------------------------------------- //
-// --------------------- TIMETABLE SHIFT RULES ------------------------ //
-// -------------------------------------------------------------------- //
-const SHIFT_CONFIG = {
-  "Morning Shift": {
-    startTime: "09:00",
-    endTime: "13:00",
-  },
-  "Evening Shift": {
-    startTime: "14:30",
-    endTime: "17:00",
-  },
-  "Full-time Shift": {
-    startTime: "09:00",
-    endTime: "17:00",
-  },
-};
-
-// Checks the HH:mm format for startTime and endTime fields in Special Shifts
-const isValidTime = (time) => {
-  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(time);
-};
-
-// Checks the validity of location
-const isValidLocation = (location) => {
-  return ["Remote", "Onsite"].includes(location);
-};
-
-// -------------------------------------------------------------------- //
-// --------------------- TIMETABLE MANAGEMENT ------------------------- //
-// -------------------------------------------------------------------- //
+import { isValidTime, isValidLocation } from "../validators/timetableValidators.js";
+import { SHIFT_CONFIG } from "../constants/timetableConstants.js";
 
 // Add a new timetable entry (shift) for a user on a specific date: Only used for empty days (Admin only)
 export const addTimetableEntry = async (req, res, next) => {
@@ -128,8 +99,9 @@ export const addTimetableEntry = async (req, res, next) => {
 
       return res.status(201).json({
         status: "Success",
+        code: 201,
         message: "Day off created successfully!",
-        result: shift,
+        data: shift,
       });
     }
 
@@ -340,8 +312,7 @@ export const getTimetableByUser = async (req, res, next) => {
     }
     const actualUserId = user._id;
 
-    // Check if the id (if supervisor) is the user's supervisor id
-    // BUT allow users to see their own timetable regardless of role
+    // Authorization check: Employees can only access their own timetable, Supervisors can access timetables of their supervisees, Admins can access all timetables
     if (
       req.user.id !== actualUserId.toString() &&
       req.user.role === "Supervisor" &&
@@ -373,7 +344,7 @@ export const getTimetableByUser = async (req, res, next) => {
       `[PAGINATION] Module: Timetable | Month: ${queryMonth || ""} | Year: ${queryYear || ""} | Returned: ${shifts?.length || 0} records`,
     );
 
-    // Special pagination for the month by month timetable retrieval
+    // Custom pagination (not the basic currentPage one) for the month by month timetable retrieval
     res.status(200).json({
       status: "Success",
       code: 200,
@@ -421,12 +392,13 @@ export const getAllTimetables = async (req, res, next) => {
 
     res.status(200).json({
       status: "Success",
+      code: 200,
       message: "All timetables fetched successfully!",
-      result: shifts,
-      meta: {
+      data: shifts,
+      pagination: {
         month: queryMonth,
         year: queryYear,
-        total: shifts.length,
+        totalCount: shifts.length,
       },
     });
   } catch (err) {
