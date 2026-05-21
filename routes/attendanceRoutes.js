@@ -127,6 +127,40 @@ router.get("/attendance/me", authenticate, getMyStatus);
 // ------------------ Routes for Admins and Supervisors ------------------- //
 // ------------------------------------------------------------------------ // 
 
+// Get statuses of Attendance (Admin/Supervisor)
+/**
+ * @swagger
+ * /attendance/statuses:
+ *   get:
+ *     summary: Get the list of attendance statuses
+ *     tags: 
+ *       - Attendance
+ *     description: Get the list of distinct attendance statuses (present, late, absent, leave, day-off).
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of attendance statuses
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: string
+ *       401:
+ *         description: Missing/Invalid token
+ *       403:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server Error
+ */
+router.get(
+  "/attendance/statuses",
+  authenticate,
+  authorize(["Admin", "Supervisor"]),
+  getAllStatuses
+);
+
 // Get attendance records (Admin/Supervisor)
 /**
  * @swagger
@@ -186,42 +220,7 @@ router.get("/attendance/me", authenticate, getMyStatus);
 router.get(
   "/attendance",
   authenticate,
-  authorize(["Admin", "Supervisor", "Employee", "Intern"]),
-  getAttendance
-);
-
-// Get statuses of Attendance (Admin/Supervisor)
-/**
- * @swagger
- * /attendance/statuses:
- *   get:
- *     summary: Get the list of attendance statuses
- *     tags: 
- *       - Attendance
- *     description: Get the list of distinct attendance statuses (present, late, absent, leave, day-off).
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of attendance statuses
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: string
- *       401:
- *         description: Missing/Invalid token
- *       403:
- *         description: Unauthorized
- *       500:
- *         description: Server Error
- */
-router.get(
-  "/attendance/statuses",
-  authenticate,
-  authorize(["Admin", "Supervisor"]),
-  getAllStatuses
+  getAttendance,
 );
 
 // Individual record routes

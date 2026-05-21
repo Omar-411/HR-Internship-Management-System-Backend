@@ -108,3 +108,24 @@ export const getStartAndEndOfToday = () => {
   return { start: today, end: tomorrow };
 };
 
+// Helper to get start of day in UTC (used as the canonical key for "today")
+export const getStartOfDay = (date) => {
+  const d = new Date(date);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+};
+
+// Helper to get end of day in UTC
+export const getEndOfDay = (date) => {
+  const d = new Date(date);
+  d.setUTCHours(23, 59, 59, 999);
+  return d;
+};
+
+// Helper to get an inclusive-exclusive UTC day range [start, end)
+export const getUtcDayRange = (date) => {
+  const start = getStartOfDay(date);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { start, end };
+};
