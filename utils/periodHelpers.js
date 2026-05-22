@@ -1,4 +1,22 @@
-// Convert period types to more user-friendly names for export purposes
+// Get a human-readable label for the period based on the filter type and parameters
+export const getPeriodLabel = ({ type, year, month, trimester, startDate, endDate }) => {
+  const months = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
+  ];
+
+  if (type === "month") return `${months[month - 1]}_${year}`;
+  if (type === "trimester") return `Trimester${trimester}_${year}`;
+  if (type === "year") return `${year}`;
+
+  if (type === "custom") {
+    const format = (d) => new Date(d).toISOString().split("T")[0]; // Format as YYYY-MM-DD
+    return `${format(startDate)}_to_${format(endDate)}`; // e.g., "2024-01-01_to_2024-03-31"
+  }
+
+  return "period";
+};
+
 export const getPeriodTypeName = (periodType) => {
   switch (periodType) {
     case "day":
@@ -51,29 +69,3 @@ export const getStatsPeriodLabel = ({
 
   return "period";
 };
-
-// Utility functions to calculate date ranges for different periods (day, month, trimester, year)
-export const getDayRange = () => {
-  const now = new Date();
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
-  return { start, end };
-};
-
-export const getMonthRange = (year, month) => ({
-  start: new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)), // Month - 1 because JS months start at 0
-  end: new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)),  // Last day of month
-});
-
-export const getTrimesterRange = (year, trimester) => {
-  const startMonth = (trimester - 1) * 3;
-  return {
-    start: new Date(Date.UTC(year, startMonth, 1, 0, 0, 0, 0)),
-    end: new Date(Date.UTC(year, startMonth + 3, 0, 23, 59, 59, 999)),
-  };
-};
-
-export const getYearRange = (year) => ({
-  start: new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0)),
-  end: new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999)),
-});

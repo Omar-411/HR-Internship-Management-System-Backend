@@ -23,4 +23,10 @@ export const errors = {
     errorCode: "START_END_DATE_REQUIRED",
     suggestion: "Please provide both startDate and endDate for custom attendance records.",
   },
+  START_DATE_AFTER_END_DATE: {
+    message: "Start date cannot be after end date",
+    code: 400,
+    errorCode: "START_DATE_AFTER_END_DATE",
+    suggestion: "Please ensure the start date is before the end date.",
+  },
 };

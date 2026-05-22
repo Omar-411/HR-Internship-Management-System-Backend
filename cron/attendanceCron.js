@@ -69,6 +69,7 @@ cron.schedule("*/15 * * * *", async () => {
     const timetables = await Timetable.find({
       date: { $gte: today, $lt: tomorrow },
       type: { $ne: "Day Off" },
+      endTime: { $exists: true, $ne: null },
     });
 
     for (const timetable of timetables) {
@@ -88,6 +89,16 @@ cron.schedule("*/15 * * * *", async () => {
       }
 
       // Extract the hours and minutes from the timetable's endTime (e.g., "17:00")
+      if (
+        !timetable.endTime ||
+        typeof timetable.endTime !== "string" ||
+        !timetable.endTime.includes(":")
+      ) {
+        console.warn(
+          `[ABSENCE-CRON-JOB] Invalid endTime for timetable ${timetable._id}`,
+        );
+        continue;
+      }
       const [hours, minutes] = timetable.endTime.split(":");
 
       // Create a Date object for the shift end time on the timetable's date

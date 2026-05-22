@@ -1,14 +1,16 @@
 import AttendanceStats from "../models/AttendanceStats.js";
 import User from "../models/User.js";
 import Department from "../models/Department.js";
-import { aggregateStats, generateStats } from "./attendanceStatsService.js";
-import { exportStatsCSV, exportStatsExcel } from "../utils/exportStats.js";
-import { sanitize } from "../utils/exportHelpers.js";
-import { resolveId } from "../utils/idResolver.js";
+import { errors as commonErrors } from "../errors/commonErrors.js";
+import AppError from "./AppError.js";
 import {
-  getPeriodTypeName,
-  getStatsPeriodLabel,
-} from "../utils/periodHelpers.js";
+  aggregateStats,
+  generateStats,
+} from "../utils/generateStatsHelpers.js";
+import { exportStatsCSV, exportStatsExcel } from "./exportStats.js";
+import { slugify } from "./slugify.js";
+import { resolveId } from "./idResolver.js";
+import { getPeriodTypeName, getStatsPeriodLabel } from "./periodHelpers.js";
 
 // Main export function for attendance stats
 export const exportAttendanceStats = async ({
@@ -27,16 +29,30 @@ export const exportAttendanceStats = async ({
   // Get all relevant users
   if (departmentId) {
     const users = await User.find({ department_id: departmentId });
-    userIds = users.map((u) => u._id);
+    if (users.length !== 0) {
+      userIds = users.map((u) => u._id);
+    }
   } else if (userId) {
     const userMatch = resolveId(userId);
+    
     const user = await User.findOne(userMatch);
-    if (!user) throw new Error("User not found!");
+    if (!user)
+      throw new AppError(
+        commonErrors.USER_NOT_FOUND.message,
+        commonErrors.USER_NOT_FOUND.code,
+        commonErrors.USER_NOT_FOUND.errorCode,
+        commonErrors.USER_NOT_FOUND.suggestion,
+      );
+
     actualUserId = user._id;
     userIds = [actualUserId];
   } else {
+    // All users
     const users = await User.find();
-    userIds = users.map((u) => u._id);
+
+    if (users.length !== 0) {
+      userIds = users.map((u) => u._id);
+    }
   }
 
   // Fetch stats for selected users and period
@@ -89,21 +105,19 @@ export const exportAttendanceStats = async ({
   }
 
   // ------ Build the filename ------ //
-
   let cleanName = "";
   let deptName = "";
 
   // Get the username if it's a single user export (for filename)
   if (actualUserId) {
     const user = await User.findById(actualUserId);
-    const fullName = `${user.name}_${user.lastName || ""}`;
-    cleanName = sanitize(fullName);
+    const clearName = `${user.slug}`;
   }
 
   // Get the department name if it's a department export (for filename)
   if (departmentId) {
     const departmentName = await Department.findById(departmentId);
-    deptName = sanitize(departmentName.name);
+    deptName = slugify(departmentName.name);
   }
 
   // Get the right file extension

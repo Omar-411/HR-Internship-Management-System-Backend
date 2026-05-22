@@ -4,7 +4,7 @@ import {
   generateMonthlyStats,
   generateTrimesterStats,
   generateYearlyStats,
-} from "../services/attendanceStatsService.js";
+} from "../utils/generateStatsHelpers.js";
 
 // DAILY Stats -> Run Every day at 23:59
 cron.schedule("59 23 * * *", async () => {

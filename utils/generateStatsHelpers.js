@@ -2,14 +2,12 @@ import Attendance from "../models/Attendance.js";
 import User from "../models/User.js";
 import AttendanceStats from "../models/AttendanceStats.js";
 import {
-  getDayRange,
-  getMonthRange,
-  getTrimesterRange,
-  getYearRange,
-} from "../utils/periodHelpers.js";
-import {
+  getUtcDayRange,
+  getUtcMonthRange,
+  getUtcTrimesterRange,
+  getUtcYearRange,
   parseTimeToMinutes,
-} from "../utils/timeHelpers.js";
+} from "./timeHelpers.js";
 
 // Stat generation function (Grneralized for any period type)
 export const generateStats = async ({ startDate, endDate, periodType }) => {
@@ -66,7 +64,7 @@ export const generateStats = async ({ startDate, endDate, periodType }) => {
 
 // Daily stats generation function
 export const generateDailyStats = async () => {
-  const { start, end } = getDayRange();
+  const { start, end } = getUtcDayRange();
 
   await generateStats({
     startDate: start,
@@ -79,7 +77,7 @@ export const generateDailyStats = async () => {
 
 // Monthly stats generation function
 export const generateMonthlyStats = async (year, month) => {
-  const { start, end } = getMonthRange(year, month);
+  const { start, end } = getUtcMonthRange(year, month);
 
   await generateStats({
     startDate: start,
@@ -92,7 +90,7 @@ export const generateMonthlyStats = async (year, month) => {
 
 // Trimester stats generation function
 export const generateTrimesterStats = async (year, trimester) => {
-  const { start, end } = getTrimesterRange(year, trimester);
+  const { start, end } = getUtcTrimesterRange(year, trimester);
 
   await generateStats({
     startDate: start,
@@ -105,7 +103,7 @@ export const generateTrimesterStats = async (year, trimester) => {
 
 // Yearly stats generation function
 export const generateYearlyStats = async (year) => {
-  const { start, end } = getYearRange(year);
+  const { start, end } = getUtcYearRange(year);
 
   await generateStats({
     startDate: start,

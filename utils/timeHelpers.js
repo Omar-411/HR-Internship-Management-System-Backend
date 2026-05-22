@@ -1,3 +1,6 @@
+import { errors as attendanceErrors } from "../errors/attendanceErrors.js";
+import AppError from "../utils/AppError.js";
+
 // ------------------------------------------------------------------- //
 // ----------- Helper functions related to Time and Dates ------------ //
 // ------------------------------------------------------------------- //
@@ -130,6 +133,24 @@ export const getUtcDayRange = (date) => {
   return { start, end };
 };
 
+export const getUtcMonthRange = (year, month) => ({
+  start: new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)), // Month - 1 because JS months start at 0
+  end: new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)),  // Last day of month
+});
+
+export const getUtcTrimesterRange = (year, trimester) => {
+  const startMonth = (trimester - 1) * 3;
+  return {
+    start: new Date(Date.UTC(year, startMonth, 1, 0, 0, 0, 0)),
+    end: new Date(Date.UTC(year, startMonth + 3, 0, 23, 59, 59, 999)),
+  };
+};
+
+export const getUtcYearRange = (year) => ({
+  start: new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0)),
+  end: new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999)),
+});
+
 // Helper function to parse time strings like "09:17 AM" into minutes from midnight
 export const parseTimeToMinutes = (timeStr) => {
   if (!timeStr || typeof timeStr !== "string") return NaN;
@@ -146,3 +167,34 @@ export const parseTimeToMinutes = (timeStr) => {
 
   return hours * 60 + minutes;
 };
+
+// Date filter utility for attendance records
+export const buildDateFilter = ({ type, year, month, trimester, startDate, endDate }) => {
+  let start, end;
+
+  if (type === "month") {
+    const start = new Date(Date.UTC(year, month - 1, 1)); // month-1 because JS months are 0-based
+    const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+
+    return { $gte: start, $lte: end };
+  }
+
+  else if (type === "trimester") {  // The Admin chose By trimester as a filter type
+    const startMonth = (trimester - 1) * 3;
+    start = new Date(Date.UTC(year, startMonth, 1));
+    end = new Date(Date.UTC(year, startMonth + 3, 0, 23, 59, 59, 999));
+  }
+
+  else if (type === "year") {  // The Admin chose By year as a filter type
+    start = new Date(Date.UTC(year, 0, 1));
+    end = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+  }
+
+  else if (type === "custom") { // The Admin chose Custom range (Flexible date range) as a filter type
+    start = new Date(startDate);
+    end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+  }
+
+  return { $gte: start, $lte: end };
+}; 

@@ -227,7 +227,6 @@ router.get(
 router.get(
   "/attendance/:id",
   authenticate,
-  authorize(["Admin", "Supervisor", "Employee", "Intern"]),
   getAttendanceById
 );
 
@@ -398,7 +397,7 @@ router.patch(
 router.get(
   "/export", 
   authenticate, 
-  authorize(["Admin", "Supervisor"]), 
+  authorize(["Admin"]), 
   exportUserAttendance
 );
 
@@ -504,7 +503,7 @@ router.get(
 router.get(
   "/export/department",
   authenticate,
-  authorize(["Admin", "Supervisor"]),
+  authorize(["Admin"]),
   exportDepartmentAttendance
 );
 
@@ -624,7 +623,7 @@ router.get(
 router.get(
   "/stats/export", 
   authenticate, 
-  authorize(["Admin", "Supervisor"]), 
+  authorize(["Admin"]), 
   exportAttendanceStatistics
 );
 

@@ -51,7 +51,7 @@ cron.schedule("0 0 * * *", async () => {
       );
     }
 
-    console.log("[RESIGNATION-CRON] Moved to inactive: ${toDeactivate.length}");
+    console.log(`[RESIGNATION-CRON] Moved to inactive: ${toDeactivate.length}`);
   } catch (err) {
     console.error("[RESIGNATION-CRON] Cron job error:", err);
   }

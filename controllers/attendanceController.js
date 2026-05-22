@@ -9,14 +9,16 @@ import { errors as departmentErrors } from "../errors/departmentErrors.js";
 import { errors as attendanceErrors } from "../errors/attendanceErrors.js";
 import { errors as timetableErrors } from "../errors/timetableErrors.js";
 import AppError from "../utils/AppError.js";
-import { buildDateFilter } from "../utils/dateFilter.js";
+import { buildDateFilter } from "../utils/timeHelpers.js";
 import {
   exportCSV,
   exportExcel,
-  sanitize,
-  getPeriodLabel,
 } from "../utils/exportHelpers.js";
-import { exportAttendanceStats } from "../services/attendanceExportService.js";
+import {
+  getPeriodLabel,
+} from "../utils/periodHelpers.js";
+import { slugify } from "../utils/slugify.js";
+import { exportAttendanceStats } from "../utils/attendanceExportHelpers.js";
 import { markPayrollDirty } from "../utils/payrollHelpers.js";
 import { createNotification } from "../services/notificationService.js";
 import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
@@ -679,12 +681,14 @@ export const updateAttendance = async (req, res, next) => {
     });
 
     if (!attendance) {
-      return res.status(404).json(
-        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
-        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
-        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
-        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
-      );
+      return res
+        .status(404)
+        .json(
+          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
+          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
+          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
+          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
+        );
     }
 
     // Get the user for notification and payroll purposes
@@ -692,12 +696,14 @@ export const updateAttendance = async (req, res, next) => {
       "name lastName supervisor_id",
     );
     if (!user) {
-      return res.status(404).json(
-        commonErrors.USER_NOT_FOUND.message,
-        commonErrors.USER_NOT_FOUND.code,
-        commonErrors.USER_NOT_FOUND.errorCode,
-        commonErrors.USER_NOT_FOUND.suggestion,
-      );
+      return res
+        .status(404)
+        .json(
+          commonErrors.USER_NOT_FOUND.message,
+          commonErrors.USER_NOT_FOUND.code,
+          commonErrors.USER_NOT_FOUND.errorCode,
+          commonErrors.USER_NOT_FOUND.suggestion,
+        );
     }
 
     // Mark related payroll as dirty for recalculation
@@ -795,12 +801,14 @@ export const checkOut = async (req, res, next) => {
     );
 
     if (!attendance) {
-      return res.status(404).json(
-        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
-        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
-        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
-        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
-      );
+      return res
+        .status(404)
+        .json(
+          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
+          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
+          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
+          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
+        );
     }
 
     await markPayrollDirty(userId, now, "Check-out recorded");
@@ -846,7 +854,7 @@ export const exportUserAttendance = async (req, res, next) => {
       email: userEmail,
     });
     if (!user) {
-      return res.status(404).json(
+      throw new AppError(
         commonErrors.USER_NOT_FOUND.message,
         commonErrors.USER_NOT_FOUND.code,
         commonErrors.USER_NOT_FOUND.errorCode,
@@ -856,11 +864,20 @@ export const exportUserAttendance = async (req, res, next) => {
 
     // Validate custom
     if (type === "custom" && (!startDate || !endDate)) {
-      return res.status(400).json(
+      throw new AppError(
         attendanceErrors.START_END_DATE_REQUIRED.message,
         attendanceErrors.START_END_DATE_REQUIRED.code,
         attendanceErrors.START_END_DATE_REQUIRED.errorCode,
         attendanceErrors.START_END_DATE_REQUIRED.suggestion,
+      );
+    }
+
+    if (type === "custom" && new Date(startDate) > new Date(endDate)) {
+      throw new AppError(
+        attendanceErrors.START_DATE_AFTER_END_DATE.message,
+        attendanceErrors.START_DATE_AFTER_END_DATE.code,
+        attendanceErrors.START_DATE_AFTER_END_DATE.errorCode,
+        attendanceErrors.START_DATE_AFTER_END_DATE.suggestion,
       );
     }
 
@@ -874,15 +891,15 @@ export const exportUserAttendance = async (req, res, next) => {
       endDate,
     });
 
-    // Fetch records
+    // Fetch the attendance records
     const records = await Attendance.find({
       userId: user._id,
       date: dateFilter,
-    }).sort({ date: 1 }); // Sort by date ascending for better readability in exports
+    }).sort({ date: 1 });
 
     if (records.length === 0) {
-      return res.status(404).json(
-        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
+      throw new AppError(
+        "Attendance records not found",
         attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
         attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
         attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
@@ -922,7 +939,7 @@ export const exportUserAttendance = async (req, res, next) => {
     }
 
     // If the format requested is Invalid
-    return res.status(400).json(
+    throw new AppError(
       attendanceErrors.INVALID_EXPORT_FORMAT.message,
       attendanceErrors.INVALID_EXPORT_FORMAT.code,
       attendanceErrors.INVALID_EXPORT_FORMAT.errorCode,
@@ -953,27 +970,23 @@ export const exportDepartmentAttendance = async (req, res, next) => {
     // Get department and check its existance by name (Because the department names are unique)
     const department = await Department.findOne({ name: departmentName });
     if (!department) {
-      return res
-        .status(404)
-        .json(
-          departmentErrors.DEPARTMENT_NOT_FOUND.message,
-          departmentErrors.DEPARTMENT_NOT_FOUND.code,
-          departmentErrors.DEPARTMENT_NOT_FOUND.errorCode,
-          departmentErrors.DEPARTMENT_NOT_FOUND.suggestion,
-        );
+      throw new AppError(
+        departmentErrors.DEPARTMENT_NOT_FOUND.message,
+        departmentErrors.DEPARTMENT_NOT_FOUND.code,
+        departmentErrors.DEPARTMENT_NOT_FOUND.errorCode,
+        departmentErrors.DEPARTMENT_NOT_FOUND.suggestion,
+      );
     }
 
     // Get all the users in that department
     const users = await User.find({ department_id: department._id });
     if (!users.length) {
-      return res
-        .status(404)
-        .json(
-          commonErrors.USER_NOT_FOUND.message,
-          commonErrors.USER_NOT_FOUND.code,
-          commonErrors.USER_NOT_FOUND.errorCode,
-          commonErrors.USER_NOT_FOUND.suggestion,
-        );
+      throw new AppError(
+        commonErrors.USER_NOT_FOUND.message,
+        commonErrors.USER_NOT_FOUND.code,
+        commonErrors.USER_NOT_FOUND.errorCode,
+        commonErrors.USER_NOT_FOUND.suggestion,
+      );
     }
 
     // Extract user IDs for attendance query
@@ -996,14 +1009,12 @@ export const exportDepartmentAttendance = async (req, res, next) => {
     }).populate("userId", "name lastName");
 
     if (!records.length) {
-      return res
-        .status(404)
-        .json(
-          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
-          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
-          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
-          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
-        );
+      throw new AppError(
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
+      );
     }
 
     // Format the return data for export
@@ -1017,7 +1028,7 @@ export const exportDepartmentAttendance = async (req, res, next) => {
     }));
 
     // Sanitize the department name for the filename
-    const cleanDeptName = sanitize(department.name);
+    const cleanDeptName = slugify(department.name);
 
     // Build the filename (The user name included)
     const periodLabel = getPeriodLabel({
@@ -1044,14 +1055,12 @@ export const exportDepartmentAttendance = async (req, res, next) => {
       return exportExcel(formattedData, res, fileName, includeName);
     }
 
-    res
-      .status(400)
-      .json(
-        attendanceErrors.INVALID_EXPORT_FORMAT.message,
-        attendanceErrors.INVALID_EXPORT_FORMAT.code,
-        attendanceErrors.INVALID_EXPORT_FORMAT.errorCode,
-        attendanceErrors.INVALID_EXPORT_FORMAT.suggestion,
-      );
+    throw new AppError(
+      attendanceErrors.INVALID_EXPORT_FORMAT.message,
+      attendanceErrors.INVALID_EXPORT_FORMAT.code,
+      attendanceErrors.INVALID_EXPORT_FORMAT.errorCode,
+      attendanceErrors.INVALID_EXPORT_FORMAT.suggestion,
+    );
   } catch (error) {
     next(error);
   }
@@ -1076,21 +1085,19 @@ export const exportAttendanceStatistics = async (req, res, next) => {
     let departmentId = null;
 
     // Validate user existance and get the user ID (If the stats export is for a specific user)
-    if (userName) {
+    if (userName & userLastName && userEmail) {
       const user = await User.findOne({
         name: userName,
         lastName: userLastName,
         email: userEmail,
       });
       if (!user) {
-        return res
-          .status(404)
-          .json(
-            commonErrors.USER_NOT_FOUND.message,
-            commonErrors.USER_NOT_FOUND.code,
-            commonErrors.USER_NOT_FOUND.errorCode,
-            commonErrors.USER_NOT_FOUND.suggestion,
-          );
+        throw new AppError(
+          commonErrors.USER_NOT_FOUND.message,
+          commonErrors.USER_NOT_FOUND.code,
+          commonErrors.USER_NOT_FOUND.errorCode,
+          commonErrors.USER_NOT_FOUND.suggestion,
+        );
       }
 
       userId = user._id;
@@ -1100,14 +1107,12 @@ export const exportAttendanceStatistics = async (req, res, next) => {
     if (departmentName) {
       const department = await Department.findOne({ name: departmentName });
       if (!department) {
-        return res
-          .status(404)
-          .json(
-            departmentErrors.DEPARTMENT_NOT_FOUND.message,
-            departmentErrors.DEPARTMENT_NOT_FOUND.code,
-            departmentErrors.DEPARTMENT_NOT_FOUND.errorCode,
-            departmentErrors.DEPARTMENT_NOT_FOUND.suggestion,
-          );
+        throw new AppError(
+          departmentErrors.DEPARTMENT_NOT_FOUND.message,
+          departmentErrors.DEPARTMENT_NOT_FOUND.code,
+          departmentErrors.DEPARTMENT_NOT_FOUND.errorCode,
+          departmentErrors.DEPARTMENT_NOT_FOUND.suggestion,
+        );
       }
       departmentId = department._id;
     }
