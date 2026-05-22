@@ -1033,11 +1033,11 @@ export const approveOrRejectLeaveRequest = async (req, res, next) => {
         for (
           let date = new Date(leaveRequest.startDate);
           date <= leaveRequest.endDate;
-          date.setDate(date.getDate() + 1)
+          date.setUTCDate(date.getUTCDate() + 1)
         ) {
           // Normalize the date to midnight
           const attendanceDate = new Date(date);
-          attendanceDate.setHours(0, 0, 0, 0);
+          attendanceDate.setUTCHours(0, 0, 0, 0);
 
           // Update or create the attendance record for this date to "leave"
           await Attendance.findOneAndUpdate(
