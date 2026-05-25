@@ -1,7 +1,6 @@
 import express from "express";
 import {
   getTimetableByUser,
-  addTimetableEntry,
   updateTimetableEntry,
   bulkUpdateTimetableEntries,
   deleteTimetableEntry,
@@ -19,70 +18,6 @@ const router = express.Router();
  *   - name: Timetable
  *     description: Endpoints for the Timetable (Shift Scheduling) CRUDs
  */  
-
-// Route to add a timetable entry (Admin Only)
-/**
- * @swagger
- * /timetable:
- *   post:
- *     summary: Add a timetable entry (Admin only)
- *     tags: 
- *       - Timetable
- *     description: It allows an admin to create a new timetable entry for a user.
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [userId, date, type]
- *             properties:
- *               userId:
- *                 type: string
- *               date:
- *                 type: string
- *                 format: date-time
- *               type:
- *                 type: string
- *                 enum:
- *                   - Morning Shift
- *                   - Evening Shift
- *                   - Full-time Shift
- *                   - Day Off
- *                   - Special Shift
- *               location:
- *                 type: string
- *                 enum: [Remote, Onsite]
- *               color:
- *                 type: string
- *               startTime:
- *                 type: string
- *                 example: "08:00"
- *               endTime:
- *                 type: string
- *                 example: "16:00"
- *     responses:
- *       201:
- *         description: Timetable entry created successfully
- *       400:
- *         description: Missing/Invalid fields | Duplicate timetable entry for the same date
- *       401:
- *         description: Missing/Invalid token
- *       403:
- *         description: Unauthorized (Admin only)
- *       404:
- *         description: User not found
- *       500:
- *         description: Server Error
- */
-router.post(
-  "/timetable",
-  authenticate,
-  authorize(["Admin"]),
-  addTimetableEntry
-);
 
 // Route to update a timetable entry (Admin Only)
 /**

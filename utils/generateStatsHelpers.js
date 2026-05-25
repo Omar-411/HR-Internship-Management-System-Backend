@@ -11,6 +11,11 @@ import {
 
 // Stat generation function (Grneralized for any period type)
 export const generateStats = async ({ startDate, endDate, periodType }) => {
+  // If startDate or endDate is missing, we cannot generate stats
+  if (!startDate || !endDate) {
+    return;
+  }
+  
   // Fetch all users to calculate stats for each user
   const users = await User.find();
 

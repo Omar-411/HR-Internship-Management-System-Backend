@@ -28,28 +28,35 @@ const timetableSchema = mongoose.Schema(
       default: false,
     },
     startTime: {
-      // Shift Start time in HH:mm format
       type: String,
       required: function () {
-        // Start and end times are required for all shift types except "Day Off"
-        return this.type !== "Day Off";
+        const type =
+          this.type ||
+          this.getUpdate?.()?.type ||
+          this.getUpdate?.()?.$set?.type;
+
+        return type !== "Day Off";
       },
       validate: {
         validator: function (v) {
-          return /^([01]\d|2[0-3]):([0-5]\d)$/.test(v); // Validates the HH:mm format
+          return /^([01]\d|2[0-3]):([0-5]\d)$/.test(v);
         },
         message: "The Start Time must be in HH:mm format",
       },
     },
     endTime: {
-      // Shift End time in HH:mm format
       type: String,
       required: function () {
-        return this.type !== "Day Off";
+        const type =
+          this.type ||
+          this.getUpdate?.()?.type ||
+          this.getUpdate?.()?.$set?.type;
+
+        return type !== "Day Off";
       },
       validate: {
         validator: function (v) {
-          return /^([01]\d|2[0-3]):([0-5]\d)$/.test(v); // Validates the HH:mm format
+          return /^([01]\d|2[0-3]):([0-5]\d)$/.test(v);
         },
         message: "The End Time must be in HH:mm format",
       },
@@ -63,8 +70,12 @@ const timetableSchema = mongoose.Schema(
       type: String,
       enum: ["Remote", "Onsite"],
       required: function () {
-        // Location is required for all shift types except "Day Off"
-        return this.type !== "Day Off";
+        const type =
+          this.type ||
+          this.getUpdate?.()?.type ||
+          this.getUpdate?.()?.$set?.type;
+
+        return type !== "Day Off";
       },
     },
     color: {

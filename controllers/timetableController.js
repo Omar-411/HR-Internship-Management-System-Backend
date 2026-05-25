@@ -7,191 +7,11 @@ import { resolveId } from "../utils/idResolver.js";
 import { createNotification } from "../services/notificationService.js";
 import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
 import { markPayrollDirty } from "../utils/payrollHelpers.js";
-import { isValidTime, isValidLocation } from "../validators/timetableValidators.js";
+import {
+  isValidTime,
+  isValidLocation,
+} from "../validators/timetableValidators.js";
 import { SHIFT_CONFIG } from "../constants/timetableConstants.js";
-
-// Add a new timetable entry (shift) for a user on a specific date: Only used for empty days (Admin only)
-export const addTimetableEntry = async (req, res, next) => {
-  try {
-    const { userId, date, type, location, color, startTime, endTime } =
-      req.body;
-
-    if (!userId || !date || !type) {
-      throw new AppError("Missing required fields (userId, date, type)", 400);
-    }
-
-    // Check the user existence
-    const user = await User.findOne(resolveId(userId)).populate(
-      "role_id",
-      "name",
-    );
-    if (!user) throw new AppError("User not found!", 404);
-
-    const actualUserId = user._id;
-
-    // Normalize the date to UTC to ensure consistency
-    const normalizedDate = new Date(date);
-    if (isNaN(normalizedDate.getTime()))
-      throw new AppError("Invalid date", 400);
-    const dateStr = normalizedDate.toISOString().split("T")[0]; // E.g., "2026-04-04"
-
-    // Check a timetable entry existence for the same user and date
-    const existingEntry = await Timetable.findOne({
-      userId: actualUserId,
-      date: dateStr,
-    });
-    if (existingEntry) {
-      throw new AppError("Timetable already exists for this date!", 400);
-    }
-
-    // Prepare the common shift data
-    let shiftData = { userId: actualUserId, type, date: dateStr, color };
-
-    // Handle the "Day Off" Adding case
-    if (type === "Day Off") {
-      const shift = await Timetable.create(shiftData);
-      console.log("[ADD-TIMETABLE-ENTRY] Day Off created!");
-
-      io.emit("timetableUpdated", { userId: actualUserId });
-
-      if (user.role_id.name === "Employee") {
-        await markPayrollDirty(
-          actualUserId,
-          new Date(),
-          "Day off entry created",
-        );
-      }
-
-      // Send notification to the user about the day off adding
-      try {
-        await createNotification({
-          recipientId: user._id,
-          type: "TIMETABLE",
-          title: "A day off has been added in your timetable",
-          message: `A day off has been added in your timetable at ${shift.date.toDateString()}.`,
-          data: {
-            entityType: "TIMETABLE",
-            entityId: shift._id,
-          },
-        });
-      } catch (error) {
-        console.log("Day off adding notification failed:", error.message);
-      }
-
-      // Notify all admins except the one who added the day off entry
-      try {
-        await createNotificationForAdminsExcept({
-          excludedUserId: req.user.id,
-          type: "TIMETABLE",
-          title: `A day off has been added in ${user.name} ${user.lastName}'s timetable`,
-          message: `A day off for ${user.name} ${user.lastName} on ${shift.date.toDateString()} has been added.`,
-          data: {
-            entityType: "TIMETABLE",
-            entityId: shift._id,
-          },
-        });
-      } catch (err) {
-        console.error(
-          "Failed to send notification for day off adding to admins:",
-          err,
-        );
-      }
-
-      return res.status(201).json({
-        status: "Success",
-        code: 201,
-        message: "Day off created successfully!",
-        data: shift,
-      });
-    }
-
-    // Check the location constraint for working shifts (Morning, Evening, Special, Full-time)
-    if (!location)
-      throw new AppError("Location is required for working shifts!", 400);
-    if (!isValidLocation(location)) {
-      throw new AppError("Invalid location! Must be 'Remote' or 'Onsite'", 400);
-    }
-    shiftData.location = location;
-
-    // Handle the working shifts cases (Morning, Evening, Special, Full-time)
-    if (type === "Special Shift") {
-      if (!startTime || !endTime) {
-        throw new AppError(
-          "Special Shift requires startTime and endTime!",
-          400,
-        );
-      }
-      if (!isValidTime(startTime) || !isValidTime(endTime)) {
-        throw new AppError("Time must be HH:mm format!", 400);
-      }
-      shiftData.startTime = startTime;
-      shiftData.endTime = endTime;
-    }
-    // Handle the Morning, Evening and Full-time shift cases
-    else {
-      const config = SHIFT_CONFIG[type];
-      if (!config) throw new AppError("Invalid shift type!", 400);
-      shiftData = { ...shiftData, ...config };
-    }
-
-    const shift = await Timetable.create(shiftData);
-    console.log(`[ADD-TIMETABLE-ENTRY] ${type} created!`);
-
-    io.emit("timetableUpdated", { userId: actualUserId });
-
-    if (user.role_id.name === "Employee") {
-      await markPayrollDirty(
-        actualUserId,
-        new Date(),
-        "Timetable entry created",
-      );
-    }
-
-    // Send notification to the user about the timetable shift adding
-    try {
-      await createNotification({
-        recipientId: user._id,
-        type: "TIMETABLE",
-        title: "A shift has been added in your timetable",
-        message: `A shift in your timetable at ${shift.date.toDateString()} has been added.`,
-        data: {
-          entityType: "TIMETABLE",
-          entityId: shift._id,
-        },
-      });
-    } catch (error) {
-      console.log("Shift adding notification failed:", error.message);
-    }
-
-    // Notify all admins except the one who added the timetable shift entry
-    try {
-      await createNotificationForAdminsExcept({
-        excludedUserId: req.user.id,
-        type: "TIMETABLE",
-        title: `A shift has been added in ${user.name} ${user.lastName}'s timetable`,
-        message: `A shift for ${user.name} ${user.lastName} on ${shift.date.toDateString()} has been added.`,
-        data: {
-          entityType: "TIMETABLE",
-          entityId: shift._id,
-        },
-      });
-    } catch (err) {
-      console.error(
-        "Failed to send notification for shift adding to admins:",
-        err,
-      );
-    }
-
-    res.status(201).json({
-      status: "Success",
-      code: 201,
-      message: "Timetable entry created successfully!",
-      data: shift,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
 
 // Update timetable entry (shift) for a user on a specific date: For already existing shifts (Admin only)
 export const updateTimetableEntry = async (req, res, next) => {
@@ -208,11 +28,16 @@ export const updateTimetableEntry = async (req, res, next) => {
       specialShiftName,
     } = req.body;
 
-    if (!userId || !date || !type || !location) {
-      throw new AppError(
-        "Missing required fields (userId, date, type, location)",
-        400,
-      );
+    if (!userId || !date || !type) {
+      throw new AppError("Missing required fields (userId, date, type)", 400);
+    }
+
+    if (type !== "Day Off" && !location) {
+      throw new AppError("Location is required for working shifts", 400);
+    }
+
+    if (location && !isValidLocation(location)) {
+      throw new AppError("Invalid location! Must be 'Remote' or 'Onsite'", 400);
     }
 
     // Check the user existance
@@ -229,18 +54,43 @@ export const updateTimetableEntry = async (req, res, next) => {
     const normalizedDate = new Date(date);
     normalizedDate.setUTCHours(0, 0, 0, 0);
 
+    // Prepare shift times
+    let startTime = undefined;
+    let endTime = undefined;
+
+    // Auto-assign times for normal shifts
+    if (SHIFT_CONFIG[type]) {
+      startTime = SHIFT_CONFIG[type].startTime;
+      endTime = SHIFT_CONFIG[type].endTime;
+    }
+
+    // Day Off, then no start and end times
+    if (type === "Day Off") {
+      startTime = undefined;
+      endTime = undefined;
+    }
+
     const shift = await Timetable.findOneAndUpdate(
-      { userId: actualUserId, date: normalizedDate },
+      {
+        userId: actualUserId,
+        date: normalizedDate,
+      },
       {
         type,
-        location,
+        location: type === "Day Off" ? undefined : location,
         color,
         duration,
         specialShiftId,
         specialShiftData,
         specialShiftName,
+        startTime: type === "Day Off" ? undefined : startTime,
+        endTime: type === "Day Off" ? undefined : endTime,
       },
-      { new: true, upsert: true, runValidators: true },
+      {
+        returnDocument: "after",
+        upsert: true,
+        runValidators: true,
+      },
     );
 
     io.emit("timetableUpdated", { userId: actualUserId });
@@ -250,8 +100,8 @@ export const updateTimetableEntry = async (req, res, next) => {
       await createNotification({
         recipientId: user._id,
         type: "TIMETABLE",
-        title: "A shift has been updated in your timetable",
-        message: `A shift in your timetable at ${shift.date.toDateString()} has been updated.`,
+        title: "A shift has been set in your timetable",
+        message: `A shift in your timetable at ${shift.date.toDateString()} has been set.`,
         data: {
           entityType: "TIMETABLE",
           entityId: shift._id,
@@ -266,8 +116,8 @@ export const updateTimetableEntry = async (req, res, next) => {
       await createNotificationForAdminsExcept({
         excludedUserId: req.user.id,
         type: "TIMETABLE",
-        title: `A shift has been updated in ${user.name} ${user.lastName}'s timetable`,
-        message: `A shift for ${user.name} ${user.lastName} on ${shift.date.toDateString()} has been updated.`,
+        title: `A shift has been set in ${user.name} ${user.lastName}'s timetable`,
+        message: `A shift for ${user.name} ${user.lastName} on ${shift.date.toDateString()} has been set.`,
         data: {
           entityType: "TIMETABLE",
           entityId: shift._id,
@@ -284,14 +134,14 @@ export const updateTimetableEntry = async (req, res, next) => {
       await markPayrollDirty(
         actualUserId,
         new Date(),
-        "Timetable entry updated",
+        "Timetable entry set",
       );
     }
 
     res.status(200).json({
       status: "Success",
       code: 200,
-      message: "Timetable entry updated successfully!",
+      message: "Timetable entry set successfully!",
       data: shift,
     });
   } catch (err) {

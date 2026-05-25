@@ -69,8 +69,7 @@ cron.schedule("*/15 * * * *", async () => {
     const timetables = await Timetable.find({
       date: { $gte: today, $lt: tomorrow },
       type: { $ne: "Day Off" },
-      endTime: { $exists: true, $ne: null },
-    });
+    }).populate("specialShiftId");
 
     for (const timetable of timetables) {
       // Skip public holidays
@@ -78,36 +77,82 @@ cron.schedule("*/15 * * * *", async () => {
         continue;
       }
 
-      // Check if an attendance already exists for the employee that day (Check-in, day-off, leave)
+      // Check if attendance already exists
       const existingAttendance = await Attendance.findOne({
         userId: timetable.userId,
         date: { $gte: today, $lt: tomorrow },
       });
 
+      // If already checked in / leave / late / day-off
       if (existingAttendance) {
         continue;
       }
 
-      // Extract the hours and minutes from the timetable's endTime (e.g., "17:00")
+      let endTime = null;
+
+      // NORMAL SHIFTS
       if (
-        !timetable.endTime ||
-        typeof timetable.endTime !== "string" ||
-        !timetable.endTime.includes(":")
+        ["Morning Shift", "Evening Shift", "Full-time Shift"].includes(
+          timetable.type,
+        )
+      ) {
+        endTime = timetable.endTime;
+      }
+
+      // SPECIAL SHIFT
+      else if (timetable.type === "Special Shift") {
+        // CASE 1: Inline custom shift data
+        if (
+          timetable.specialShiftData?.periods?.length
+        ) {
+          const periods = timetable.specialShiftData.periods;
+
+          // Get the latest end time (In case of multiple periods)
+          endTime = periods[periods.length - 1].endTime;
+        }
+
+        // CASE 2: Linked special shift
+        else if (
+          timetable.specialShiftId?.periods?.length
+        ) {
+          const periods = timetable.specialShiftId.periods;
+
+          // Get the latest end time (In case of multiple periods)
+          endTime = periods[periods.length - 1].endTime;
+        }
+      }
+
+      // Skip invalid shifts
+      if (
+        !endTime ||
+        typeof endTime !== "string" ||
+        !endTime.includes(":")
       ) {
         console.warn(
           `[ABSENCE-CRON-JOB] Invalid endTime for timetable ${timetable._id}`,
         );
         continue;
       }
-      const [hours, minutes] = timetable.endTime.split(":");
 
-      // Create a Date object for the shift end time on the timetable's date
+      // Parse HH:mm
+      const [hours, minutes] = endTime.split(":");
+
+      // Create shift end datetime
       const shiftEnd = new Date(timetable.date);
 
-      // Set the hours and minutes for the shift end time in UTC
-      shiftEnd.setUTCHours(Number(hours), Number(minutes), 0, 0);
+      shiftEnd.setUTCHours(
+        Number(hours),
+        Number(minutes),
+        0,
+        0,
+      );
 
-      // If shift has ended and employee never checked in
+      // Add grace period
+      shiftEnd.setUTCMinutes(
+        shiftEnd.getUTCMinutes() + (timetable.gracePeriod || 0),
+      );
+
+      // MARK THE USER AS ABSENT
       if (now > shiftEnd) {
         await Attendance.create({
           userId: timetable.userId,
@@ -115,7 +160,9 @@ cron.schedule("*/15 * * * *", async () => {
           status: "absent",
         });
 
-        console.log(`[ABSENCE-CRON-JOB] Marked absent: ${timetable.userId}`);
+        console.log(
+          `[ABSENCE-CRON-JOB] Marked absent: ${timetable.userId}`,
+        );
       }
     }
 
