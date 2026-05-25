@@ -10,13 +10,8 @@ import { errors as attendanceErrors } from "../errors/attendanceErrors.js";
 import { errors as timetableErrors } from "../errors/timetableErrors.js";
 import AppError from "../utils/AppError.js";
 import { buildDateFilter } from "../utils/timeHelpers.js";
-import {
-  exportCSV,
-  exportExcel,
-} from "../utils/exportHelpers.js";
-import {
-  getPeriodLabel,
-} from "../utils/periodHelpers.js";
+import { exportCSV, exportExcel } from "../utils/exportHelpers.js";
+import { getPeriodLabel } from "../utils/periodHelpers.js";
 import { slugify } from "../utils/slugify.js";
 import { exportAttendanceStats } from "../utils/attendanceExportHelpers.js";
 import { markPayrollDirty } from "../utils/payrollHelpers.js";
@@ -46,6 +41,7 @@ import {
   FACE_ATTESTATION_SECRET,
   faceNonceStore,
 } from "../constants/attendanceConstants.js";
+import { resolveId } from "../utils/idResolver.js";
 
 // Get the list of statuses (Admin/Supervisor)
 export const getAllStatuses = async (req, res, next) => {
@@ -67,81 +63,35 @@ export const getAllStatuses = async (req, res, next) => {
 export const getMyStatus = async (req, res, next) => {
   try {
     const userId = req.user.id;
+
     const { start: today, end: tomorrow } = getUtcDayRange(new Date());
 
-    // Check the user's existence
-    const user = await User.findById(userId);
-    if (!user) {
-      return res
-        .status(404)
-        .json(
-          commonErrors.USER_NOT_FOUND.message,
-          commonErrors.USER_NOT_FOUND.code,
-          commonErrors.USER_NOT_FOUND.errorCode,
-          commonErrors.USER_NOT_FOUND.suggestion,
-        );
-    }
-
-    // Get today's attendance record for the user
-    let attendance = await Attendance.findOne({
+    // Find today's attendance record for the user
+    const attendance = await Attendance.findOne({
       userId,
-      date: { $gte: today, $lt: tomorrow },
-    }).sort({ date: -1 });
-
-    // Legacy/bad-data recovery: find a record updated today that indicates check-in
-    const legacyCheckIn = await Attendance.findOne({
-      userId,
-      updatedAt: { $gte: today, $lt: tomorrow },
-      $or: [
-        { checkInTime: { $exists: true, $ne: null } },
-        { status: { $in: ["present", "late"] } },
-      ],
-    }).sort({ updatedAt: -1 });
-
-    if (!attendance && legacyCheckIn) {
-      attendance = legacyCheckIn;
-      const d = attendance.date ? new Date(attendance.date) : null;
-      const needsRepair = !d || d < today || d >= tomorrow;
-      if (needsRepair) {
-        attendance.date = today;
-        await attendance.save();
-      }
-    } else if (attendance && legacyCheckIn && !indicatesCheckIn(attendance)) {
-      // Merge legacy check-in details into the canonical "today" record
-      attendance.checkInTime =
-        legacyCheckIn.checkInTime || attendance.checkInTime;
-      attendance.checkOutTime =
-        legacyCheckIn.checkOutTime ?? attendance.checkOutTime;
-      attendance.location = legacyCheckIn.location || attendance.location;
-      attendance.workLocation =
-        legacyCheckIn.workLocation || attendance.workLocation;
-      if (
-        legacyCheckIn.status === "present" ||
-        legacyCheckIn.status === "late"
-      ) {
-        attendance.status = legacyCheckIn.status;
-      }
-      await attendance.save();
-    }
+      date: {
+        $gte: today,
+        $lt: tomorrow,
+      },
+    });
 
     if (!attendance) {
       return res.status(200).json({
-        status: "success",
+        status: "Success",
         code: 200,
-        message:
-          "No attendance record found for today. You haven't checked in yet!",
+        message: "No attendance record found for today.",
         data: null,
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       status: "Success",
       code: 200,
-      message: "Attendance record retrieved successfully!",
+      message: "Attendance record retrieved successfully.",
       data: attendance,
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 };
 
@@ -158,51 +108,118 @@ export const getAttendance = async (req, res, next) => {
       search,
       page = 1,
       limit: queryLimit,
+      forSummary,
     } = req.query;
 
+    // Pagination parameters (month by month)
     const parsedPage = Math.max(parseInt(page) || 1, 1);
     const limit = parseInt(queryLimit) || 20;
     const skip = (parsedPage - 1) * limit;
 
-    const filter = {}; // Allow filtering
-
     let targetUserId = userId;
 
-    // Check for user existence if userId is provided
+    // Validate userId if provided (userId is for filtering a user attendance records in the pop up in the calender view)
     if (userId) {
+      // Check the user's existence (In case of a search of a user's attendance records in the calendar view)
       const userMatch = resolveId(userId);
       const user = await User.findOne(userMatch);
       if (!user) {
-        return res.status(404).json({
-          status: "Error",
-          code: 404,
-          message: "User not found!",
-        });
+        throw new AppError(
+          commonErrors.USER_NOT_FOUND.message,
+          commonErrors.USER_NOT_FOUND.code,
+          commonErrors.USER_NOT_FOUND.errorCode,
+          commonErrors.USER_NOT_FOUND.suggestion,
+        );
       }
+
       targetUserId = user._id;
     }
 
-    // Authorization & checking the Identity
-    if (req.user.role === "Admin" || req.user.role === "Supervisor") {
-      if (targetUserId) filter.userId = targetUserId;
-    } else {
-      filter.userId = req.user.id;
+    // ROLE-BASED ACCESS CONTROL
+    const currentUserId = req.user.id;
+    const userRole = req.user.role;
+
+    let allowedUserIds = [];
+
+    // CASE 1: ADMINS (All records)
+    if (userRole === "Admin") {
+      // If userId is provided, filter by that user, otherwise get all records
+      if (userId) {
+        allowedUserIds = [targetUserId];
+      } else {
+        const users = await User.find().select("_id");
+        allowedUserIds = users.map((u) => u._id);
+      }
     }
 
-    // Date Filtering
+    // CASE 2: SUPERVISORS (can access their own records + their team members' records)
+    else if (userRole === "Supervisor") {
+      // Get the supervisor's team members
+      const teamUsers = await User.find({
+        supervisor_id: currentUserId,
+      }).select("_id");
+
+      allowedUserIds = teamUsers.map((u) => u._id);
+
+      if (targetUserId) {
+        // Check if the user is allowed
+        const isAllowed = allowedUserIds.some((id) => id.equals(targetUserId));
+        if (!isAllowed) {
+          throw new AppError(
+            errors.UNAUTHORIZED_TO_ACCESS_RECORD.message,
+            errors.UNAUTHORIZED_TO_ACCESS_RECORD.code,
+            errors.UNAUTHORIZED_TO_ACCESS_RECORD.errorCode,
+            errors.UNAUTHORIZED_TO_ACCESS_RECORD.suggestion,
+          );
+        }
+
+        allowedUserIds = [targetUserId];
+      }
+    }
+
+    // CASE 3: EMPLOYEES/INTERNS (can only access their own records)
+    else {
+      allowedUserIds = [currentUserId];
+    }
+
+    // Build the attendance filter
+    const filter = {};
+
+    if (allowedUserIds.length > 0) {
+      filter.userId = { $in: allowedUserIds };
+    }
+
+    // No attendance records
+    else {
+      return res.status(200).json({
+        status: "Success",
+        code: 200,
+        message: "No attendance records found for this range and filters.",
+        data: [],
+        pagination: {
+          currentPage: parsedPage,
+          totalPages: 0,
+          limitPerPage: limit,
+          totalCount: 0,
+        },
+      });
+    }
+
+    // Date filter
     if (startDate || endDate) {
       filter.date = {};
       if (startDate) filter.date.$gte = getStartOfDay(startDate);
       if (endDate) filter.date.$lte = getEndOfDay(endDate);
     }
 
-    // Status filtering
+    // Status filter
     if (status) {
       filter.status = status;
     }
 
-    // SEARCH & FILTER CONFIGURATION (on Users)
+    // USER SEARCH FILTER (For searching the user name/email in the calendar view)
     const userFilter = {};
+
     if (search) {
       userFilter.$or = [
         { name: { $regex: search, $options: "i" } },
@@ -225,107 +242,17 @@ export const getAttendance = async (req, res, next) => {
       if (deptDoc) userFilter.department_id = deptDoc._id;
     }
 
-    if (req.query.forSummary === "true") {
-      const totalUsers = await User.countDocuments(userFilter);
-
-      const pagedUsers = await User.find(userFilter)
-        .populate("role_id", "name")
-        .populate("department_id", "name")
-        .populate("supervisor_id", "name lastName")
-        .skip(skip)
-        .limit(limit)
-        .lean();
-
-      // Find attendance records for these specific users on the target date
-      const attendanceFilter = {
-        date: {
-          $gte: getStartOfDay(startDate),
-          $lte: getEndOfDay(endDate),
-        },
-      };
-      const userIds = pagedUsers.map((u) => u._id);
-      attendanceFilter.userId = { $in: userIds };
-
-      const records = await Attendance.find(attendanceFilter)
-        .populate({
-          path: "userId",
-          populate: [
-            { path: "role_id", select: "name" },
-            { path: "department_id", select: "name" },
-            { path: "supervisor_id", select: "name lastName" },
-          ],
-        })
-        .lean();
-
-      // Map attendance onto the users (Left Join)
-      const mappedResults = pagedUsers.map((user) => {
-        const record = records.find(
-          (r) => r.userId.toString() === user._id.toString(),
-        );
-        return (
-          record || {
-            userId: {
-              _id: user._id,
-              name: user.name,
-              lastName: user.lastName,
-              email: user.email,
-              role_id: user.role_id,
-              department_id: user.department_id,
-              supervisor_id: user.supervisor_id,
-            },
-            date: getStartOfDay(startDate),
-            status: "absent",
-            checkInTime: null,
-            checkOutTime: null,
-            workLocation: null,
-            isImplicit: true,
-          }
-        );
-      });
-
-      // Special handling: if we return the user object inside 'userId', it matches 'populate' format
-      const finalResults = mappedResults.map((res) => {
-        if (res.isImplicit) {
-          // Flatten user if already populated
-          return res;
-        }
-        // For real records, we need to populate userId manually if not already (though we didn't populate it in find(filter) above)
-        // Actually, for consistency, let's keep the user object in 'userId'
-        return res;
-      });
-
-      // Mandatory Logging
-      // [DEBUG-ATTENDANCE] Total users: X | Users with attendance: Y | Date: selectedDate
-      console.log(
-        `[DEBUG-ATTENDANCE] Total users: ${totalUsers} | Users with attendance: ${records.length} | Page: ${parsedPage} | Date: ${startDate}`,
-      );
-
-      return res.status(200).json({
-        status: "Success",
-        code: 200,
-        data: finalResults,
-        pagination: {
-          currentPage: parsedPage,
-          totalPages: Math.ceil(totalUsers / limit),
-          limitPerPage: limit,
-          totalCount: finalResults.length,
-        },
-      });
-    }
-
-    // ─── Standard 'Record-Centric' Logic (For History / Calendar) ───────────────────
-
-    // Search for users matching the userFilter criteria and get their IDs
-    let userIds = null;
+    // Apply user filter to find matching user IDs for attendance filtering
     if (Object.keys(userFilter).length > 0) {
       const users = await User.find(userFilter).select("_id");
-      userIds = users.map((u) => u._id);
+      const userIds = users.map((u) => u._id);
 
-      // If no users match, then we return an empty result
+      // If no users match the filter, return an empty result immediately
       if (userIds.length === 0) {
         return res.status(200).json({
           status: "Success",
           code: 200,
+          message: "No attendance records found for these filters.",
           data: [],
           pagination: {
             currentPage: parsedPage,
@@ -336,33 +263,11 @@ export const getAttendance = async (req, res, next) => {
         });
       }
 
-      if (filter.userId && !Array.isArray(filter.userId)) {
-        // A specific userId was already set — check if it's in the matched set
-        const specificId = filter.userId.toString();
-        const inSet = userIds.some((id) => id.toString() === specificId);
-        if (!inSet) {
-          return res.status(200).json({
-            status: "Success",
-            code: 200,
-            data: [],
-            pagination: {
-              currentPage: parsedPage,
-              totalPages: 0,
-              limitPerPage: limit,
-              totalCount: 0,
-            },
-          });
-        }
-        // else: keep filter.userId as the specific ID (more precise than $in)
-      } else {
-        filter.userId = { $in: userIds };
-      }
+      filter.userId = { $in: userIds };
     }
 
-    // Get total count for pagination
+    // Fetch the attendance records with pagination
     const totalRecords = await Attendance.countDocuments(filter);
-
-    // Get attendance records
     const attendanceRecords = await Attendance.find(filter)
       .populate({
         path: "userId",
@@ -376,20 +281,28 @@ export const getAttendance = async (req, res, next) => {
       .limit(limit)
       .lean();
 
-    // [PAGINATION-DEBUG] Added log to track backend output
-    console.log(
-      `[PAGINATION] Module: Attendance | Page: ${parsedPage || 1} | Limit: ${limit || 10} | Returned: ${attendanceRecords?.length || 0} records`,
-    );
+    const cleaned = attendanceRecords.map((record) => ({
+      _id: record._id,
+      userId: record.userId?._id,
+      name: record.userId?.name,
+      lastName: record.userId?.lastName,
+      role: record.userId?.role_id?.name,
+      department: record.userId?.department_id?.name,
+      status: record.status,
+      checkInTime: record.checkInTime,
+      checkOutTime: record.checkOutTime,
+      date: record.date,
+    }));
 
     return res.status(200).json({
       status: "Success",
       code: 200,
-      data: attendanceRecords,
+      data: cleaned,
       pagination: {
         currentPage: parsedPage,
         totalPages: Math.ceil(totalRecords / limit),
         limitPerPage: limit,
-        totalCount: attendanceRecords.length,
+        totalCount: totalRecords,
       },
     });
   } catch (error) {
@@ -400,6 +313,8 @@ export const getAttendance = async (req, res, next) => {
 export const getAttendanceById = async (req, res, next) => {
   try {
     const { id } = req.params;
+
+    // Check the attendance record's existence
     const record = await Attendance.findById(id).populate({
       path: "userId",
       populate: [
@@ -409,13 +324,16 @@ export const getAttendanceById = async (req, res, next) => {
     });
 
     if (!record) {
-      return res
-        .status(404)
-        .json({ status: "Error", message: "Attendance record not found!" });
+      throw new AppError(
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
+      );
     }
 
     const requesterId = String(req.user.id);
-    const recordOwnerId = String(record.userId._id || record.userId);
+    const recordOwnerId = String(record.userId._id);
     const role = req.user.role;
 
     if (
@@ -423,16 +341,32 @@ export const getAttendanceById = async (req, res, next) => {
       role !== "Supervisor" &&
       requesterId !== recordOwnerId
     ) {
-      return res
-        .status(403)
-        .json({ status: "Error", message: "Unauthorized!" });
+      throw new AppError(
+        attendanceErrors.UNAUTHORIZED_TO_ACCESS_RECORD.message,
+        attendanceErrors.UNAUTHORIZED_TO_ACCESS_RECORD.code,
+        attendanceErrors.UNAUTHORIZED_TO_ACCESS_RECORD.errorCode,
+        attendanceErrors.UNAUTHORIZED_TO_ACCESS_RECORD.suggestion,
+      );
     }
+
+    const cleanedRecord = {
+      _id: record._id,
+      userId: record.userId._id,
+      name: record.userId.name,
+      lastName: record.userId.lastName,
+      role: record.userId.role_id.name,
+      department: record.userId.department_id.name,
+      status: record.status,
+      checkInTime: record.checkInTime,
+      checkOutTime: record.checkOutTime,
+      date: record.date,
+    };
 
     res.status(200).json({
       status: "Success",
       code: 200,
       message: "Attendance record retrieved successfully!",
-      data: record,
+      data: cleanedRecord,
     });
   } catch (error) {
     next(error);
@@ -681,14 +615,12 @@ export const updateAttendance = async (req, res, next) => {
     });
 
     if (!attendance) {
-      return res
-        .status(404)
-        .json(
-          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
-          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
-          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
-          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
-        );
+      throw new AppError(
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
+      );
     }
 
     // Get the user for notification and payroll purposes
@@ -696,14 +628,12 @@ export const updateAttendance = async (req, res, next) => {
       "name lastName supervisor_id",
     );
     if (!user) {
-      return res
-        .status(404)
-        .json(
-          commonErrors.USER_NOT_FOUND.message,
-          commonErrors.USER_NOT_FOUND.code,
-          commonErrors.USER_NOT_FOUND.errorCode,
-          commonErrors.USER_NOT_FOUND.suggestion,
-        );
+      throw new AppError(
+        commonErrors.USER_NOT_FOUND.message,
+        commonErrors.USER_NOT_FOUND.code,
+        commonErrors.USER_NOT_FOUND.errorCode,
+        commonErrors.USER_NOT_FOUND.suggestion,
+      );
     }
 
     // Mark related payroll as dirty for recalculation
@@ -773,14 +703,12 @@ export const checkOut = async (req, res, next) => {
     // Check the user's existance
     const user = await User.findById(userId);
     if (!user) {
-      return res
-        .status(404)
-        .json(
-          commonErrors.USER_NOT_FOUND.message,
-          commonErrors.USER_NOT_FOUND.code,
-          commonErrors.USER_NOT_FOUND.errorCode,
-          commonErrors.USER_NOT_FOUND.suggestion,
-        );
+      throw new AppError(
+        commonErrors.USER_NOT_FOUND.message,
+        commonErrors.USER_NOT_FOUND.code,
+        commonErrors.USER_NOT_FOUND.errorCode,
+        commonErrors.USER_NOT_FOUND.suggestion,
+      );
     }
 
     const checkOutTime = now.toLocaleTimeString("en-US", {
@@ -801,14 +729,12 @@ export const checkOut = async (req, res, next) => {
     );
 
     if (!attendance) {
-      return res
-        .status(404)
-        .json(
-          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
-          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
-          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
-          attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
-        );
+      throw new AppError(
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.message,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.code,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.errorCode,
+        attendanceErrors.ATTENDANCE_RECORD_NOT_FOUND.suggestion,
+      );
     }
 
     await markPayrollDirty(userId, now, "Check-out recorded");

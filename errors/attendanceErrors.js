@@ -29,4 +29,10 @@ export const errors = {
     errorCode: "START_DATE_AFTER_END_DATE",
     suggestion: "Please ensure the start date is before the end date.",
   },
+  UNAUTHORIZED_TO_ACCESS_RECORD: {
+    message: "You are not authorized to access this (these) attendance record(s)",
+    code: 403,
+    errorCode: "UNAUTHORIZED_TO_ACCESS_RECORD",
+    suggestion: "You canot access this (these) attendance record(s)",
+  }
 };

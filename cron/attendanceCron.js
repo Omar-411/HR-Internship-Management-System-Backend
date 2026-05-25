@@ -65,6 +65,8 @@ cron.schedule("*/15 * * * *", async () => {
     const tomorrow = new Date(today);
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
+    let absenceCount = 0;
+
     // Get all today's working timetables
     const timetables = await Timetable.find({
       date: { $gte: today, $lt: tomorrow },
@@ -163,10 +165,11 @@ cron.schedule("*/15 * * * *", async () => {
         console.log(
           `[ABSENCE-CRON-JOB] Marked absent: ${timetable.userId}`,
         );
+        absenceCount++;
       }
     }
 
-    console.log("[ABSENCE-CRON-JOB] Absence detection completed.");
+    console.log(`[ABSENCE-CRON-JOB] Absence detection completed. Total absent: ${absenceCount}`);
   } catch (err) {
     console.error("[ABSENCE-CRON-JOB] Absence cron error:", err);
   }
