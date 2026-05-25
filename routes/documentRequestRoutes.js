@@ -3,15 +3,12 @@ import {
   createDocumentRequest,
   getAllDocumentRequests,
   getDocumentRequestById,
-  editDocumentRequest,
   deleteDocumentRequest,
   markDocumentRequestAsFulfilled,
   rejectDocumentRequest,
   uploadDocumentFulfillRequest,
   consultDocumentFulfillRequest,
   downloadDocumentFulfillRequest,
-  deleteDocumentFulfillRequest,
-  getDocumentsFulfillRequest,
 } from "../controllers/documentRequestController.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
@@ -31,9 +28,6 @@ router.get("/document-request/:id", authenticate, getDocumentRequestById);
 
 // Create a new document request
 router.post("/document-requests", authenticate, createDocumentRequest);
-
-// Edit a document request
-router.patch("/document-requests/:id", authenticate, editDocumentRequest);
 
 // Delete a document request
 router.delete("/document-requests/:id", authenticate, deleteDocumentRequest);
@@ -72,20 +66,6 @@ router.get(
   "/document-requests/:id/download",
   authenticate,
   downloadDocumentFulfillRequest,
-);
-
-// Delete a document to fullfill a document request
-router.delete(
-  "/document-requests/:id/delete",
-  authenticate,
-  deleteDocumentFulfillRequest,
-);
-
-// Get all documents that fulfill a document request
-router.get(
-  "/document-requests/:id/documents",
-  authenticate,
-  getDocumentsFulfillRequest,
 );
 
 export default router;

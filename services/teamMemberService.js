@@ -29,14 +29,14 @@ export const getTeamRoles = async () => {
 
 // Get all team members added to a team
 export const getProjectTeamMembers = async (queryParams, teamId, user) => {
-  console.log("TEAM FETCH TRACE - ID RECEIVED:", teamId);
+  console.log("[TEAM-FETCH-TRACE] - ID RECEIVED:", teamId);
 
   // Resolve projectId (teamId here is the projectId from the route)
   const projectMatch = resolveId(teamId);
   const Project = mongoose.model("Project");
   const projectExists = await Project.findOne(projectMatch);
   console.log(
-    "TEAM FETCH TRACE - PROJECT EXISTS:",
+    "[TEAM-FETCH-TRACE] - PROJECT EXISTS:",
     projectExists ? "YES" : "NO",
   );
 
@@ -54,11 +54,13 @@ export const getProjectTeamMembers = async (queryParams, teamId, user) => {
     "projectId",
   );
 
+  console.log("[TEAM-FETCH-TRACE] - TEAM FOUND:", team ? "YES" : "NO");
+
   if (!team) {
     const projObjectId = projectExists._id;
 
     // Auto-create team if missing to ensure UI continuity
-    console.log(`⚠️ TEAM FETCH TRACE - Auto-creating team for ${teamId}`);
+    console.log(`[TEAM-FETCH-TRACE] - Auto-creating team for ${teamId}`);
     team = await Team.create({
       name: `${projectExists.name} Team`,
       projectId: projObjectId,
@@ -66,7 +68,7 @@ export const getProjectTeamMembers = async (queryParams, teamId, user) => {
 
     // CRITICAL: Update the project with the new team_id
     console.log(
-      `⚠️ TEAM FETCH TRACE - Linking team ${team._id} to project ${projObjectId}`,
+      `[TEAM-FETCH-TRACE] - Linking team ${team._id} to project ${projObjectId}`,
     );
     await Project.findByIdAndUpdate(projObjectId, { team_id: team._id });
 
@@ -74,7 +76,7 @@ export const getProjectTeamMembers = async (queryParams, teamId, user) => {
     team = await Team.findById(team._id).populate("projectId");
   }
 
-  console.log("TEAM FETCH TRACE - FINAL TEAM OBJECT:", {
+  console.log("[TEAM-FETCH-TRACE] - FINAL TEAM OBJECT:", {
     teamId: team?._id,
     projectId: team?.projectId?._id || team?.projectId,
   });
@@ -104,7 +106,7 @@ export const getProjectTeamMembers = async (queryParams, teamId, user) => {
     "--v -teamId",
   )(finalQuery);
 
-  console.log("TEAM FETCH TRACE - MEMBERS FOUND:", result?.data?.length || 0);
+  console.log("[TEAM-FETCH-TRACE] - MEMBERS FOUND:", result?.data?.length || 0);
 
   // Get the list of team members
   const members = result.data;
@@ -267,7 +269,7 @@ export const addTeamMember = async (teamId, userId, role, currentUser) => {
   }
 
   // Check if the new team member has as supervisor (supervisor_id) = the project product owner
-  const userMatch = resolveId(userId);
+  const userMatch = resolveId(userId).populate("role_id", "name");
   const teamMember = await User.findOne(userMatch);
   if (
     !teamMember ||
@@ -314,6 +316,16 @@ export const addTeamMember = async (teamId, userId, role, currentUser) => {
       role: "Scrum Master",
     });
     if (existingScrumMaster) {
+      throw new AppError(
+        projectErrors.INVALID_SCRUM_MASTER.message,
+        projectErrors.INVALID_SCRUM_MASTER.code,
+        projectErrors.INVALID_SCRUM_MASTER.errorCode,
+        projectErrors.INVALID_SCRUM_MASTER.suggestion,
+      );
+    }
+
+    // Check if the new team member has the "Employee" role, since only an employee can be a scrum master
+    if (teamMember.role_id.name !== "Employee") {
       throw new AppError(
         projectErrors.INVALID_SCRUM_MASTER.message,
         projectErrors.INVALID_SCRUM_MASTER.code,
@@ -619,162 +631,5 @@ export const removeTeamMember = async (teamMemberId, currentUser) => {
     status: "Success",
     code: 200,
     message: "Team member removed successfully",
-  };
-};
-
-// Replace a team member with another user in the team
-export const replaceTeamMember = async (
-  oldMemberId,
-  newUserId,
-  currentUser,
-) => {
-  // Check the old team member existence
-  const oldMember = await TeamMember.findById(oldMemberId).populate({
-    path: "teamId",
-    populate: { path: "projectId" },
-  });
-  if (!oldMember)
-    throw new AppError(
-      commonErrors.USER_NOT_FOUND.message,
-      commonErrors.USER_NOT_FOUND.code,
-      commonErrors.USER_NOT_FOUND.errorCode,
-      commonErrors.USER_NOT_FOUND.suggestion,
-    );
-
-  // Get the project object
-  const project = oldMember.teamId.projectId;
-
-  // Authorize only the Product Owner of the project to replace team members
-  if (project.productOwnerId.toString() !== currentUser.id.toString()) {
-    throw new AppError(
-      errors.UNAUTHORIZED_TO_REPLACE_TEAM_MEMBER.message,
-      errors.UNAUTHORIZED_TO_REPLACE_TEAM_MEMBER.code,
-      errors.UNAUTHORIZED_TO_REPLACE_TEAM_MEMBER.errorCode,
-      errors.UNAUTHORIZED_TO_REPLACE_TEAM_MEMBER.suggestion,
-    );
-  }
-
-  // Check if the new user exists and has as a supervisor (supervisor_id) = the project product owner
-  const newUserMatch = resolveId(newUserId);
-  const newUser = await User.findOne(newUserMatch);
-  if (
-    !newUser ||
-    newUser.supervisor_id?.toString() !== project.productOwnerId.toString()
-  ) {
-    throw new AppError(
-      commonErrors.USER_NOT_FOUND.message,
-      commonErrors.USER_NOT_FOUND.code,
-      commonErrors.USER_NOT_FOUND.errorCode,
-      commonErrors.USER_NOT_FOUND.suggestion,
-    );
-  }
-
-  // Check if the new user is already a member of the team
-  const existingMember = await TeamMember.findOne({
-    teamId: oldMember.teamId._id,
-    userId: newUser._id,
-  });
-  if (existingMember) {
-    throw new AppError(
-      errors.TEAM_MEMBER_ALREADY_EXISTS.message,
-      errors.TEAM_MEMBER_ALREADY_EXISTS.code,
-      errors.TEAM_MEMBER_ALREADY_EXISTS.errorCode,
-      errors.TEAM_MEMBER_ALREADY_EXISTS.suggestion,
-    );
-  }
-
-  // Check if the new user is available to take on a new project
-  if (!isUserAvailable(newUser)) {
-    throw new AppError(
-      commonErrors.USER_UNAVAILABLE.message,
-      commonErrors.USER_UNAVAILABLE.code,
-      commonErrors.USER_UNAVAILABLE.errorCode,
-      commonErrors.USER_UNAVAILABLE.suggestion,
-    );
-  }
-
-  // Create new member
-  const newMember = await TeamMember.create({
-    teamId: oldMember.teamId._id,
-    userId: newUser._id,
-    role: oldMember.role,
-  });
-
-  // Update the projectsCount of the old and new users if the project is active
-  if (project.status === "Active") {
-    // increment the new user's projectsCount
-    const updated = await User.findOneAndUpdate(
-      { _id: newUser._id, projectsCount: { $lt: 2 } },
-      { $inc: { projectsCount: 1 } },
-    );
-    if (!updated) {
-      throw new AppError(
-        commonErrors.USER_UNAVAILABLE.message,
-        commonErrors.USER_UNAVAILABLE.code,
-        commonErrors.USER_UNAVAILABLE.errorCode,
-        "New user already has 2 active projects",
-      );
-    }
-
-    // decrement the old user's projectsCount
-    await User.updateOne(
-      { _id: oldMember.userId, projectsCount: { $gt: 0 } },
-      { $inc: { projectsCount: -1 } },
-    );
-  }
-
-  // Transfer the tasks
-  await Task.updateMany(
-    { assignedTo: oldMember.userId, projectId: project._id },
-    { $set: { assignedTo: newUser._id } },
-  );
-
-  // Deactivate the old team member
-  oldMember.isActiveInProject = false;
-  await oldMember.save();
-
-  // Notify the deactivated team member
-  try {
-    await createNotification({
-      recipientId: oldMember.userId,
-      type: "TEAM_MEMBER",
-      title: "Deactivation from project team",
-      message: `You have been deactivated for the moment from the team for the project "${project.name}".`,
-      data: {
-        entityType: "Project",
-        entityId: project._id,
-      },
-    });
-  } catch (err) {
-    console.error(
-      "Failed to send notification for the team member deactivation:",
-      err,
-    );
-  }
-
-  // Notify the new team member
-  try {
-    await createNotification({
-      recipientId: newUser._id,
-      type: "TEAM_MEMBER",
-      title: "Added to project team",
-      message: `You have been added to the team for the project "${project.name}".`,
-      data: {
-        entityType: "Project",
-        entityId: project._id,
-      },
-    });
-  } catch (err) {
-    console.error(
-      "Failed to send notification for the team member addition:",
-      err,
-    );
-  }
-
-  return {
-    status: "Success",
-    message: "Team member replaced successfully",
-    code: 200,
-    data: newMember,
   };
 };

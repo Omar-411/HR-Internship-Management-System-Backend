@@ -3,7 +3,6 @@ import {
     addTeamMember,
     updateTeamMember,
     removeTeamMember,
-    replaceTeamMember,
     getProjectTeamMembers,
     getSupervisorTeamMembers,
 } from "../controllers/teamMemberController.js";
@@ -35,8 +34,5 @@ router.patch("/team-members/:teamMemberId", authenticate, authorize(["Supervisor
 
 // Route to remove a team member from the team
 router.delete("/team-members/:teamMemberId", authenticate, authorize(["Supervisor"]), removeTeamMember);
-
-// Route to replace a team member with another user
-router.patch("/team-members/replace/:teamMemberId", authenticate, authorize(["Supervisor"]), replaceTeamMember);
 
 export default router;

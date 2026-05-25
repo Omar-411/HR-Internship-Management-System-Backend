@@ -49,23 +49,6 @@ export const getDocumentRequestById = async (req, res, next) => {
   }
 };
 
-// Edit a document request
-export const editDocumentRequest = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const result = await documentRequestService.editDocumentRequest(
-      id,
-      req.body,
-      req.user,
-    );
-
-    res.status(result.code).json(result);
-  } catch (err) {
-    next(err);
-  }
-};
-
 // Delete a document request
 export const deleteDocumentRequest = async (req, res, next) => {
   try {
@@ -97,23 +80,6 @@ export const markDocumentRequestAsFulfilled = async (req, res, next) => {
   }
 };
 
-// Upload a document to fulfill a document request
-export const uploadDocumentFulfillRequest = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const result = await projectDocumentService.uploadDocumentForRequest(
-      id,
-      req.file,
-      req.user,
-    );
-
-    res.status(result.code).json(result);
-  } catch (err) {
-    next(err);
-  }
-};
-
 // Reject a document request
 export const rejectDocumentRequest = async (req, res, next) => {
   try {
@@ -123,6 +89,23 @@ export const rejectDocumentRequest = async (req, res, next) => {
     const result = await documentRequestService.rejectDocumentRequest(
       id,
       comment,
+      req.user,
+    );
+
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Upload a document to fulfill a document request
+export const uploadDocumentFulfillRequest = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const result = await projectDocumentService.uploadDocumentForRequest(
+      id,
+      req.file,
       req.user,
     );
 
@@ -182,37 +165,3 @@ export const downloadDocumentFulfillRequest = async (req, res, next) => {
     if (!res.headersSent) next(err);
   }
 };
-
-// Delete a document related to the document request
-export const deleteDocumentFulfillRequest = async (req, res, next) => {
-  try {
-    const { id: documentId } = req.params;
-
-    const result = await projectDocumentService.deleteDocumentForRequest(
-      documentId,
-      req.user,
-    );
-
-    res.status(result.code).json(result);
-  } catch (err) {
-    next(err);
-  }
-};
-
-// Get all documents by request
-export const getDocumentsFulfillRequest = async (req, res, next) => {
-  try {
-    const { id: requestId } = req.params;
-
-    const result = await projectDocumentService.getDocumentsByRequest(
-      requestId,
-      req.user,
-      req.query,
-    );
-
-    res.status(result.code).json(result);
-  } catch (err) {
-    next(err);
-  }
-};
-

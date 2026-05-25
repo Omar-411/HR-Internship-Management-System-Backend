@@ -95,21 +95,3 @@ export const removeTeamMember = async (req, res, next) => {
     next(err);
   }
 };
-
-// Replace a team member with another user (In the tasks)
-export const replaceTeamMember = async (req, res, next) => {
-  try {
-    const { teamMemberId } = req.params; // ID of the team member to be replaced
-    const { newUserId } = req.body; // ID of the new user to replace the old team member
-
-    const result = await teamMemberService.replaceTeamMember(
-      teamMemberId,
-      newUserId,
-      req.user
-    );
-
-    res.status(result.code).json(result);
-  } catch (err) {
-    next(err);
-  }
-};

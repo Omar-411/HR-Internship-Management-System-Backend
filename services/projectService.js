@@ -15,7 +15,6 @@ import {
   buildProjectMatchFilter,
   buildProjectAccessMatch,
   validateCreateProject,
-  validateTeamMembers,
   normalizeProjectRequirements,
   applyProjectUpdates,
 } from "../utils/projectHelpers.js";
@@ -464,71 +463,21 @@ export const createProject = async (data, user) => {
 
     const createdTeam = team[0];
 
-    // Prepare the team members (Including the Scrum Master if provided)
-    const membersToInsert = [
-      ...(scrumMasterId
-        ? [
-            {
-              teamId: createdTeam._id,
-              userId: scrumMasterId,
-              role: "Scrum Master",
-            },
-          ]
-        : []),
-      ...teamMembers.map((m) => ({
-        teamId: createdTeam._id,
-        userId: m.userId,
-        role: m.role,
-      })),
-    ];
-
-    let createdMembers = [];
-
-    if (membersToInsert.length > 0) {
-      await validateTeamMembers(membersToInsert, teamMembers, productOwnerId);
-
-      createdMembers = await TeamMember.insertMany(membersToInsert, {
-        session,
-      });
-    }
-
     // Link the team to the project
     createdProject.team_id = createdTeam._id;
     await createdProject.save({ session });
 
     // Commit the transaction
     await session.commitTransaction();
-
-    // Notify the assigned members (If any)
-    try {
-      await notifyProjectMembers({
-        projectId: createdProject._id,
-        excludedUserIds: [productOwnerId],
-        type: "PROJECT",
-        title: "New Project Assignment",
-        message: `You have been assigned to the project "${createdProject.name}".`,
-        data: {
-          entityType: "PROJECT",
-          entityId: createdProject._id,
-        },
-      });
-    } catch (err) {
-      console.error(
-        "Failed to notify project members of the project creation:",
-        err,
-      );
-    }
-
     session.endSession();
 
     return {
       status: "Success",
       code: 201,
-      message: "Project created successfully!",
+      message: "Project created successfully and AI evaluation initiated!",
       data: {
         project: createdProject,
         team: createdTeam,
-        teamMembers: createdMembers,
       },
     };
   } catch (err) {
