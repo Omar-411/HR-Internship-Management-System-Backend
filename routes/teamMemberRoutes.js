@@ -16,9 +16,6 @@ const router = express.Router();
 // Route to get all possible team roles
 router.get("/team-roles", authenticate, getTeamRoles);
 
-// Route to get all team members of a project
-router.get("/team-members/:teamId", authenticate, getProjectTeamMembers);
-
 // Route to get team members (Supervisor/admin only)
 router.get(
   "/team-members/supervisor/:id",  
@@ -26,6 +23,9 @@ router.get(
   authorize(["Admin", "Supervisor"]),
   getSupervisorTeamMembers
 );
+
+// Route to get all team members of a project
+router.get("/team-members/:teamId", authenticate, getProjectTeamMembers);
 
 // Route to add a new team member to the team
 router.post("/team-members/:teamId", authenticate, authorize(["Supervisor"]), addTeamMember);

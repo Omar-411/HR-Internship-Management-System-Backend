@@ -33,6 +33,14 @@ const projectSchema = mongoose.Schema(
     description: {
       type: String,
     },
+    requiredTech: {
+      type: [String],
+      default: [],
+    },
+    rolesNeeded: {
+      type: [String],
+      default: [],
+    },
     status: {
       type: String,
       enum: ["Planning", "Active", "Completed", "On Hold", "Archived"],
@@ -68,6 +76,28 @@ const projectSchema = mongoose.Schema(
     team_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Team",
+    },
+    aiEvaluationStatus: {
+      type: String,
+      enum: ["Pending", "Generated", "Failed"],
+      default: "Pending",
+    },
+    aiEvaluationResult: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    aiEvaluationError: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    aiEvaluatedAt: {
+      type: Date,
+      default: null,
+    },
+    aiEvaluatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
   },
   {

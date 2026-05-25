@@ -12,10 +12,11 @@ const authorize = (roles = [], options = {}) => {
       // Check the Role Permission
       const allowedRoles = Array.isArray(roles) ? roles : [roles];
       const userRole = (user.role || "").toString().trim().toLowerCase();
+      const normalizedUserRole = userRole === "hr" ? "admin" : userRole;
       
-      console.log(`[AUTH-DEBUG] Path: ${req.originalUrl}, UserRole: "${user.role}", Normalized: "${userRole}", Allowed: ${JSON.stringify(allowedRoles)}`);
+      console.log(`[AUTH-DEBUG] Path: ${req.originalUrl}, UserRole: "${user.role}", Normalized: "${normalizedUserRole}", Allowed: ${JSON.stringify(allowedRoles)}`);
 
-      if (allowedRoles.some(r => r.trim().toLowerCase() === userRole)) {
+      if (allowedRoles.some(r => r.trim().toLowerCase() === normalizedUserRole)) {
         return next();
       }
 

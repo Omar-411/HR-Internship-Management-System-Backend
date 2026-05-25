@@ -16,6 +16,7 @@ import {
   buildProjectAccessMatch,
   validateCreateProject,
   validateTeamMembers,
+  normalizeProjectRequirements,
   applyProjectUpdates,
 } from "../utils/projectHelpers.js";
 import {
@@ -67,6 +68,7 @@ export const getAllProjects = async (req) => {
     startDate,
     endDate,
     archived = "false",
+    aiEvaluationStatus,
   } = req.query;
 
   const limit = 12; // 12 projects per page
@@ -87,6 +89,7 @@ export const getAllProjects = async (req) => {
     startDate,
     endDate,
     archived,
+    aiEvaluationStatus,
   });
 
   // Aggregate the project info with the related data (Product owner, Team members, Current sprint, Tasks stats).
@@ -214,6 +217,8 @@ export const getAllProjects = async (req) => {
       $project: {
         name: 1,
         description: 1,
+        requiredTech: 1,
+        rolesNeeded: 1,
         sector: 1,
         status: 1,
         startDate: 1,
@@ -236,6 +241,9 @@ export const getAllProjects = async (req) => {
         totalTasks: 1,
         completedTasks: 1,
         progress: 1,
+        aiEvaluationStatus: { $ifNull: ["$aiEvaluationStatus", "Pending"] },
+        aiEvaluatedAt: 1,
+        aiEvaluatedBy: 1,
       },
     },
 
@@ -354,6 +362,7 @@ export const getProjectById = async (projectId, user) => {
         tasksCount: { $size: "$tasks" },
         sprintsCount: { $size: "$sprints" },
         documentsCount: { $size: "$documents" },
+        aiEvaluationStatus: { $ifNull: ["$aiEvaluationStatus", "Pending"] },
       },
     },
 
@@ -407,6 +416,8 @@ export const createProject = async (data, user) => {
       name,
       sector,
       description,
+      requiredTech = [],
+      rolesNeeded = [],
       startDate,
       dueDate,
       scrumMasterId,
@@ -427,6 +438,8 @@ export const createProject = async (data, user) => {
           sector,
           status: "Planning",
           description,
+          requiredTech: normalizeProjectRequirements(requiredTech),
+          rolesNeeded: normalizeProjectRequirements(rolesNeeded),
           startDate,
           dueDate,
           productOwnerId,

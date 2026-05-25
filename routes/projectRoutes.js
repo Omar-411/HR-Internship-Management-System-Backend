@@ -10,6 +10,8 @@ import {
     restoreProject,
     deleteProject,
     getProjectOverview,
+    getProjectAiEvaluation,
+    evaluateProjectCandidates,
 } from "../controllers/projectController.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
@@ -27,6 +29,12 @@ router.get("/projects", authenticate, getAllProjects);
 
 // Route to get project overview (Stats about sprints, tasks, velocity, etc.)
 router.get("/projects/:id/overview", authenticate, getProjectOverview);
+
+// Route to evaluate and rank project candidates using the AI matching model
+router.post("/projects/:id/ai-evaluation", authenticate, authorize(["Admin", "Supervisor"]), evaluateProjectCandidates);
+
+// Route to get the saved project AI evaluation state/result
+router.get("/projects/:id/ai-evaluation", authenticate, authorize(["Admin", "Supervisor"]), getProjectAiEvaluation);
 
 // Route to get a specific project by ID
 router.get("/projects/:id", authenticate, getProjectById);

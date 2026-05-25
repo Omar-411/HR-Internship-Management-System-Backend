@@ -60,6 +60,7 @@ export const buildProjectMatchFilter = async ({
   startDate,
   endDate,
   archived,
+  aiEvaluationStatus,
 }) => {
   const match = {};
 
@@ -106,6 +107,33 @@ export const buildProjectMatchFilter = async ({
     });
 
     match.productOwnerId = user ? user._id : null;
+  }
+
+  if (aiEvaluationStatus) {
+    const allowedAiStatuses = Project.schema.path("aiEvaluationStatus").enumValues;
+    if (!allowedAiStatuses.includes(aiEvaluationStatus)) {
+      throw new AppError(
+        errors.INVALID_AI_EVALUATION_STATUS.message,
+        errors.INVALID_AI_EVALUATION_STATUS.code,
+        errors.INVALID_AI_EVALUATION_STATUS.errorCode,
+        errors.INVALID_AI_EVALUATION_STATUS.suggestion,
+      );
+    }
+
+    if (aiEvaluationStatus === "Pending") {
+      match.$and = [
+        ...(match.$and || []),
+        {
+          $or: [
+            { aiEvaluationStatus: "Pending" },
+            { aiEvaluationStatus: { $exists: false } },
+            { aiEvaluationStatus: null },
+          ],
+        },
+      ];
+    } else {
+      match.aiEvaluationStatus = aiEvaluationStatus;
+    }
   }
 
   return match;
@@ -159,7 +187,7 @@ export const buildProjectAccessMatch = async (projectId, userId, role) => {
 
 // Validate input data for creating a project
 export const validateCreateProject = async (data, productOwnerId) => {
-  const { name, sector, startDate, dueDate, scrumMasterId } = data;
+  const { name, sector, startDate, dueDate, scrumMasterId, requiredTech, rolesNeeded } = data;
 
   // Check for required fields
   if (!name || !sector || !startDate || !dueDate) {
@@ -190,6 +218,20 @@ export const validateCreateProject = async (data, productOwnerId) => {
       errors.INVALID_SECTOR.code,
       errors.INVALID_SECTOR.errorCode,
       errors.INVALID_SECTOR.suggestion,
+    );
+  }
+
+  if (
+    (requiredTech !== undefined && !Array.isArray(requiredTech)) ||
+    (rolesNeeded !== undefined && !Array.isArray(rolesNeeded)) ||
+    (Array.isArray(requiredTech) && requiredTech.some((value) => typeof value !== "string")) ||
+    (Array.isArray(rolesNeeded) && rolesNeeded.some((value) => typeof value !== "string"))
+  ) {
+    throw new AppError(
+      errors.INVALID_REQUIREMENTS.message,
+      errors.INVALID_REQUIREMENTS.code,
+      errors.INVALID_REQUIREMENTS.errorCode,
+      errors.INVALID_REQUIREMENTS.suggestion,
     );
   }
 
@@ -245,6 +287,34 @@ export const validateCreateProject = async (data, productOwnerId) => {
       );
     }
   }
+};
+
+export const normalizeProjectRequirements = (values = []) => {
+  if (
+    !Array.isArray(values) ||
+    values.some((value) => typeof value !== "string")
+  ) {
+    throw new AppError(
+      errors.INVALID_REQUIREMENTS.message,
+      errors.INVALID_REQUIREMENTS.code,
+      errors.INVALID_REQUIREMENTS.errorCode,
+      errors.INVALID_REQUIREMENTS.suggestion,
+    );
+  }
+
+  return [...new Set(
+    values
+      .map((value) => value.trim())
+      .filter(Boolean),
+  )];
+};
+
+export const resetProjectAiEvaluation = (project) => {
+  project.aiEvaluationStatus = "Pending";
+  project.aiEvaluationResult = null;
+  project.aiEvaluationError = null;
+  project.aiEvaluatedAt = null;
+  project.aiEvaluatedBy = null;
 };
 
 // Validate the team members to be added to the project
@@ -347,6 +417,8 @@ export const applyProjectUpdates = async (project, data, isLocked) => {
     name,
     sector,
     description,
+    requiredTech,
+    rolesNeeded,
     startDate,
     dueDate,
     status,
@@ -371,6 +443,7 @@ export const applyProjectUpdates = async (project, data, isLocked) => {
   if (name && name !== project.name) {
     if (isLocked) throwLocked();
     project.name = name;
+    resetProjectAiEvaluation(project);
   }
 
   // Project sector update
@@ -388,12 +461,26 @@ export const applyProjectUpdates = async (project, data, isLocked) => {
     }
 
     project.sector = sector;
+    resetProjectAiEvaluation(project);
   }
 
   // Project description update
   if (description !== undefined) {
     if (isLocked) throwLocked();
     project.description = description;
+    resetProjectAiEvaluation(project);
+  }
+
+  if (requiredTech !== undefined) {
+    if (isLocked) throwLocked();
+    project.requiredTech = normalizeProjectRequirements(requiredTech);
+    resetProjectAiEvaluation(project);
+  }
+
+  if (rolesNeeded !== undefined) {
+    if (isLocked) throwLocked();
+    project.rolesNeeded = normalizeProjectRequirements(rolesNeeded);
+    resetProjectAiEvaluation(project);
   }
 
   // Project dates update

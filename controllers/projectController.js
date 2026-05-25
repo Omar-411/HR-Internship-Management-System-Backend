@@ -1,6 +1,7 @@
 import Project from "../models/Project.js";
 import * as projectService from "../services/projectService.js";
 import * as projectAnalyticsService from "../services/analytics/projectAnalyticsService.js";
+import * as projectAiEvaluationService from "../services/projectAiEvaluationService.js";
 
 // Get all the sectors in a project
 export const getAllSectors = async (req, res, next) => {
@@ -52,6 +53,40 @@ export const getProjectOverview = async (req, res, next) => {
     res.status(result.code).json(result);
   }
   catch (err) {
+    next(err);
+  }
+};
+
+// Evaluate and rank project candidates with the AI matching model
+export const evaluateProjectCandidates = async (req, res, next) => {
+  try {
+    const result = await projectAiEvaluationService.evaluateProjectCandidatesForBackend(
+      req.params.id,
+      {
+        scope: req.query.scope,
+        parseCvUrls: req.body?.parseCvUrls,
+        cvTexts: req.body?.cvTexts,
+        aiOptions: req.body?.aiOptions,
+        currentUser: req.user,
+      },
+    );
+
+    res.status(result.code).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Get the stored AI evaluation state/result for a project
+export const getProjectAiEvaluation = async (req, res, next) => {
+  try {
+    const result = await projectAiEvaluationService.getStoredProjectAiEvaluation(
+      req.params.id,
+      req.user,
+    );
+
+    res.status(result.code).json(result);
+  } catch (err) {
     next(err);
   }
 };

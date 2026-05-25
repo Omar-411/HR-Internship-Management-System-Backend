@@ -23,11 +23,23 @@ export const errors = {
     errorCode: "PROJECT_INVALID_SECTOR",
     suggestion: "Select a valid sector value.",
   },
+  INVALID_REQUIREMENTS: {
+    message: "Invalid project requirements",
+    code: 400,
+    errorCode: "PROJECT_INVALID_REQUIREMENTS",
+    suggestion: "Required technologies and needed roles must be lists of text values.",
+  },
   INVALID_STATUS: {
     message: "Invalid project status",
     code: 400,
     errorCode: "PROJECT_INVALID_STATUS",
     suggestion: "Select a valid project status.",
+  },
+  INVALID_AI_EVALUATION_STATUS: {
+    message: "Invalid AI evaluation status",
+    code: 400,
+    errorCode: "PROJECT_INVALID_AI_EVALUATION_STATUS",
+    suggestion: "Use one of these values: Pending, Generated, Failed.",
   },
   INVALID_DUE_DATE: {
     message: "Invalid due date",
