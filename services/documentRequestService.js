@@ -508,6 +508,8 @@ export const rejectDocumentRequest = async (requestId, comment, user) => {
   request.fileURL = null;
   request.fileName = null;
   request.public_id = null;
+  request.uploadedBy = null;
+  request.uploadedAt = null;
 
   await request.save();
 

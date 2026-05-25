@@ -55,6 +55,15 @@ const documentRequestSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    uploadedAt: {
+      type: Date,
+      default: null,
+    },
     rejectionComment: {
       type: String,
       default: null,

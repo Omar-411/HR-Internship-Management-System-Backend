@@ -14,7 +14,6 @@ import AppError from "../utils/AppError.js";
 import {
   uploadDocumentCore,
   downloadDocumentCore,
-  deleteDocumentCore,
   consultDocumentCore,
 } from "./documentCoreService.js";
 import { getAll } from "./handlersFactory.js";
@@ -112,6 +111,9 @@ export const uploadDocumentForRequest = async (
   request.fileName = file.originalname;
   request.public_id = cloudResult.filePublicId;
   request.status = "Under Review";
+  request.uploadedBy = currentUser.id;
+  request.uploadedAt = new Date();
+  request.rejectionComment = null; // Clear any previous rejection comment if re-uploading after a rejection
   await request.save();
 
   // Get the user who uploaded the document
