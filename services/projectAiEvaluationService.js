@@ -123,7 +123,9 @@ async function extractCvTextFromUrl(cvURL) {
   if (!cvURL) return "";
   try {
     const response = await fetch(cvURL);
-    if (!response.ok) return "";
+    if (!response.ok) {
+      return "";
+    }
     const contentType = response.headers.get("content-type") || "";
     const buffer = Buffer.from(await response.arrayBuffer());
     const isPdfBuffer = buffer.subarray(0, 4).toString("utf8") === "%PDF";
@@ -141,7 +143,7 @@ async function extractCvTextFromUrl(cvURL) {
     if (contentType.startsWith("text/")) {
       return buffer.toString("utf8");
     }
-  } catch {
+  } catch (err) {
     return "";
   }
   return "";
@@ -258,7 +260,7 @@ export async function evaluateProjectCandidatesForBackend(projectIdentifier, opt
   const usersWithProvidedCvText = users.map((user) => attachCvText(user, cvTextMap));
   const usersForEvaluation = await hydrateCvTexts(
     usersWithProvidedCvText,
-    options.parseCvUrls !== false,
+    options.parseCvUrls !== false
   );
   const excludedCandidates = usersForEvaluation
     .filter((user) => !hasReadableCvText(user))
