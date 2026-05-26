@@ -8,6 +8,7 @@ export const assignAllowanceToEmployee = async (req, res, next) => {
       req.ip,
       req.user,
     );
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -23,6 +24,7 @@ export const toggleEmployeeAllowanceActivation = async (req, res, next) => {
         req.ip,
         req.user,
       );
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -35,6 +37,7 @@ export const getAllEmployeeAllowances = async (req, res, next) => {
     const result = await employeeAllowanceService.getAllEmployeeAllowances(
       req.query,
     );
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -50,6 +53,7 @@ export const updateEmployeeAllowance = async (req, res, next) => {
       req.ip,
       req.user,
     );
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -63,6 +67,7 @@ export const getEmployeeAllowanceById = async (req, res, next) => {
       req.params.id,
       req.user,
     );
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -77,6 +82,7 @@ export const getEmployeeAllowances = async (req, res, next) => {
       req.user,
       req.query,
     );
+    
     res.status(result.code).json(result);
   } catch (err) {
     next(err);

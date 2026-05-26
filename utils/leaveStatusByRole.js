@@ -1,3 +1,4 @@
+// Utility function to get relevant leave request statuses based on user role
 export const getStatusesByRole = (role) => {
   const normalizedRole = (role || "").toString().trim().toLowerCase();
 

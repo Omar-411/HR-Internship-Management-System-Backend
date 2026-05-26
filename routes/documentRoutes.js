@@ -11,7 +11,6 @@ import {
   downloadAdminDocument,
   consultAdminDocument,
   deleteAdminDocument,
-  fulfillDocumentRequest,
   generateDocument,
   sendGeneratedDocumentByEmail,
   getAdminDocumentsKPIsService,

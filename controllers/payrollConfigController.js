@@ -1,17 +1,5 @@
 import * as payrollConfigService from "../services/payrollConfigService.js";
 
-// Helper to format errors consistently
-const handleControllerError = (err, res, next) => {
-  if (err.isOperational) {
-    return res.status(err.statusCode || 400).json({
-      status: "Fail",
-      error: err.message,
-      field: err.field || null, // If the validator/service adds a field name
-    });
-  }
-  next(err);
-};
-
 // Create a new payroll configuration for a specific year
 export const createPayrollConfig = async (req, res, next) => {
   try {
@@ -20,9 +8,10 @@ export const createPayrollConfig = async (req, res, next) => {
       req.user,
       req.ip,
     );
+
     res.status(result.code).json(result);
   } catch (err) {
-    handleControllerError(err, res, next);
+    next(err);
   }
 };
 
@@ -34,7 +23,7 @@ export const getAllConfigs = async (req, res, next) => {
 
     res.status(result.code).json(result);
   } catch (err) {
-    handleControllerError(err, res, next);
+    next(err);
   }
 };
 
@@ -46,7 +35,7 @@ export const getActivePayrollConfig = async (req, res, next) => {
 
     res.status(result.code).json(result);
   } catch (err) {
-    handleControllerError(err, res, next);
+    next(err);
   }
 };
 
@@ -55,9 +44,10 @@ export const getYearVersions = async (req, res, next) => {
   try {
     const { year } = req.params;
     const result = await payrollConfigService.getYearVersions(year);
+
     res.status(result.code).json(result);
   } catch (err) {
-    handleControllerError(err, res, next);
+    next(err);
   }
 };
 
@@ -72,7 +62,7 @@ export const createNewVersion = async (req, res, next) => {
 
     res.status(result.code).json(result);
   } catch (err) {
-    handleControllerError(err, res, next);
+    next(err);
   }
 };
 
@@ -85,8 +75,9 @@ export const toggleActivation = async (req, res, next) => {
       req.user,
       req.ip,
     );
+    
     res.status(result.code).json(result);
   } catch (err) {
-    handleControllerError(err, res, next);
+    next(err);
   }
 };

@@ -54,10 +54,11 @@ export const getPayrollById = async (req, res, next) => {
   }
 };
 
-// Get all payroll records
+// Get all payroll records of all employees
 export const getAllPayrolls = async (req, res, next) => {
   try {
     const result = await payrollService.getAllPayrolls(req.query);
+    
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -86,6 +87,7 @@ export const validatePayroll = async (req, res, next) => {
       req.user,
       req.ip,
     );
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -101,6 +103,7 @@ export const markPayrollAsPaid = async (req, res, next) => {
       req.file,
       req.ip,
     );
+    
     res.status(result.code).json(result);
   } catch (err) {
     next(err);

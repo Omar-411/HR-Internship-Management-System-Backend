@@ -1,5 +1,7 @@
 import User from "../models/User.js";
 import Timetable from "../models/Timetable.js";
+import { errors as commonErrors } from "../errors/commonErrors.js";
+import { errors } from "../errors/timetableErrors.js";
 import AppError from "../utils/AppError.js";
 import mongoose from "mongoose";
 import { io } from "../server.js";
@@ -13,7 +15,7 @@ import {
 } from "../validators/timetableValidators.js";
 import { SHIFT_CONFIG } from "../constants/timetableConstants.js";
 
-// Update timetable entry (shift) for a user on a specific date: For already existing shifts (Admin only)
+// Upsert timetable entry (shift) for a user on a specific date: For already existing shifts (Admin only)
 export const updateTimetableEntry = async (req, res, next) => {
   try {
     const {
@@ -29,15 +31,30 @@ export const updateTimetableEntry = async (req, res, next) => {
     } = req.body;
 
     if (!userId || !date || !type) {
-      throw new AppError("Missing required fields (userId, date, type)", 400);
+      throw new AppError(
+        errors.MISSING_REQUIRED_FIELDS.message,
+        errors.MISSING_REQUIRED_FIELDS.code,
+        errors.MISSING_REQUIRED_FIELDS.errorCode,
+        errors.MISSING_REQUIRED_FIELDS.suggestion,
+      );
     }
 
     if (type !== "Day Off" && !location) {
-      throw new AppError("Location is required for working shifts", 400);
+      throw new AppError(
+        errors.LOCATION_REQUIRED.message,
+        errors.LOCATION_REQUIRED.code,
+        errors.LOCATION_REQUIRED.errorCode,
+        errors.LOCATION_REQUIRED.suggestion,
+      );
     }
 
     if (location && !isValidLocation(location)) {
-      throw new AppError("Invalid location! Must be 'Remote' or 'Onsite'", 400);
+      throw new AppError(
+        errors.INVALID_LOCATION.message,
+        errors.INVALID_LOCATION.code,
+        errors.INVALID_LOCATION.errorCode,
+        errors.INVALID_LOCATION.suggestion,
+      );
     }
 
     // Check the user existance
@@ -46,8 +63,14 @@ export const updateTimetableEntry = async (req, res, next) => {
       "name",
     );
     if (!user) {
-      throw new AppError("User not found", 404);
+      throw new AppError(
+        commonErrors.USER_NOT_FOUND.message,
+        commonErrors.USER_NOT_FOUND.code,
+        commonErrors.USER_NOT_FOUND.errorCode,
+        commonErrors.USER_NOT_FOUND.suggestion,
+      );
     }
+
     const actualUserId = user._id;
 
     // Normalize date to midnight to ensure consistent indexing
@@ -131,11 +154,7 @@ export const updateTimetableEntry = async (req, res, next) => {
     }
 
     if (user.role_id.name === "Employee") {
-      await markPayrollDirty(
-        actualUserId,
-        new Date(),
-        "Timetable entry set",
-      );
+      await markPayrollDirty(actualUserId, new Date(), "Timetable entry set");
     }
 
     res.status(200).json({
@@ -158,18 +177,30 @@ export const getTimetableByUser = async (req, res, next) => {
     // Check the user existance
     const user = await User.findOne(resolveId(userId));
     if (!user) {
-      throw new AppError("User not found", 404);
+      throw new AppError(
+        commonErrors.USER_NOT_FOUND.message,
+        commonErrors.USER_NOT_FOUND.code,
+        commonErrors.USER_NOT_FOUND.errorCode,
+        commonErrors.USER_NOT_FOUND.suggestion,
+      );
     }
+
     const actualUserId = user._id;
 
-    // Authorization check: Employees can only access their own timetable, Supervisors can access timetables of their supervisees, Admins can access all timetables
+    // Authorization check: 
+    // Employees can only access their own timetable, Supervisors can access timetables of their supervisees, Admins can access all timetables
     if (
       req.user.id !== actualUserId.toString() &&
       req.user.role === "Supervisor" &&
       user.supervisor_id &&
       !user.supervisor_id.equals(new mongoose.Types.ObjectId(req.user.id))
     ) {
-      throw new AppError("Unauthorized!", 403);
+      throw new AppError(
+        errors.UNAUTHORIZED_TO_ACCESS_TIMETABLE.message,
+        errors.UNAUTHORIZED_TO_ACCESS_TIMETABLE.code,
+        errors.UNAUTHORIZED_TO_ACCESS_TIMETABLE.errorCode,
+        errors.UNAUTHORIZED_TO_ACCESS_TIMETABLE.suggestion,
+      );
     }
 
     // Pagination of shifts  by month and year (Default: current month timetable)
@@ -189,7 +220,6 @@ export const getTimetableByUser = async (req, res, next) => {
       date: { $gte: startDate, $lte: endDate },
     }).sort({ date: 1 });
 
-    // [DEBUG-PAGINATION] Added log to track pagination requests from frontend for testing purposes
     console.log(
       `[PAGINATION] Module: Timetable | Month: ${queryMonth || ""} | Year: ${queryYear || ""} | Returned: ${shifts?.length || 0} records`,
     );
@@ -271,8 +301,10 @@ export const bulkUpdateTimetableEntries = async (req, res, next) => {
       !location
     ) {
       throw new AppError(
-        "Missing required fields (userId, dates array, type, location)",
-        400,
+        errors.MISSING_REQUIRED_FIELDS.message,
+        errors.MISSING_REQUIRED_FIELDS.code,
+        errors.MISSING_REQUIRED_FIELDS.errorCode,
+        errors.MISSING_REQUIRED_FIELDS.suggestion,
       );
     }
 
@@ -282,8 +314,14 @@ export const bulkUpdateTimetableEntries = async (req, res, next) => {
       "name",
     );
     if (!user) {
-      throw new AppError("User not found", 404);
+      throw new AppError(
+        commonErrors.USER_NOT_FOUND.message,
+        commonErrors.USER_NOT_FOUND.code,
+        commonErrors.USER_NOT_FOUND.errorCode,
+        commonErrors.USER_NOT_FOUND.suggestion,
+      );
     }
+
     const actualUserId = user._id;
 
     const updatedShifts = [];
@@ -292,7 +330,13 @@ export const bulkUpdateTimetableEntries = async (req, res, next) => {
       // Normalize the date to UTC to ensure consistency
       const normalizedDate = new Date(date);
       if (isNaN(normalizedDate.getTime()))
-        throw new AppError("Invalid date", 400);
+        throw new AppError(
+          errors.INVALID_DATE.message,
+          errors.INVALID_DATE.code,
+          errors.INVALID_DATE.errorCode,
+          errors.INVALID_DATE.suggestion,
+        );
+
       const dateStr = normalizedDate.toISOString().split("T")[0]; // E.g., "2026-04-04"
 
       // Prepare the common shift data
@@ -318,33 +362,53 @@ export const bulkUpdateTimetableEntries = async (req, res, next) => {
 
         // Check the location constraint for working shifts (Morning, Evening, Special, Full-time)
         if (!location) {
-          throw new AppError("Location is required for working shifts!", 400);
+          throw new AppError(
+            errors.LOCATION_REQUIRED.message,
+            errors.LOCATION_REQUIRED.code,
+            errors.LOCATION_REQUIRED.errorCode,
+            errors.LOCATION_REQUIRED.suggestion,
+          );
         }
         if (!isValidLocation(location)) {
           throw new AppError(
-            "Invalid location! Must be 'Remote' or 'Onsite'",
-            400,
+            errors.INVALID_LOCATION.message,
+            errors.INVALID_LOCATION.code,
+            errors.INVALID_LOCATION.errorCode,
+            errors.INVALID_LOCATION.suggestion,
           );
         }
 
         // Morning, Evening, Full-time and Special Shift cases
         if (type !== "Special Shift") {
           const config = SHIFT_CONFIG[type];
-          if (!config) throw new AppError("Invalid shift type", 400);
+
+          if (!config)
+            throw new AppError(
+              errors.INVALID_SHIFT_TYPE.message,
+              errors.INVALID_SHIFT_TYPE.code,
+              errors.INVALID_SHIFT_TYPE.errorCode,
+              errors.INVALID_SHIFT_TYPE.suggestion,
+            );
+
           shiftData = { ...shiftData, ...config };
           shiftData.location = location;
         } else {
           // Special Shift requires startTime and endTime
           if (!startTime || !endTime) {
             throw new AppError(
-              "Special Shift requires both startTime and endTime!",
-              400,
+              errors.SPECIAL_SHIFT_DATES_REQUIRED.message,
+              errors.SPECIAL_SHIFT_DATES_REQUIRED.code,
+              errors.SPECIAL_SHIFT_DATES_REQUIRED.errorCode,
+              errors.SPECIAL_SHIFT_DATES_REQUIRED.suggestion,
             );
           }
+
           if (!isValidTime(startTime) || !isValidTime(endTime)) {
             throw new AppError(
-              "startTime and endTime must be in HH:mm format!",
-              400,
+              errors.INVALID_SPECIAL_SHIFT_DATES.message,
+              errors.INVALID_SPECIAL_SHIFT_DATES.code,
+              errors.INVALID_SPECIAL_SHIFT_DATES.errorCode,
+              errors.INVALID_SPECIAL_SHIFT_DATES.suggestion,
             );
           }
 
@@ -418,10 +482,15 @@ export const bulkUpdateTimetableEntries = async (req, res, next) => {
 // Delete a timetable entry (a user shift) for a specific date
 export const deleteTimetableEntry = async (req, res, next) => {
   try {
-    const { userId, date, type } = req.body;
+    const { userId, date } = req.body;
 
-    if (!userId || !date || !type) {
-      throw new AppError("Missing required fields (userId, date, type)", 400);
+    if (!userId || !date) {
+      throw new AppError(
+        errors.MISSING_REQUIRED_FIELDS.message,
+        errors.MISSING_REQUIRED_FIELDS.code,
+        errors.MISSING_REQUIRED_FIELDS.errorCode,
+        errors.MISSING_REQUIRED_FIELDS.suggestion,
+      );
     }
 
     // Check the user existance
@@ -430,8 +499,14 @@ export const deleteTimetableEntry = async (req, res, next) => {
       "name",
     );
     if (!user) {
-      throw new AppError("User not found", 404);
+      throw new AppError(
+        commonErrors.USER_NOT_FOUND.message,
+        commonErrors.USER_NOT_FOUND.code,
+        commonErrors.USER_NOT_FOUND.errorCode,
+        commonErrors.USER_NOT_FOUND.suggestion,
+      );
     }
+
     const actualUserId = user._id;
 
     const normalizedDate = new Date(date);
@@ -441,19 +516,20 @@ export const deleteTimetableEntry = async (req, res, next) => {
     const existingEntry = await Timetable.findOne({
       userId: actualUserId,
       date: normalizedDate,
-      type,
     });
+
     if (!existingEntry) {
       throw new AppError(
-        "Timetable entry not found for the specified date and type",
-        404,
+        errors.TIMETABLE_NOT_FOUND.message,
+        errors.TIMETABLE_NOT_FOUND.code,
+        errors.TIMETABLE_NOT_FOUND.errorCode,
+        errors.TIMETABLE_NOT_FOUND.suggestion,
       );
     }
 
     const deletedEntry = await Timetable.findOneAndDelete({
       userId: actualUserId,
       date: normalizedDate,
-      type,
     });
 
     // Notify user of schedule change
@@ -519,8 +595,10 @@ export const clearMonthTimetable = async (req, res, next) => {
 
     if (!userId || yearParam === undefined || monthParam === undefined) {
       throw new AppError(
-        "Missing required parameters (userId, year, month)",
-        400,
+        errors.MISSING_REQUIRED_FIELDS.message,
+        errors.MISSING_REQUIRED_FIELDS.code,
+        errors.MISSING_REQUIRED_FIELDS.errorCode,
+        errors.MISSING_REQUIRED_FIELDS.suggestion,
       );
     }
 
@@ -528,7 +606,12 @@ export const clearMonthTimetable = async (req, res, next) => {
     const month = parseInt(monthParam);
 
     if (isNaN(year) || isNaN(month) || month < 0 || month > 11) {
-      throw new AppError("Invalid year or month format", 400);
+      throw new AppError(
+        errors.INVALID_DATE.message,
+        errors.INVALID_DATE.code,
+        errors.INVALID_DATE.errorCode,
+        errors.INVALID_DATE.suggestion,
+      );
     }
 
     // Check the user existence
@@ -537,8 +620,14 @@ export const clearMonthTimetable = async (req, res, next) => {
       "name",
     );
     if (!user) {
-      throw new AppError("User not found", 404);
+      throw new AppError(
+        commonErrors.USER_NOT_FOUND.message,
+        commonErrors.USER_NOT_FOUND.code,
+        commonErrors.USER_NOT_FOUND.errorCode,
+        commonErrors.USER_NOT_FOUND.suggestion,
+      );
     }
+
     const actualUserId = user._id;
 
     // Compute first and last day of the month

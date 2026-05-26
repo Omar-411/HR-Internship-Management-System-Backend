@@ -86,4 +86,10 @@ export const errors = {
     errorCode: "REQUESTER_CANNOT_FULFILL_OWN_REQUEST",
     suggestion: "Ask another project member to upload the document for this request."
   },
+  UNAUTHORIZED_ACCESS: {
+    message: "You are not authorized to access this document request or its associated document(s).",
+    code: 403,
+    errorCode: "UNAUTHORIZED_ACCESS",
+    suggestion: "Make sure you are a member of the project team before accessing this document request.",
+  },
 };

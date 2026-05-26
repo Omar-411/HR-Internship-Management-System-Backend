@@ -4,6 +4,7 @@ import * as teamService from "../services/teamService.js";
 export const getTeamById = async (req, res, next) => {
   try {
     const result = await teamService.getTeamById(req.params.id, req.user);
+    
     res.status(result.code).json(result);
   } catch (err) {
     next(err);

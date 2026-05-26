@@ -83,10 +83,12 @@ const projectSchema = mongoose.Schema(
       default: "Pending",
     },
     aiEvaluationResult: {
+      // Store the AI recommandations
       type: mongoose.Schema.Types.Mixed,
       default: null,
     },
     aiEvaluationError: {
+      // Store any error that occurred during AI evaluation
       type: mongoose.Schema.Types.Mixed,
       default: null,
     },
@@ -107,11 +109,9 @@ const projectSchema = mongoose.Schema(
 
 projectSchema.pre("save", async function () {
   if (!this.slug) {
-    // First save only: generate slug from name
+    // Generate the project slug when creating it
     this.slug = await generateUniqueSlug(this.constructor, this.name);
   }
-  // Do NOT regenerate slug on rename. Slug is immutable after
-  // first assignment to preserve URL stability.
 });
 
 export default mongoose.model("Project", projectSchema);

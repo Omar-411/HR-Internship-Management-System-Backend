@@ -5,6 +5,7 @@ import * as resignationStatsService from "../services/analytics/resignationStats
 export const getResignationStatuses = async (req, res, next) => {
   try {
     const result = await resignationService.getResignationStatuses();
+    
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -31,6 +32,7 @@ export const getResignationById = async (req, res, next) => {
       resignationId,
       req.user,
     );
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -43,6 +45,7 @@ export const getAllResignations = async (req, res, next) => {
     const queryParams = req.query;
 
     const result = await resignationService.getAllResignations(queryParams);
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -53,6 +56,7 @@ export const getAllResignations = async (req, res, next) => {
 export const getMyResignation = async (req, res, next) => {
   try {
     const result = await resignationService.getMyResignation(req.user.id);
+    
     res.status(result.code).json(result);
   } catch (err) {
     next(err);

@@ -47,6 +47,12 @@ export const errors = {
     errorCode: "UNAUTHORIZED_TO_DELETE_DOCUMENT",
     suggestion: "You are not allowed to delete this document.",
   },
+  UNAUTHORIZED_TO_TOGGLE_DOCUMENT_CONFIDENTIALITY: {
+    message: "You are not authorized to toggle the confidentiality of this document",
+    code: 403,
+    errorCode: "UNAUTHORIZED_TO_TOGGLE_DOCUMENT_CONFIDENTIALITY",
+    suggestion: "You are not allowed to toggle the confidentiality of this document.",
+  },
   UNKNOWN_TEMPLATE_TYPE: {
     message: "Unknown template type",
     code: 400,

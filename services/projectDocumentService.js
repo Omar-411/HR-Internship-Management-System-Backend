@@ -18,6 +18,7 @@ import {
 } from "./documentCoreService.js";
 import { getAll } from "./handlersFactory.js";
 import { createNotification } from "./notificationService.js";
+import { isTeamMemberOrProductOwnerOrAdmin } from "../utils/projectHelpers.js";
 
 // Upload a document to fulfill a document request (Every member of the project team)
 export const uploadDocumentForRequest = async (
@@ -27,7 +28,9 @@ export const uploadDocumentForRequest = async (
 ) => {
   console.log("Uploading document for request:", {
     requestId,
-    file: file ? { originalname: file.originalname, mimetype: file.mimetype } : null,
+    file: file
+      ? { originalname: file.originalname, mimetype: file.mimetype }
+      : null,
   });
 
   // Check if there is a file in the request
@@ -147,35 +150,20 @@ export const uploadDocumentForRequest = async (
 };
 
 // Consult a document related to the document request
-export const consultDocumentForRequest = async (documentId, currentUser) => {
+export const consultDocumentForRequest = async (documentRequestId, currentUser) => {
   // Check the document existence
-  const document = await Document.findById(documentId);
-  if (!document) {
+  const documentRequest = await DocumentRequest.findById(documentRequestId);
+  if (!documentRequest) {
     throw new AppError(
-      commonErrors.DOCUMENT_NOT_FOUND.message,
-      commonErrors.DOCUMENT_NOT_FOUND.code,
-      commonErrors.DOCUMENT_NOT_FOUND.errorCode,
-      commonErrors.DOCUMENT_NOT_FOUND.suggestion,
+      errors.DOCUMENT_REQUEST_NOT_FOUND.message,
+      errors.DOCUMENT_REQUEST_NOT_FOUND.code,
+      errors.DOCUMENT_REQUEST_NOT_FOUND.errorCode,
+      errors.DOCUMENT_REQUEST_NOT_FOUND.suggestion,
     );
-  }
-
-  // Check if the document is related to a project
-  if (!document.projectId) {
-    throw new AppError(
-      documentErrors.NOT_A_PROJECT_DOCUMENT.message,
-      documentErrors.NOT_A_PROJECT_DOCUMENT.code,
-      documentErrors.NOT_A_PROJECT_DOCUMENT.errorCode,
-      documentErrors.NOT_A_PROJECT_DOCUMENT.suggestion,
-    );
-  }
-
-  // Admin can see all project documents
-  if (currentUser.role === "Admin") {
-    return consultDocumentCore(document);
   }
 
   // Get the project document
-  const project = await Project.findById(document.projectId);
+  const project = await Project.findById(documentRequest.projectId);
   if (!project) {
     throw new AppError(
       projectErrors.PROJECT_NOT_FOUND.message,
@@ -185,67 +173,31 @@ export const consultDocumentForRequest = async (documentId, currentUser) => {
     );
   }
 
-  // Authorization check: only the project team members can consult the document
-  // Check Product Owner
-  const isOwner = project.productOwnerId.toString() === currentUser.id;
+  // AUTHORIZATION CHECK
+  await isTeamMemberOrProductOwnerOrAdmin(
+    project,
+    currentUser,
+    errors.UNAUTHORIZED_ACCESS
+  );
 
-  // Check team membership
-  const team = await Team.findOne({ projectId: project._id });
-
-  let isMember = false;
-  if (team) {
-    isMember = await TeamMember.exists({
-      teamId: team._id,
-      userId: currentUser.id,
-    });
-  }
-
-  if (!isOwner && !isMember) {
-    throw new AppError(
-      documentErrors.UNAUTHORIZED_ACCESS.message,
-      documentErrors.UNAUTHORIZED_ACCESS.code,
-      documentErrors.UNAUTHORIZED_ACCESS.errorCode,
-      documentErrors.UNAUTHORIZED_ACCESS.suggestion,
-    );
-  }
-
-  return consultDocumentCore(document);
+  return consultDocumentCore(documentRequest);
 };
 
 // Download a document related to the document request
-export const downloadDocumentForRequest = async (
-  documentId,
-  res,
-  currentUser,
-) => {
-  // Check the document existence
-  const document = await Document.findById(documentId);
-  if (!document) {
+export const downloadDocumentForRequest = async (id, currentUser, res) => {
+  // Check the document request existence
+  const request = await DocumentRequest.findById(id);
+  if (!request) {
     throw new AppError(
-      commonErrors.DOCUMENT_NOT_FOUND.message,
-      commonErrors.DOCUMENT_NOT_FOUND.code,
-      commonErrors.DOCUMENT_NOT_FOUND.errorCode,
-      commonErrors.DOCUMENT_NOT_FOUND.suggestion,
+      errors.DOCUMENT_REQUEST_NOT_FOUND.message,
+      errors.DOCUMENT_REQUEST_NOT_FOUND.code,
+      errors.DOCUMENT_REQUEST_NOT_FOUND.errorCode,
+      errors.DOCUMENT_REQUEST_NOT_FOUND.suggestion,
     );
-  }
-
-  // Check if the document is related to a project
-  if (!document.projectId) {
-    throw new AppError(
-      documentErrors.NOT_A_PROJECT_DOCUMENT.message,
-      documentErrors.NOT_A_PROJECT_DOCUMENT.code,
-      documentErrors.NOT_A_PROJECT_DOCUMENT.errorCode,
-      documentErrors.NOT_A_PROJECT_DOCUMENT.suggestion,
-    );
-  }
-
-  // Admin can see all project documents
-  if (currentUser.role === "Admin") {
-    return await downloadDocumentCore(document, res);
   }
 
   // Get the project document
-  const project = await Project.findById(document.projectId);
+  const project = await Project.findById(request.projectId);
   if (!project) {
     throw new AppError(
       projectErrors.PROJECT_NOT_FOUND.message,
@@ -255,29 +207,29 @@ export const downloadDocumentForRequest = async (
     );
   }
 
-  // Authorization check: only the project team members can consult the document
-  // Check Product Owner
-  const isOwner = project.productOwnerId.toString() === currentUser.id;
+  // AUTHORIZATION CHECK
+  await isTeamMemberOrProductOwnerOrAdmin(
+    project,
+    currentUser,
+    errors.UNAUTHORIZED_ACCESS
+  );
 
-  // Check team membership
-  const team = await Team.findOne({ projectId: project._id });
-
-  let isMember = false;
-  if (team) {
-    isMember = await TeamMember.exists({
-      teamId: team._id,
-      userId: currentUser.id,
-    });
-  }
-
-  if (!isOwner && !isMember) {
+  // Check if there is an uploaded document to download
+  if (!request.fileURL) {
     throw new AppError(
-      documentErrors.UNAUTHORIZED_ACCESS.message,
-      documentErrors.UNAUTHORIZED_ACCESS.code,
-      documentErrors.UNAUTHORIZED_ACCESS.errorCode,
-      documentErrors.UNAUTHORIZED_ACCESS.suggestion,
+      "No file has been uploaded for this document request yet.",
+      commonErrors.NO_FILE_UPLOADED.code,
+      commonErrors.NO_FILE_UPLOADED.errorCode,
+      commonErrors.NO_FILE_UPLOADED.suggestion,
     );
   }
 
-  return await downloadDocumentCore(document, res);
+  // Construct the Cloudinary download URL using fl_attachment
+  const downloadURL = request.fileURL.replace(
+    "/upload/",
+    "/upload/fl_attachment/",
+  );
+
+  // Redirect the client to the Cloudinary download URL
+  return res.redirect(302, downloadURL);
 };

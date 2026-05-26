@@ -59,8 +59,8 @@ export const uploadPersonalDocumentService = async ({
     $or: [
       { publicId: targetUserId },
       { slug: targetUserId },
-      ...(targetUserId.match(/^[a-f\d]{24}$/i) ? [{ _id: targetUserId }] : [])
-    ]
+      ...(targetUserId.match(/^[a-f\d]{24}$/i) ? [{ _id: targetUserId }] : []),
+    ],
   });
 
   if (!user) {
@@ -225,8 +225,8 @@ export const getPersonalDocumentsService = async ({
     $or: [
       { publicId: userId },
       { slug: userId },
-      ...(userId.match(/^[a-f\d]{24}$/i) ? [{ _id: userId }] : [])
-    ]
+      ...(userId.match(/^[a-f\d]{24}$/i) ? [{ _id: userId }] : []),
+    ],
   });
 
   if (!user) {
@@ -281,19 +281,18 @@ export const toggleConfidentialityService = async ({
 
   if (!isOwner && !isAdmin) {
     throw new AppError(
-      "You are not authorized to change the confidentiality of this document.",
-      403,
-      "UNAUTHORIZED",
-      "Only the document owner or an admin can toggle its confidentiality.",
+      documentErrors.UNAUTHORIZED_TO_TOGGLE_DOCUMENT_CONFIDENTIALITY.message,
+      documentErrors.UNAUTHORIZED_TO_TOGGLE_DOCUMENT_CONFIDENTIALITY.code,
+      documentErrors.UNAUTHORIZED_TO_TOGGLE_DOCUMENT_CONFIDENTIALITY.errorCode,
+      documentErrors.UNAUTHORIZED_TO_TOGGLE_DOCUMENT_CONFIDENTIALITY.suggestion,
     );
   }
 
-  // Use findByIdAndUpdate to flip just the one field — avoids re-running
-  // full Mongoose schema validation on the rest of the document's fields.
+  // Toggle the confidentiality of the document
   const updated = await Document.findByIdAndUpdate(
     documentId,
     { $set: { isConfidential: !document.isConfidential } },
-    { new: true, runValidators: false },
+    { returnDocument: "after", runValidators: false },
   );
 
   // Get the target user for notifications purposes
@@ -363,6 +362,7 @@ export const getAdminDocumentsService = async ({ queryParams }) => {
   parsedQuery.documentType_id = {
     $ne: personalType._id,
   };
+  
   return getDocumentsCore(parsedQuery);
 };
 

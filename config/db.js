@@ -8,8 +8,7 @@ if (process.env.NODE_ENV === "test") {
   dotenv.config();
 }
 
-// Connect MongoDB based on the NODE_ENV
-// Connect MongoDB based on the NODE_ENV with retry logic for replica sets
+// Connect MongoDB based on the NODE_ENV + retry logic for replica sets
 const connectMongo = async (retryCount = 5) => {
   const URI =
     process.env.NODE_ENV === "test"

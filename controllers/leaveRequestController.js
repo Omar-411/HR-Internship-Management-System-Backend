@@ -19,96 +19,7 @@ import { getIO } from "../socket.js";
 import { createNotification } from "../services/notificationService.js";
 import { createNotificationForAdmins } from "../utils/notificationHelpers.js";
 import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
-
-// --------------------------------------------------------- //
-// ------------------ HELPER FUNCTIONS --------------------- //
-// --------------------------------------------------------- //
-const buildLeaveRequestQuery = (user, queryParams) => {
-  const { typeId, status, month, year } = queryParams;
-
-  let roleFilter = {};
-  const userRole = (user.role || "").toString().trim().toLowerCase();
-  const allowedStatuses = getStatusesByRole(userRole);
-  const userId = user._id || user.id;
-
-  // ROLE FILTER
-  if (userRole === "supervisor") {
-    roleFilter = {
-      $or: [
-        {
-          supervisorId: userId,
-          status: { $in: allowedStatuses },
-        },
-        {
-          employeeId: userId,
-        },
-      ],
-    };
-  } else if (userRole === "admin") {
-    roleFilter = {
-      status: { $in: allowedStatuses },
-    };
-  } else if (userRole === "employee" || userRole === "intern") {
-    roleFilter = {
-      employeeId: userId,
-    };
-  } else {
-    throw new AppError(
-      tokenErrors.UNAUTHORIZED.message,
-      tokenErrors.UNAUTHORIZED.code,
-      tokenErrors.UNAUTHORIZED.errorCode,
-      tokenErrors.UNAUTHORIZED.suggestion,
-    );
-  }
-
-  // THE OTHER FILTERS
-  let filters = {};
-
-  // Filter by the leave request type
-  if (typeId) filters.typeId = typeId;
-
-  // Filter by the leave request status
-  if (status) {
-    if (!allowedStatuses.includes(status)) {
-      throw new AppError(
-        errors.INVALID_STATUS_PER_ROLE.message,
-        errors.INVALID_STATUS_PER_ROLE.code,
-        errors.INVALID_STATUS_PER_ROLE.errorCode,
-        errors.INVALID_STATUS_PER_ROLE.suggestion,
-      );
-    }
-    filters.status = status;
-  }
-
-  // Filter by month and year (for the startDate and endDate)
-  if (month || year) {
-    if (!year) {
-      throw new AppError(
-        errors.YEAR_REQUIRED.message,
-        errors.YEAR_REQUIRED.code,
-        errors.YEAR_REQUIRED.errorCode,
-        errors.YEAR_REQUIRED.suggestion,
-      );
-    }
-
-    const parsedMonth = parseInt(month) - 1 || 0;
-    const parsedYear = parseInt(year);
-
-    const startDate = new Date(parsedYear, parsedMonth, 1);
-    const endDate = new Date(parsedYear, parsedMonth + 1, 0, 23, 59, 59);
-
-    filters.startDate = { $lte: endDate };
-    filters.endDate = { $gte: startDate };
-  }
-
-  return {
-    $and: [roleFilter, filters],
-  };
-};
-
-// --------------------------------------------------------- //
-// --------------- LEAVE REQUEST WORKFLOW ------------------ //
-// --------------------------------------------------------- //
+import { buildLeaveRequestQuery } from "../utils/leaveRequestHelpers.js";
 
 // Get All leave requests based on the user role (with pagination: 10 leave requests per page): Every authenticated user
 export const getAllLeaveRequests = async (req, res, next) => {
@@ -239,7 +150,7 @@ export const getLeaveRequestById = async (req, res, next) => {
   }
 };
 
-// Add a new leave request (Every authenticated user)
+// Add a new leave request (Every authenticated user except the admin)
 export const addLeaveRequest = async (req, res, next) => {
   try {
     const user = req.user; // Get the user from the token
@@ -483,7 +394,7 @@ export const updateLeaveRequest = async (req, res, next) => {
     }
 
     // Ensure user owns the leave request
-    if (leaveRequest.employeeId.toString() !== user.id) {
+    if (leaveRequest.employeeId.toString() !== user.id.toString()) {
       throw new AppError(
         errors.UNAUTHORIZED_TO_UPDATE_LEAVE_REQUEST.message,
         errors.UNAUTHORIZED_TO_UPDATE_LEAVE_REQUEST.code,
@@ -647,6 +558,7 @@ export const cancelLeaveRequest = async (req, res, next) => {
 
     // Determine if the user is authorized to cancel this request
     let canCancel = false;
+
     // Case 1: For an Employee or Intern
     if (userRole === "employee" || userRole === "intern") {
       canCancel = leaveRequest.status === "Pending Supervisor Approval";
@@ -759,10 +671,6 @@ export const markLeaveRequestUnderReview = async (req, res, next) => {
 
     // ADMIN FLOW
     else if (userRole === "admin") {
-      // Admins can take over ANY request that is not yet Approved/Rejected.
-      // They can take over from Pending Supervisor, Under Supervisor, or Pending Admin.
-
-      // First, check if it's already under review by THIS admin
       leaveRequest = await LeaveRequest.findOne({
         _id: id,
         status: "Under Admin Review",
@@ -770,8 +678,7 @@ export const markLeaveRequestUnderReview = async (req, res, next) => {
       });
 
       if (!leaveRequest) {
-        // If not, transition from ANY "pending" or "under review" status to "Under Admin Review"
-        // This allows Admin to override Supervisor flow if needed.
+        // Override Supervisor flow if needed.
         leaveRequest = await LeaveRequest.findOneAndUpdate(
           {
             _id: id,

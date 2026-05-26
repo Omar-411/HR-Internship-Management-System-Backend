@@ -42,11 +42,9 @@ export const getAllSectors = async () => {
   };
 };
 
-// Get all project statuses except "Archived" (For the dropdown in the project filters, "Archived" is in a different section in the frontend)
+// Get all project statuses
 export const getAllStatuses = async () => {
-  const statuses = Project.schema
-    .path("status")
-    .enumValues.filter((s) => s !== "Archived");
+  const statuses = Project.schema.path("status").enumValues;
 
   return {
     status: "Success",
@@ -269,11 +267,18 @@ export const getAllProjects = async (req) => {
 };
 
 // Get a project by Id
-export const getProjectById = async (projectId, user) => {
+export const getProjectById = async (projectId, normalizedProjectId, user) => {
   const { role, id: userId } = user;
 
-  // Check existence
-  const existingProject = await Project.findOne(resolveId(projectId));
+  // Check the project existence
+  const existingProject = await Project.findOne({
+    $or: [
+      { slug: normalizedProjectId },
+      { publicId: projectId },
+      ...(projectId.match(/^[a-f\d]{24}$/i) ? [{ _id: projectId }] : []),
+    ],
+  });
+
   if (!existingProject) {
     throw new AppError(
       errors.PROJECT_NOT_FOUND.message,
@@ -286,7 +291,7 @@ export const getProjectById = async (projectId, user) => {
   const actualProjectId = existingProject._id;
 
   // Authorization filter
-  const match = await buildProjectAccessMatch(projectId, userId, role);
+  const match = await buildProjectAccessMatch(actualProjectId, userId, role);
 
   const project = await Project.aggregate([
     { $match: match },
@@ -490,9 +495,21 @@ export const createProject = async (data, user) => {
 };
 
 // Update a project
-export const updateProject = async (projectId, data, userId) => {
+export const updateProject = async (
+  projectId,
+  normalizedParam,
+  data,
+  userId,
+) => {
   // Check the project existence
-  const project = await Project.findOne(resolveId(projectId));
+  const project = await Project.findOne({
+    $or: [
+      { slug: normalizedParam },
+      { publicId: projectId },
+      ...(projectId.match(/^[a-f\d]{24}$/i) ? [{ _id: projectId }] : []),
+    ],
+  });
+
   if (!project) {
     throw new AppError(
       errors.PROJECT_NOT_FOUND.message,
@@ -541,9 +558,15 @@ export const updateProject = async (projectId, data, userId) => {
 };
 
 // Archive a project
-export const archiveProject = async (projectId, userId) => {
+export const archiveProject = async (projectId, normalizedParam, userId) => {
   // Check the project existence
-  const project = await Project.findOne(resolveId(projectId));
+  const project = await Project.findOne({
+    $or: [
+      { slug: normalizedParam },
+      { publicId: projectId },
+      ...(projectId.match(/^[a-f\d]{24}$/i) ? [{ _id: projectId }] : []),
+    ],
+  });
   if (!project) {
     throw new AppError(
       errors.PROJECT_NOT_FOUND.message,
@@ -617,8 +640,14 @@ export const archiveProject = async (projectId, userId) => {
 };
 
 // Restore a project
-export const restoreProject = async (projectId, userId) => {
-  const project = await Project.findOne(resolveId(projectId));
+export const restoreProject = async (projectId, normalizedParam, userId) => {
+  const project = await Project.findOne({
+    $or: [
+      { slug: normalizedParam },
+      { publicId: projectId },
+      ...(projectId.match(/^[a-f\d]{24}$/i) ? [{ _id: projectId }] : []),
+    ],
+  });
   if (!project) {
     throw new AppError(
       errors.PROJECT_NOT_FOUND.message,
@@ -678,16 +707,25 @@ export const restoreProject = async (projectId, userId) => {
 };
 
 // Delete a project (Admin only)
-export const deleteProject = async (projectId, currentUser) => {
+export const deleteProject = async (
+  projectId,
+  normalizedParam,
+  currentUser,
+) => {
   const session = await mongoose.startSession();
 
   try {
     session.startTransaction();
 
     // Check project existence
-    const project = await Project.findOne(resolveId(projectId)).session(
-      session,
-    );
+    const project = await Project.findOne({
+      $or: [
+        { slug: normalizedParam },
+        { publicId: projectId },
+        ...(projectId.match(/^[a-f\d]{24}$/i) ? [{ _id: projectId }] : []),
+      ],
+    }).session(session);
+    
     if (!project) {
       throw new AppError(
         errors.PROJECT_NOT_FOUND.message,

@@ -291,7 +291,7 @@ userSchema.index(
 // Pre-save hook to generate a unique slug based on the user's full name
 userSchema.pre("save", async function () {
   if (!this.slug) {
-    // First save only: generate slug from full name
+    // Generate the user slug when creating it
     this.slug = await generateUniqueSlug(
       this.constructor,
       `${this.name}-${this.lastName}`,

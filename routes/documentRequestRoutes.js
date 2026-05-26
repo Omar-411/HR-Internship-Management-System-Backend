@@ -46,7 +46,7 @@ router.patch(
   rejectDocumentRequest,
 );
 
-// Upload a document to fulfill a document request
+// Upload a document to a document request
 router.post(
   "/document-requests/:id/upload",
   authenticate,
@@ -54,14 +54,14 @@ router.post(
   uploadDocumentFulfillRequest,
 );
 
-// Consult a document to fullfill a document request
+// Consult a document uploaded to a document request
 router.get(
   "/document-requests/:id/consult",
   authenticate,
   consultDocumentFulfillRequest,
 );
 
-// Download a document to fullfill a document request
+// Download a document uploaded to a document request
 router.get(
   "/document-requests/:id/download",
   authenticate,

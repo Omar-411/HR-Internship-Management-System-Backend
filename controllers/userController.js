@@ -52,12 +52,12 @@ export const getAllUsers = async (req, res, next) => {
       req.query.role_id = { ne: supervisorRoleId };
     }
 
-    console.log("USER FETCH DEBUG - Original Query:", req.query);
+    console.log("[USER-FETCH-DEBUG] - Original Query:", req.query);
 
     // Map the query parameters (For ex: role -> role_id and department -> department_id)
     const queryParams = await transformUserFilters(req.query);
 
-    console.log("USER FETCH DEBUG - Transformed Query:", queryParams);
+    console.log("[USER-FETCH-DEBUG] - Transformed Query:", queryParams);
 
     const result = await userService.getUsers(queryParams);
 
@@ -71,6 +71,7 @@ export const getAllUsers = async (req, res, next) => {
 export const getActiveSupervisorsController = async (req, res, next) => {
   try {
     const result = await supervisorService.getActiveSupervisors(req.query);
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -81,6 +82,7 @@ export const getActiveSupervisorsController = async (req, res, next) => {
 export const getRecentSupervisorsController = async (req, res, next) => {
   try {
     const result = await supervisorService.getRecentSupervisors(req.query);
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -91,6 +93,7 @@ export const getRecentSupervisorsController = async (req, res, next) => {
 export const getPublicInterns = async (req, res, next) => {
   try {
     const result = await internService.getPublic();
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);

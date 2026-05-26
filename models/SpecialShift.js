@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 
-
 // Stores reusable special shift types that admins can define once and apply to multiple timetable slots.
 const periodSchema = new mongoose.Schema(
   {

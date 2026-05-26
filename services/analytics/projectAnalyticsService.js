@@ -5,14 +5,22 @@ import { errors as commonErrors } from "../../errors/commonErrors.js";
 import AppError from "../../utils/AppError.js";
 import { isTeamMemberOrProductOwnerOrAdmin } from "../../utils/projectHelpers.js";
 import { getMonthRange } from "../../utils/timeHelpers.js";
-
 import { resolveId } from "../../utils/idResolver.js";
 
 // Get a precise project overview (Stats about sprints, tasks, velocity, etc.)
-export const getProjectOverview = async (projectId, currentUser) => {
+export const getProjectOverview = async (
+  projectId,
+  normalizedParam,
+  currentUser,
+) => {
   // Check the project existence
-  const projectMatch = resolveId(projectId);
-  const project = await Project.findOne(projectMatch);
+  const project = await Project.findOne({
+    $or: [
+      { slug: normalizedParam },
+      { publicId: projectId },
+      ...(projectId.match(/^[a-f\d]{24}$/i) ? [{ _id: projectId }] : []),
+    ],
+  });
   if (!project)
     throw new AppError(
       errors.PROJECT_NOT_FOUND.message,
@@ -313,8 +321,11 @@ export const getProjectOverview = async (projectId, currentUser) => {
 // Get project summary per month (Number of projects created each month, completed projects, active projects, etc.)
 export const getProjectSummaryPerMonth = async () => {
   const now = new Date();
-  const { startOfMonth, endOfMonth } = getMonthRange(now.getFullYear(), now.getMonth() + 1);
-  
+  const { startOfMonth, endOfMonth } = getMonthRange(
+    now.getFullYear(),
+    now.getMonth() + 1,
+  );
+
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
   endOfMonth.setDate(0);

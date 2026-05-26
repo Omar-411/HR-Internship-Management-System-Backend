@@ -4,6 +4,7 @@ import * as teamMemberService from "../services/teamMemberService.js";
 export const getTeamRoles = async (req, res, next) => {
   try {
     const result = await teamMemberService.getTeamRoles();
+    
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -14,6 +15,7 @@ export const getTeamRoles = async (req, res, next) => {
 export const getProjectTeamMembers = async (req, res, next) => {
   try {
     const { teamId } = req.params;
+    
     const result = await teamMemberService.getProjectTeamMembers(
       req.query, 
       teamId, 

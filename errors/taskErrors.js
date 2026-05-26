@@ -191,4 +191,28 @@ export const errors = {
     errorCode: "UNAUTHORIZED_TO_DOWNLOAD_SUBMISSION",
     suggestion: "Only the assigned user, product owner, and team members of the project can download the task submission.",
   },
+  CANNOT_MOVE_TASK_INACTIVE_PROJECT: {
+    message: "Cannot move task in an inactive project.",
+    code: 400,
+    errorCode: "CANNOT_MOVE_TASK_INACTIVE_PROJECT",
+    suggestion: "Please move the task within an active project.",
+  },
+  CANNOT_SUBMIT_TASK_INACTIVE_PROJECT: {
+    message: "Cannot submit task in an inactive project.",
+    code: 400,
+    errorCode: "CANNOT_SUBMIT_TASK_INACTIVE_PROJECT",
+    suggestion: "Please submit the task within an active project.",
+  },
+  CANNOT_REVIEW_TASK_INACTIVE_PROJECT: {
+    message: "Cannot review task in an inactive project.",
+    code: 400,
+    errorCode: "CANNOT_REVIEW_TASK_INACTIVE_PROJECT",
+    suggestion: "Please review the task within an active project.",
+  },
+  TASK_WITHOUT_ACTIVE_SPRINT: {
+    message: "Task must be assigned to an active sprint before moving it from the product backlog.",
+    code: 400,
+    errorCode: "TASK_WITHOUT_ACTIVE_SPRINT",
+    suggestion: "Please assign the task to an active sprint before moving it from the product backlog.",
+  },
 };

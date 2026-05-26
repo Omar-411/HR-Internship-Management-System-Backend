@@ -23,6 +23,7 @@ export const getPayrollTrend = async () => {
 
   // Build the last 6 months payrolls
   const months = [];
+  
   for (let i = 5; i >= 0; i--) {
     // Calculate the month and year for each of the last 6 months
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);

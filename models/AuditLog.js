@@ -90,9 +90,7 @@ const auditLogSchema = mongoose.Schema(
     },
     target_id: {
       type: mongoose.Schema.Types.ObjectId,
-      required: function () {
-        return this.action !== "BULK_CALCULATE_PAYROLL";
-      },
+      required: true,
     },
     target_name: {
       type: String, // Storing name for quick reference even if target is deleted

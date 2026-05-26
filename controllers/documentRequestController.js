@@ -69,6 +69,7 @@ export const deleteDocumentRequest = async (req, res, next) => {
 export const markDocumentRequestAsFulfilled = async (req, res, next) => {
   try {
     const { id } = req.params; // ID of the document request to mark as fulfilled
+    
     const result = await documentRequestService.markDocumentRequestAsFulfilled(
       id,
       req.user,
@@ -118,10 +119,10 @@ export const uploadDocumentFulfillRequest = async (req, res, next) => {
 // Consult a document related to the document request
 export const consultDocumentFulfillRequest = async (req, res, next) => {
   try {
-    const { id: documentId } = req.params;
+    const { id: documentRequestId } = req.params;
 
     const result = await projectDocumentService.consultDocumentForRequest(
-      documentId,
+      documentRequestId,
       req.user,
     );
 
@@ -136,31 +137,8 @@ export const downloadDocumentFulfillRequest = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // Fetch the DocumentRequest by ID
-    const request = await DocumentRequest.findById(id).populate([
-      { path: "requestedBy", select: "name email" },
-      { path: "fulfilledBy", select: "name email" },
-    ]);
+    await projectDocumentService.downloadDocumentForRequest(id, req.user, res);
 
-    if (!request) {
-      return res.status(404).json({ message: "Document request not found" });
-    }
-
-    // Verify a file has been uploaded for this request
-    if (!request.fileURL) {
-      return res.status(400).json({
-        message: "No file has been uploaded for this document request yet"
-      });
-    }
-
-    // Construct the Cloudinary download URL using fl_attachment
-    const downloadURL = request.fileURL.replace(
-      "/upload/",
-      "/upload/fl_attachment/"
-    );
-
-    // Redirect the client to the Cloudinary download URL
-    return res.redirect(302, downloadURL);
   } catch (err) {
     if (!res.headersSent) next(err);
   }

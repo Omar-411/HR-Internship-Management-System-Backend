@@ -5,6 +5,7 @@ import { logAuditAction } from "../utils/logger.js";
 export const getAllDocumentTypes = async (req, res, next) => {
   try {
     const result = await documentTypeService.getAllDocumentTypesService();
+    
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -17,6 +18,7 @@ export const getDocumentTypeById = async (req, res, next) => {
     const result = await documentTypeService.getDocumentTypeByIdService(
       req.params.id,
     );
+    
     res.status(result.code).json(result);
   } catch (err) {
     next(err);

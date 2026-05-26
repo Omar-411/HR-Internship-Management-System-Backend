@@ -24,6 +24,7 @@ export const toggleBonusTypeActivation = async (req, res, next) => {
       req.user,
       req.ip,
     );
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -34,6 +35,7 @@ export const toggleBonusTypeActivation = async (req, res, next) => {
 export const getAllBonusTypes = async (req, res, next) => {
   try {
     const result = await bonusTypeService.getAllBonusTypes(req.query);
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -44,7 +46,9 @@ export const getAllBonusTypes = async (req, res, next) => {
 export const getBonusTypeById = async (req, res, next) => {
   try {
     const { id } = req.params;
+
     const result = await bonusTypeService.getBonusTypeById(id);
+
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
@@ -68,6 +72,7 @@ export const updateBonusType = async (req, res, next) => {
       req.user,
       req.ip,
     );
+    
     res.status(result.code).json(result);
   } catch (err) {
     next(err);

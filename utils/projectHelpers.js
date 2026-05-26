@@ -37,7 +37,7 @@ export const isTeamMemberOrProductOwnerOrAdmin = async (
     teamId: project.team_id,
   });
 
-  console.log("AUTH TRACE - Membership Found:", !!membership);
+  console.log("[AUTH-TRACE] - Membership Found:", !!membership);
 
   if (!membership) {
     throw new AppError(

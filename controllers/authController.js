@@ -6,6 +6,7 @@ dotenv.config();
 export const login = async (req, res, next) => {
   try {
     const result = await authService.loginService(req.body);
+    
     if (result.type === "OTP_REQUIRED") {
       return res.status(200).json({
         status: "Success but OTPVerificationRequired",

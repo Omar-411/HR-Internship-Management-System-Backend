@@ -8,22 +8,22 @@ import UserRole from "../models/UserRole.js";
 
 // Get Dashboard data for supervisors
 export const getSupervisorDashboard = async (user) => {
-  const userId = user.id || user._id;
+  const userId = user.id;
   const supervisorId = new mongoose.Types.ObjectId(userId);
 
-  // 1. Get Team Members
+  // Get the supervisor Team Members
   const teamMembers = await User.find({ supervisor_id: supervisorId }).select(
     "name _id publicId",
   );
   const teamMemberIds = teamMembers.map((m) => m._id);
 
-  // 2. Get Supervisor's Projects
+  // Get the Supervisor's Projects
   const projects = await Project.find({ productOwnerId: supervisorId }).select(
     "_id status name",
   );
   const projectIds = projects.map((p) => p._id);
 
-  // 3. Get Task Stats for these projects
+  // Get the Task Stats for these projects
   const tasks = await Task.find({ projectId: { $in: projectIds } }).select(
     "status assignedTo completedAt updatedAt title",
   );
@@ -34,7 +34,7 @@ export const getSupervisorDashboard = async (user) => {
   const projectSummary = {
     total: projects.length,
     done: projects.filter((p) => p.status === "Completed").length,
-    atRisk: projects.filter((p) => p.status === "On Hold").length, // Simple at-risk logic
+    atRisk: projects.filter((p) => p.status === "On Hold").length, 
     value:
       tasks.length === 0
         ? 0
@@ -53,7 +53,7 @@ export const getSupervisorDashboard = async (user) => {
     done: tasks.filter((t) => t.status === "Done").length,
   };
 
-  // Activities (Recent updates)
+  // Activities (Recent task updates)
   const activities = tasks
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .slice(0, 5)
@@ -108,10 +108,10 @@ export const getSupervisorDashboard = async (user) => {
 
 // Get Dashboard data for Admins
 export const getAdminDashboard = async (user) => {
-  // User Roles lookup
+  // Get the intern role to differentiate between employees and interns in counts
   const internRole = await UserRole.findOne({ name: { $regex: /^intern$/i } });
 
-  // Counts
+  // Counts: Total Employees, Total Interns, Active Users, Inactive Users, Ongoing Projects
   const [
     totalEmployees,
     totalInterns,
@@ -126,7 +126,7 @@ export const getAdminDashboard = async (user) => {
     Project.countDocuments({ status: { $in: ["Active", "Planning"] } }),
   ]);
 
-  // 3. Attendance Trends (Last 6 Months)
+  // Attendance Trends (Last 6 Months)
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
   sixMonthsAgo.setDate(1);
@@ -144,6 +144,7 @@ export const getAdminDashboard = async (user) => {
         },
       },
     ]),
+
     Timetable.aggregate([
       { $match: { date: { $gte: sixMonthsAgo }, type: { $ne: "Day Off" } } },
       {
@@ -171,13 +172,16 @@ export const getAdminDashboard = async (user) => {
   ];
   const statsMap = new Map();
 
-  // Initialize with last 6 months to ensure continuity
+  // Initialize a map with last 6 months to ensure fast lookups and consistent ordering, even if some months have no data
   for (let i = 5; i >= 0; i--) {
     const d = new Date();
+
     d.setMonth(d.getMonth() - i);
     const m = d.getMonth() + 1;
     const y = d.getFullYear();
+
     const key = `${y}-${m}`;
+
     statsMap.set(key, { month: m, year: y, present: 0, expected: 0 });
   }
 
@@ -185,6 +189,7 @@ export const getAdminDashboard = async (user) => {
     const key = `${s._id.year}-${s._id.month}`;
     if (statsMap.has(key)) statsMap.get(key).present = s.present;
   });
+
   timetableStats.forEach((s) => {
     const key = `${s._id.year}-${s._id.month}`;
     if (statsMap.has(key)) statsMap.get(key).expected = s.expected;
@@ -195,17 +200,18 @@ export const getAdminDashboard = async (user) => {
     .map((s) => {
       // Use Timetable 'expected' as baseline; fallback to Attendance 'present' count if no schedule exists
       const totalBaseline = s.expected > 0 ? s.expected : s.present;
+
       return {
         month: monthNames[s.month - 1],
         attendance:
           totalBaseline === 0
             ? 0
             : Math.round((s.present / totalBaseline) * 100),
-        target: 95,
+        target: 100, // Target attendance rate that we want to reach
       };
     });
 
-  // Overall Avg Attendance Rate (Weighted)
+  // Calculate the Overall Avg Attendance Rate
   const totalPresentAll = Array.from(statsMap.values()).reduce(
     (acc, s) => acc + s.present,
     0,
@@ -214,14 +220,16 @@ export const getAdminDashboard = async (user) => {
     (acc, s) => acc + (s.expected > 0 ? s.expected : s.present),
     0,
   );
+
   const avgAttendanceRate =
     totalExpectedAll === 0
       ? 0
       : parseFloat(((totalPresentAll / totalExpectedAll) * 100).toFixed(1));
 
-  // 4. Today's Attendance Distribution
+  // Calculate the daily Attendance Distribution
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
+
   const endOfToday = new Date(startOfToday);
   endOfToday.setDate(endOfToday.getDate() + 1);
 
@@ -276,7 +284,7 @@ export const getAdminDashboard = async (user) => {
 
 // Get Dashboard data for Individual Users (Employee/Intern)
 export const getDashboardStats = async (user) => {
-  const userId = user.id || user._id;
+  const userId = user.id;
 
   // Fetch all tasks for the user
   const tasks = await Task.find({ assignedTo: userId });
@@ -285,15 +293,18 @@ export const getDashboardStats = async (user) => {
 
   // Calculate Monday of the current week
   const currentDay = now.getDay();
-  const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay; // If Sunday, go back 6 days, else back to Monday
+  const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
   const monday = new Date(now);
+
   monday.setDate(now.getDate() + diffToMonday);
   monday.setHours(0, 0, 0, 0);
 
   let tasksThisWeekCount = 0;
 
   const overdueCounts = { todo: 0, inProgress: 0, stuck: 0 };
+
   let completedCount = 0;
+
   const totalTasks = tasks.length;
 
   // For weekly productivity: days of the week (0=Mon, 1=Tue, ..., 6=Sun)
@@ -327,8 +338,8 @@ export const getDashboardStats = async (user) => {
         const compAt = new Date(t.completedAt);
         if (compAt >= monday && compAt <= now) {
           tasksThisWeekCount++;
-          // For weekly productivity
-          // Sunday is 0 in JS, so normalize: Mon=0, Tue=1, ..., Sun=6
+          
+          // For weekly productivity: Sunday is 0 in JS, so normalize: Mon=0, Tue=1, ..., Sun=6
           const jsDay = compAt.getDay();
           const normDay = jsDay === 0 ? 6 : jsDay - 1;
           completedThisWeekByDay[normDay]++;
@@ -337,10 +348,12 @@ export const getDashboardStats = async (user) => {
         // For Avg Completion Time
         if (t.createdAt) {
           const compTime = compAt.getTime();
+          
           // Find which week it belongs to
           for (let i = 0; i < 6; i++) {
             const wStart = weekStartDates[i].getTime();
             const wEnd = wStart + msInWeek - 1;
+            
             if (compTime >= wStart && compTime <= wEnd) {
               const daysDiff =
                 (compTime - new Date(t.createdAt).getTime()) / msInDay;
@@ -380,13 +393,14 @@ export const getDashboardStats = async (user) => {
     { status: "stuck", count: overdueCounts.stuck },
   ];
 
-  // Calculate weekly productivity bands
-  // Bands: low (0-3), medium (4-6), high (7+)
+  // Calculate weekly productivity bands => Bands: low (0-3), medium (4-6), high (7+)
   let low = 0,
     medium = 0,
     high = 0;
+
   // Only calculate up to current day (if today is Wed (2), we look at 0, 1, 2)
   const daysPassed = currentDay === 0 ? 7 : currentDay;
+  
   for (let i = 0; i < daysPassed; i++) {
     const c = completedThisWeekByDay[i];
     if (c <= 3) low++;
@@ -397,11 +411,13 @@ export const getDashboardStats = async (user) => {
   let lowPct = 0,
     medPct = 0,
     highPct = 0;
+  
   if (daysPassed > 0) {
     lowPct = Math.round((low / daysPassed) * 100);
     medPct = Math.round((medium / daysPassed) * 100);
     highPct = 100 - lowPct - medPct;
   }
+  
   const weeklyProductivity = [lowPct, medPct, highPct];
 
   const tasksByStatus = [

@@ -86,7 +86,7 @@ const timetableSchema = mongoose.Schema(
       ref: "SpecialShift",
       default: null,
     },
-    // Inline custom shift data (custom one-time, not saved to SpecialShift collection)
+    // Inline custom shift data (custom one-time, not saved to the SpecialShift collection)
     specialShiftData: {
       type: new mongoose.Schema(
         {

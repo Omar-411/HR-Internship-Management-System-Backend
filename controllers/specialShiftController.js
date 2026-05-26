@@ -1,4 +1,5 @@
 import SpecialShift from "../models/SpecialShift.js";
+import { errors } from "../errors/specialShiftErrors.js";
 import AppError from "../utils/AppError.js";
 
 // Get all reusable Special Shift types
@@ -24,51 +25,76 @@ export const createSpecialShift = async (req, res, next) => {
   try {
     const { name, description, type, periods } = req.body;
 
-    // ─── Early Validation ────────────────────────────────────────────────────
+    // Input Validation
     if (!name || !name.trim()) {
-      throw new AppError("Shift name is required", 400);
+      throw new AppError(
+        errors.SHIFT_NAME_REQUIRED.message,
+        errors.SHIFT_NAME_REQUIRED.code,
+        errors.SHIFT_NAME_REQUIRED.errorCode,
+        errors.SHIFT_NAME_REQUIRED.suggestion
+      );
     }
 
     if (!type || !["single", "double"].includes(type)) {
-      throw new AppError("Type must be 'single' or 'double'", 400);
+      throw new AppError(
+        errors.SHIFT_TYPE_INVALID.message,
+        errors.SHIFT_TYPE_INVALID.code,
+        errors.SHIFT_TYPE_INVALID.errorCode,
+        errors.SHIFT_TYPE_INVALID.suggestion
+      );
     }
 
     if (!Array.isArray(periods) || periods.length === 0) {
-      throw new AppError("Periods array is required", 400);
+      throw new AppError(
+        errors.SHIFT_PERIODS_REQUIRED.message,
+        errors.SHIFT_PERIODS_REQUIRED.code,
+        errors.SHIFT_PERIODS_REQUIRED.errorCode,
+        errors.SHIFT_PERIODS_REQUIRED.suggestion
+      );
     }
 
     // Enforce type ↔ period count consistency
     if (type === "single" && periods.length !== 1) {
       throw new AppError(
-        "A 'single' shift type must have exactly 1 period",
-        400
+        "Single shift type must have only 1 period",
+        errors.SHIFT_PERIODS_TYPE_MISMATCH.code,
+        errors.SHIFT_PERIODS_TYPE_MISMATCH.errorCode,
+        errors.SHIFT_PERIODS_TYPE_MISMATCH.suggestion
       );
     }
     if (type === "double" && periods.length !== 2) {
       throw new AppError(
-        "A 'double' shift type must have exactly 2 periods",
-        400
+        "Double shift type must have 2 periods",
+        errors.SHIFT_PERIODS_TYPE_MISMATCH.code,
+        errors.SHIFT_PERIODS_TYPE_MISMATCH.errorCode,
+        errors.SHIFT_PERIODS_TYPE_MISMATCH.suggestion
       );
     }
 
     // Validate each period's time format (HH:MM)
     const timeRegex = /^\d{2}:\d{2}$/;
+
     for (let i = 0; i < periods.length; i++) {
       const { startTime, endTime } = periods[i] || {};
+
       if (!startTime || !timeRegex.test(startTime)) {
         throw new AppError(
           `Period ${i + 1}: startTime must be in HH:MM format`,
-          400
+          errors.SPECIAL_SHIFT_TIME_FORMAT_INVALID.code,
+          errors.SPECIAL_SHIFT_TIME_FORMAT_INVALID.errorCode,
+          errors.SPECIAL_SHIFT_TIME_FORMAT_INVALID.suggestion
         );
       }
+      
       if (!endTime || !timeRegex.test(endTime)) {
         throw new AppError(
           `Period ${i + 1}: endTime must be in HH:MM format`,
-          400
+          errors.SPECIAL_SHIFT_TIME_FORMAT_INVALID.code,
+          errors.SPECIAL_SHIFT_TIME_FORMAT_INVALID.errorCode,
+          errors.SPECIAL_SHIFT_TIME_FORMAT_INVALID.suggestion
         );
       }
     }
-    // ─── End Validation ───────────────────────────────────────────────────────
 
     const specialShift = await SpecialShift.create({
       name: name.trim(),

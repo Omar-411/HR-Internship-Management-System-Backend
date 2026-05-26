@@ -9,92 +9,14 @@ import {
   removeLeaveTypeFromUsers,
 } from "../services/leaveWalletService.js";
 import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.js";
-
-// ---------------------------------------------------------------- //
-// ----------------------- HELPER FUNCTIONS ----------------------- //
-// ---------------------------------------------------------------- //
-export const validateLeaveTypeName = (name) => {
-  if (!name || name.trim() === "") {
-    throw new AppError(
-      errors.LEAVE_TYPE_NAME_REQUIRED.message,
-      errors.LEAVE_TYPE_NAME_REQUIRED.code,
-      errors.LEAVE_TYPE_NAME_REQUIRED.errorCode,
-      errors.LEAVE_TYPE_NAME_REQUIRED.suggestion,
-    );
-  }
-
-  // Normalize the leave type name
-  return (
-    name.trim().charAt(0).toUpperCase() + name.trim().slice(1).toLowerCase()
-  );
-};
-
-export const validateDefaultDays = (defaultDays) => {
-  if (defaultDays === undefined || defaultDays < 0) {
-    throw new AppError(
-      errors.INVALID_DEFAULT_DAYS.message,
-      errors.INVALID_DEFAULT_DAYS.code,
-      errors.INVALID_DEFAULT_DAYS.errorCode,
-      errors.INVALID_DEFAULT_DAYS.suggestion,
-    );
-  }
-};
-
-export const validateMaxDays = (maxDays) => {
-  if (maxDays === undefined || maxDays < 0) {
-    throw new AppError(
-      errors.INVALID_MAX_DAYS.message,
-      errors.INVALID_MAX_DAYS.code,
-      errors.INVALID_MAX_DAYS.errorCode,
-      errors.INVALID_MAX_DAYS.suggestion,
-    );
-  }
-};
-
-export const validateLeaveTypeGender = (gender) => {
-  const allowedGenders = LeaveType.schema.path("gender").enumValues;
-  if (!allowedGenders.includes(gender)) {
-    throw new AppError(
-      errors.INVALID_GENDER.message,
-      errors.INVALID_GENDER.code,
-      errors.INVALID_GENDER.errorCode,
-      errors.INVALID_GENDER.suggestion,
-    );
-  }
-};
-
-export const validateLeaveTypeDeductFrom = (deductFrom) => {
-  const allowedValues = LeaveType.schema.path("deductFrom").enumValues;
-  if (!allowedValues.includes(deductFrom)) {
-    throw new AppError(
-      errors.INVALID_DEDUCT_FROM.message,
-      errors.INVALID_DEDUCT_FROM.code,
-      errors.INVALID_DEDUCT_FROM.errorCode,
-      errors.INVALID_DEDUCT_FROM.suggestion,
-    );
-  }
-};
-
-// Check the name existance
-export const checkLeaveTypeNameExistence = async (name, id) => {
-  const existingLeaveType = await LeaveType.findOne({
-    name: { $regex: new RegExp(`^${name}$`, "i") },
-    _id: { $ne: id },
-  });
-
-  if (existingLeaveType) {
-    throw new AppError(
-      errors.LEAVE_TYPE_ALREADY_EXISTS.message,
-      errors.LEAVE_TYPE_ALREADY_EXISTS.code,
-      errors.LEAVE_TYPE_ALREADY_EXISTS.errorCode,
-      errors.LEAVE_TYPE_ALREADY_EXISTS.suggestion,
-    );
-  }
-};
-
-// ---------------------------------------------------------------- //
-// ---------------------- LEAVE TYPE MANAGEMENT ------------------- //
-// ---------------------------------------------------------------- //
+import {
+  validateLeaveTypeName,
+  validateDefaultDays,
+  validateMaxDays,
+  validateLeaveTypeGender,
+  validateLeaveTypeDeductFrom,
+  checkLeaveTypeNameExistence,
+} from "../validators/leaveTypeValidators.js";
 
 // Get all leave types
 export const getAllLeaveTypes = async (req, res, next) => {
@@ -102,7 +24,7 @@ export const getAllLeaveTypes = async (req, res, next) => {
     let queryParams = req.query;
     queryParams = {
       ...queryParams,
-      limit: queryParams.limit || 100,
+      limit: queryParams.limit || 20,
       sort: "-createdAt",
     };
 

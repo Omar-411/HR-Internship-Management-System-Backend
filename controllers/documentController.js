@@ -209,24 +209,3 @@ export const getAdminDocumentsKPIsService = async (req, res, next) => {
     next(err);
   }
 };
-
-// ------------------------------------------------------------------------------- //
-// ----------------------- DOCUMENT REQUEST CONTROLLERS -------------------------- //
-// ------------------------------------------------------------------------------- //
-
-export const fulfillDocumentRequest = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const file = req.file;
-    if (!file) return res.status(400).json({ message: "No file provided" });
-
-    const result = await documentService.fulfillDocumentRequestService(
-      id,
-      file,
-      req.user._id,
-    );
-    res.status(200).json(result);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};

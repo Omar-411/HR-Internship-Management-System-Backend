@@ -147,7 +147,7 @@ export const getProjectTasks = async (req, res, next) => {
       filter.status = status;
     }
 
-    // Prepare the project tasks (apply pagination via .skip + .limit)
+    // Prepare the project tasks query with pagination and sorting
     const tasks = await Task.find(filter)
       .populate("assignedTo", "name lastName profileImageURL role")
       .populate("sprintId", "number name goal status")
@@ -542,14 +542,17 @@ export const addTask = async (req, res, next) => {
 
     // User Assignment validation
     let validAssignedTo = null;
+
     if (assignees && Array.isArray(assignees) && assignees.length > 0) {
       // Verify all selected users exist in DB
       const users = await mongoose
         .model("User")
         .find({ _id: { $in: assignees } });
-      console.log("FOUND USERS:", users);
+
+      console.log("[FOUND-USERS-FOR-TASK-ASSIGNMENT]:", users);
+
       if (users.length !== assignees.length) {
-        console.log("FAIL REASON: users not found in DB");
+        console.log("[FAIL-REASON]: users not found in DB");
         throw new AppError(
           commonErrors.USER_NOT_FOUND.message,
           commonErrors.USER_NOT_FOUND.code,
@@ -566,7 +569,7 @@ export const addTask = async (req, res, next) => {
       });
 
       if (!membership) {
-        console.log("FAIL REASON: user is not a member of project team");
+        console.log("[FAIL-REASON]: user is not a member of project team");
         throw new AppError(
           commonErrors.USER_NOT_FOUND.message,
           commonErrors.USER_NOT_FOUND.code,
@@ -720,7 +723,10 @@ export const updateTask = async (req, res, next) => {
         // Move to Backlog status if removed from a sprint
         task.sprintId = null;
         task.status = "Backlog";
-      } else {
+      }
+
+      // Else, we assign it to a sprint, but we need to check the sprint validity and status
+      else {
         // Check the sprint existence
         sprint = await Sprint.findById(updates.sprintId);
         if (!sprint || sprint.projectId.toString() !== project._id.toString()) {
@@ -770,6 +776,7 @@ export const updateTask = async (req, res, next) => {
       if (nextStatus === "Done") {
         // Check if its sub tasks are done before marking the parent task as done
         const subTasks = await Task.find({ parentTaskId: task._id });
+
         if (subTasks.length === 0) {
           task.completedAt = new Date();
         } else {
@@ -784,6 +791,7 @@ export const updateTask = async (req, res, next) => {
               errors.INVALID_TASK_STATUS.suggestion,
             );
           }
+
           task.completedAt = new Date();
         }
       }
@@ -1043,6 +1051,16 @@ export const moveTask = async (req, res, next) => {
     // Check if the project is archived, completed or on hold
     isProjectInactive(project);
 
+    // Check if the project is active, otherwise tasks cannot be moved
+    if (project.status !== "Active") {
+      throw new AppError(
+        errors.CANNOT_MOVE_TASK_INACTIVE_PROJECT.message,
+        errors.CANNOT_MOVE_TASK_INACTIVE_PROJECT.code,
+        errors.CANNOT_MOVE_TASK_INACTIVE_PROJECT.errorCode,
+        errors.CANNOT_MOVE_TASK_INACTIVE_PROJECT.suggestion,
+      );
+    }
+
     // Check user authorization: Product owner of the project + Team members of the project can move a task
     const { id: userId } = req.user;
     const isProductOwner =
@@ -1063,6 +1081,7 @@ export const moveTask = async (req, res, next) => {
 
     if (status) {
       const validStatuses = Task.schema.path("status").enumValues;
+
       if (!validStatuses.includes(status)) {
         throw new AppError(
           errors.INVALID_TASK_STATUS.message,
@@ -1080,6 +1099,28 @@ export const moveTask = async (req, res, next) => {
           errors.TASK_WITHOUT_SPRINT.errorCode,
           errors.TASK_WITHOUT_SPRINT.suggestion,
         );
+      }
+
+      // Prevent a task from moving to "To Do" if it's not assigned to an active sprint
+      if (status === "To Do") {
+        if (!task.sprintId) {
+          throw new AppError(
+            errors.TASK_WITHOUT_SPRINT.message,
+            errors.TASK_WITHOUT_SPRINT.code,
+            errors.TASK_WITHOUT_SPRINT.errorCode,
+            errors.TASK_WITHOUT_SPRINT.suggestion,
+          );
+        }
+
+        const sprint = await Sprint.findById(task.sprintId);
+        if (!sprint || sprint.status !== "Active") {
+          throw new AppError(
+            errors.TASK_WITHOUT_ACTIVE_SPRINT.message,
+            errors.TASK_WITHOUT_ACTIVE_SPRINT.code,
+            errors.TASK_WITHOUT_ACTIVE_SPRINT.errorCode,
+            errors.TASK_WITHOUT_ACTIVE_SPRINT.suggestion,
+          );
+        }
       }
 
       task.status = status;
@@ -1136,6 +1177,7 @@ export const submitTask = async (req, res, next) => {
       completionRate !== undefined && completionRate !== ""
         ? Number(completionRate)
         : undefined;
+
     const parsedHoursSpent =
       hoursSpent !== undefined && hoursSpent !== ""
         ? Number(hoursSpent)
@@ -1165,6 +1207,16 @@ export const submitTask = async (req, res, next) => {
 
     // Check if the project is archived, completed or on hold
     isProjectInactive(project);
+
+    // Check if the project is active, otherwise tasks cannot be submitted (in the planning project)
+    if (project.status !== "Active") {
+      throw new AppError(
+        errors.CANNOT_SUBMIT_TASK_INACTIVE_PROJECT.message,
+        errors.CANNOT_SUBMIT_TASK_INACTIVE_PROJECT.code,
+        errors.CANNOT_SUBMIT_TASK_INACTIVE_PROJECT.errorCode,
+        errors.CANNOT_SUBMIT_TASK_INACTIVE_PROJECT.suggestion,
+      );
+    }
 
     // Authorization check: Only the assigned user can submit the task
     const { id: userId } = req.user;
@@ -1543,6 +1595,16 @@ export const reviewTask = async (req, res, next) => {
 
     // Check if the project is archived, completed or on hold
     isProjectInactive(project);
+
+    // Check if the project is active, otherwise tasks cannot be reviewed (in the planning project)
+    if (project.status !== "Active") {
+      throw new AppError(
+        errors.CANNOT_REVIEW_TASK_INACTIVE_PROJECT.message,
+        errors.CANNOT_REVIEW_TASK_INACTIVE_PROJECT.code,
+        errors.CANNOT_REVIEW_TASK_INACTIVE_PROJECT.errorCode,
+        errors.CANNOT_REVIEW_TASK_INACTIVE_PROJECT.suggestion,
+      );
+    }
 
     // The Task must be in Review
     if (task.status !== "Review") {

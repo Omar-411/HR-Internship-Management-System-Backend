@@ -283,11 +283,11 @@ export const getAttendance = async (req, res, next) => {
 
     const cleaned = attendanceRecords.map((record) => ({
       _id: record._id,
-      userId: record.userId?._id,
-      name: record.userId?.name,
-      lastName: record.userId?.lastName,
-      role: record.userId?.role_id?.name,
-      department: record.userId?.department_id?.name,
+      userId: record.userId._id,
+      name: record.userId.name,
+      lastName: record.userId.lastName,
+      role: record.userId.role_id.name,
+      department: record.userId.department_id.name,
       status: record.status,
       checkInTime: record.checkInTime,
       checkOutTime: record.checkOutTime,
@@ -332,13 +332,15 @@ export const getAttendanceById = async (req, res, next) => {
       );
     }
 
+    // Authorization check
+    const role = req.user.role;
     const requesterId = String(req.user.id);
     const recordOwnerId = String(record.userId._id);
-    const role = req.user.role;
+    const isTeamMember = role === "Supervisor" && String(record.userId.supervisor_id) === requesterId; 
 
     if (
       role !== "Admin" &&
-      role !== "Supervisor" &&
+      !isTeamMember &&
       requesterId !== recordOwnerId
     ) {
       throw new AppError(
@@ -472,14 +474,21 @@ export const checkIn = async (req, res, next) => {
 
     // Determine the presence status (late/present)
     let status = "present";
+    
+    // Determine the start time from the timetable
     const resolvedStartTime =
       shift.startTime || shift.specialShiftData?.periods?.[0]?.startTime;
 
     if (resolvedStartTime) {
+      // Split the start time into HH:mm format
       const [startHour, startMinute] = resolvedStartTime.split(":").map(Number);
+
       const shiftStart = new Date(todayUTC);
       shiftStart.setUTCHours(startHour, startMinute, 0, 0);
+
       const grace = shift.gracePeriod || 5;
+
+      // If the current time is after the shift start time + grace period, mark as late
       const lateThreshold = new Date(shiftStart.getTime() + grace * 60000);
       if (now > lateThreshold) status = "late";
     }

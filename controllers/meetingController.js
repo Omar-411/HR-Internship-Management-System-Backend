@@ -37,6 +37,7 @@ export const getMeetingById = async (req, res, next) => {
 export const createMeeting = async (req, res, next) => {
   try {
     const result = await meetingService.createMeeting(req.body, req.user);
+    
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
