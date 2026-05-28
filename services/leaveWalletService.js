@@ -1,11 +1,6 @@
 import User from "../models/User.js";
 
-/*
-    When a leave type's defaultDays is updated, we need to sync the change to all users who have a balance for that leave type. 
-    This function calculates the difference between the old and new default days and updates each user's remaining days accordingly, 
-    ensuring that no user's remaining days become negative and that even old users who had a different defaultDays before still get 
-    the correct adjustment based on the new defaultDays.
-*/
+// Sync the change in default days of a leave type to all users who have a balance for that leave type
 export const syncLeaveTypeToUsers = async (
   leaveTypeId,
   oldDefaultDays,

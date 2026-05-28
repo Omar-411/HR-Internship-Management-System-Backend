@@ -72,6 +72,7 @@ export const getAllConfigs = async (queryParams) => {
 
 // Get the active payroll configuration for a specific year
 export const getActivePayrollConfig = async (year) => {
+  // Find the active config for the specified year
   const config = await PayrollConfig.findOne({ year, isActive: true });
   if (!config) {
     throw new AppError(
@@ -99,6 +100,7 @@ export const createNewVersion = async (newConfig, user, ip) => {
     .sort("-version")
     .select("version");
 
+  // Determine the next version number
   const nextVersion = (latestConfig?.version || 1) + 1;
 
   // Deactivate the current active config
@@ -151,6 +153,7 @@ export const createNewVersion = async (newConfig, user, ip) => {
 // Get all versions for a specific year
 export const getYearVersions = async (year) => {
   const versions = await PayrollConfig.find({ year }).sort("-version");
+  
   return {
     status: "Success",
     code: 200,

@@ -283,6 +283,7 @@ export const updateSprint = async (sprintId, updates, user) => {
 
   // Save the changes
   await sprint.save();
+  
   if (isScheduleChanged) {
     await upsertSprintReviewMeeting(sprint, project);
   }
@@ -384,6 +385,16 @@ export const startSprint = async (sprintId, user) => {
 
   // Check if the project is archived, completed or on hold
   isProjectInactive(project);
+
+  // Check if the project is active
+  if (project.status !== "Active") {
+    throw new AppError(
+      projectErrors.PROJECT_NOT_ACTIVE.message,
+      projectErrors.PROJECT_NOT_ACTIVE.code,
+      projectErrors.PROJECT_NOT_ACTIVE.errorCode,
+      projectErrors.PROJECT_NOT_ACTIVE.suggestion,
+    );
+  }
 
   // Check if the sprint is in "Planned" status to be able to start it
   if (sprint.status !== "Planned") {

@@ -1,5 +1,3 @@
-// services/analytics/alertStatsService.js
-
 import Alert from "../../models/Alert.js";
 import {
   getStartAndEndOfToday,

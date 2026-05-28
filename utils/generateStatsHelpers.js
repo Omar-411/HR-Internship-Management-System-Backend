@@ -11,11 +11,17 @@ import {
 
 // Stat generation function (Grneralized for any period type)
 export const generateStats = async ({ startDate, endDate, periodType }) => {
-  // If startDate or endDate is missing, we cannot generate stats
-  if (!startDate || !endDate) {
+  // Validates the input dates to ensure they are valid Date objects and not NaN
+  if (
+    !startDate ||
+    !endDate ||
+    isNaN(startDate.valueOf()) ||
+    isNaN(endDate.valueOf())
+  ) {
+    console.error("Invalid dates:", { startDate, endDate });
     return;
   }
-  
+
   // Fetch all users to calculate stats for each user
   const users = await User.find();
 

@@ -7,7 +7,7 @@ import { getIO } from "../socket.js";
 
 // Mark a notification as read
 export const markNotificationAsRead = async (notificationId, currentUser) => {
-  // Check notification existence
+  // Check the notification existence
   const notification = await Notification.findById(notificationId);
   if (!notification) {
     throw new AppError(
@@ -75,7 +75,7 @@ export const markAllNotificationsAsRead = async (currentUser) => {
 
 // Delete a single notification.
 export const deleteNotification = async (notificationId, currentUser) => {
-  // Check notification existence
+  // Check the notification existence
   const notification = await Notification.findById(notificationId);
   if (!notification) {
     throw new AppError(
@@ -97,7 +97,6 @@ export const deleteNotification = async (notificationId, currentUser) => {
   }
 
   await Notification.findByIdAndDelete(notificationId);
-
   await emitUnreadNotificationCount(notification.recipientId);
 
   return {
@@ -138,6 +137,7 @@ export const getRecentNotifications = async (currentUser) => {
 
 // Get unread notification count for the current user (Fallback function for the unread notification count)
 export const getUnreadNotificationCount = async (currentUser) => {
+  // Count the number of unread notifications for the current user
   const count = await Notification.countDocuments({
     recipientId: currentUser.id,
     isRead: false,

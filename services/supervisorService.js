@@ -1,17 +1,15 @@
-// Custom service for supervisor-related operations
 import User from "../models/User.js";
+import UserRole from "../models/UserRole.js";
 import { getAll } from "./handlersFactory.js";
-import { resolveRoleId, resolveDepartmentId} from "../utils/userResolvers.js";
+import { resolveRoleId, resolveDepartmentId } from "../utils/userResolvers.js";
+import { SENSITIVE_FIELDS } from "../constants/userConstants.js";
 
-// Sensitive fields that must never leave the backend
-const SENSITIVE_FIELDS = "-password -verificationCode -verificationCodeExpires -resetPasswordToken -resetPasswordExpires -loginAttempts -resendCount -resendDate -mustResetPassword";
-
-// Get all active supervisors. Query params example: page=1&keyword=omar
+// Get all active supervisors
 export const getActiveSupervisors = async (queryParams) => {
-  // Find the role IDs for all roles that can be assigned as a supervisor (excluding Admin)
-  const roles = await import("../models/UserRole.js").then((m) => m.default.find({
+  // Find the supervisor role
+  const roles = await UserRole.find({
     name: { $in: [/^HR$/i, /^Supervisor$/i] },
-  }));
+  });
   const roleIds = roles.map((r) => r._id);
 
   const finalQuery = {
@@ -23,6 +21,7 @@ export const getActiveSupervisors = async (queryParams) => {
   // Resolve the department name - Id if we applied a department filter
   if (finalQuery.department) {
     finalQuery.department_id = await resolveDepartmentId(finalQuery.department);
+    
     delete finalQuery.department;
   }
 

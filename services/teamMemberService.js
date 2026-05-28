@@ -31,7 +31,7 @@ export const getTeamRoles = async () => {
 export const getProjectTeamMembers = async (queryParams, teamId, user) => {
   console.log("[TEAM-FETCH-TRACE] - ID RECEIVED:", teamId);
 
-  // Resolve projectId (teamId here is the projectId from the route)
+  // Check the project existence
   const projectMatch = resolveId(teamId);
   const Project = mongoose.model("Project");
   const projectExists = await Project.findOne(projectMatch);
@@ -56,23 +56,24 @@ export const getProjectTeamMembers = async (queryParams, teamId, user) => {
 
   console.log("[TEAM-FETCH-TRACE] - TEAM FOUND:", team ? "YES" : "NO");
 
+  // If there is no team, we create it
   if (!team) {
     const projObjectId = projectExists._id;
 
-    // Auto-create team if missing to ensure UI continuity
     console.log(`[TEAM-FETCH-TRACE] - Auto-creating team for ${teamId}`);
+
     team = await Team.create({
       name: `${projectExists.name} Team`,
       projectId: projObjectId,
     });
 
-    // CRITICAL: Update the project with the new team_id
+    // Link the team to the project
     console.log(
       `[TEAM-FETCH-TRACE] - Linking team ${team._id} to project ${projObjectId}`,
     );
+
     await Project.findByIdAndUpdate(projObjectId, { team_id: team._id });
 
-    // Populate the newly created team
     team = await Team.findById(team._id).populate("projectId");
   }
 
@@ -88,7 +89,7 @@ export const getProjectTeamMembers = async (queryParams, teamId, user) => {
 
   const finalQuery = {
     ...queryParams,
-    limit: 6,
+    limit: 12,
     sort: "-createdAt",
     teamId: team._id,
   };
@@ -114,7 +115,6 @@ export const getProjectTeamMembers = async (queryParams, teamId, user) => {
   // Get the task stats for each team member
   const statMembers = await Promise.all(
     members.map(async (member) => {
-      // Safety check: if user was deleted but remains in TeamMember collection
       if (!member.userId) {
         return {
           _id: member._id,
@@ -170,7 +170,7 @@ export const getSupervisorTeamMembers = async (
   currentUser,
   queryParams,
 ) => {
-  // Check user existence
+  // Check the supervisor existence
   const supervisorMatch = resolveId(supervisorId);
   const supervisor = await User.findOne(supervisorMatch);
   if (!supervisor) {
@@ -221,14 +221,13 @@ export const getSupervisorTeamMembers = async (
 
 // Add a team member to a team
 export const addTeamMember = async (teamId, userId, role, currentUser) => {
-  console.log("PROJECT ID RECEIVED:", teamId);
-  console.log("TEAM QUERY:", { projectId: teamId });
+  console.log("[PROJECT-ID-RECEIVED]:", teamId);
+  console.log("[TEAM-QUERY]:", { projectId: teamId });
 
-  // Check the team existence by projectId since frontend passes projectId as the teamId param
+  // Check the project existence
   const projectMatch = resolveId(teamId);
   const Project = mongoose.model("Project");
   const projectExists = await Project.findOne(projectMatch);
-
   if (!projectExists) {
     throw new AppError(
       projectErrors.PROJECT_NOT_FOUND.message,
@@ -241,20 +240,19 @@ export const addTeamMember = async (teamId, userId, role, currentUser) => {
   let team = await Team.findOne({ projectId: projectExists._id }).populate(
     "projectId",
   );
-  console.log("TEAM FOUND:", team);
+  console.log("[TEAM-FOUND]:", team);
 
   if (!team) {
-    console.log("No team found, creating one...");
+    console.log("[NO-TEAM-FOUND], creating one...");
     team = await Team.create({
       name: `${projectExists.name} Team`,
       projectId: projectExists._id,
     });
 
-    // CRITICAL: Link the new team back to the project
+    // Link the new team back to the project
     console.log(`LINKING NEW TEAM ${team._id} TO PROJECT ${projectExists._id}`);
     await Project.findByIdAndUpdate(projectExists._id, { team_id: team._id });
 
-    // Populate it for the downstream authorization check
     team = await Team.findById(team._id).populate("projectId");
   }
 

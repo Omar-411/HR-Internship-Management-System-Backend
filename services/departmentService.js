@@ -15,7 +15,7 @@ import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.
 export const getDepartments = async (queryParams) => {
   const finalQuery = {
     sort: "name",
-    limit: 100,
+    limit: 15,
     ...queryParams,
   };
   return await getAll(Department)(finalQuery);

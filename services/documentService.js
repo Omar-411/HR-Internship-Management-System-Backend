@@ -281,10 +281,10 @@ export const toggleConfidentialityService = async ({
 
   if (!isOwner && !isAdmin) {
     throw new AppError(
-      documentErrors.UNAUTHORIZED_TO_TOGGLE_DOCUMENT_CONFIDENTIALITY.message,
-      documentErrors.UNAUTHORIZED_TO_TOGGLE_DOCUMENT_CONFIDENTIALITY.code,
-      documentErrors.UNAUTHORIZED_TO_TOGGLE_DOCUMENT_CONFIDENTIALITY.errorCode,
-      documentErrors.UNAUTHORIZED_TO_TOGGLE_DOCUMENT_CONFIDENTIALITY.suggestion,
+      errors.UNAUTHORIZED_TO_TOGGLE_DOCUMENT_CONFIDENTIALITY.message,
+      errors.UNAUTHORIZED_TO_TOGGLE_DOCUMENT_CONFIDENTIALITY.code,
+      errors.UNAUTHORIZED_TO_TOGGLE_DOCUMENT_CONFIDENTIALITY.errorCode,
+      errors.UNAUTHORIZED_TO_TOGGLE_DOCUMENT_CONFIDENTIALITY.suggestion,
     );
   }
 

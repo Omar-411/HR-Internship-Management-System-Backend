@@ -114,6 +114,7 @@ export const createDocumentRequest = async (data, currentUser) => {
       projectErrors.PROJECT_NOT_FOUND.suggestion,
     );
   }
+  
   const projectObjectId = project._id;
 
   // Check the team existence for the project

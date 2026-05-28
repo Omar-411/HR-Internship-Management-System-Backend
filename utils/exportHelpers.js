@@ -40,6 +40,7 @@ export const exportCSV = (data, res, fileName) => {
 
   res.header("Content-Type", "text/csv");
   res.attachment(fileName); // The filename will be the user's name + the filter type (e.g., "John_Doe_Monthly_Attendance.csv")
+  
   return res.send(csv);
 };
 
@@ -150,5 +151,6 @@ export const exportExcel = async (data, res, fileName, includeName = false) => {
   );
 
   await workbook.xlsx.write(res);
+  
   res.end();
 };

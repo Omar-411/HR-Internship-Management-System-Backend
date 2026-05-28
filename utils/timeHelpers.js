@@ -126,10 +126,12 @@ export const getEndOfDay = (date) => {
 };
 
 // Helper to get an inclusive-exclusive UTC day range [start, end)
-export const getUtcDayRange = (date) => {
+export const getUtcDayRange = (date = new Date()) => {
   const start = getStartOfDay(date);
   const end = new Date(start);
+ 
   end.setUTCDate(end.getUTCDate() + 1);
+  
   return { start, end };
 };
 

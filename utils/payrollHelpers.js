@@ -531,10 +531,11 @@ export const calculateUnpaidLeaveDeduction = async (
   const timetableMap = buildTimetableMap(timetables);
 
   // Calculate a fallback daily hours value in case no timetable entry exists for a day
-  // (standardMonthlyHours / number of working weekdays in the month)
   const standardMonthlyHours = config?.payroll?.standardMonthlyHours || 173;
   let workingDaysInMonth = 0;
+
   const tempCursor = new Date(monthStart);
+
   while (tempCursor <= monthEnd) {
     const day = tempCursor.getDay();
     if (day !== 0 && day !== 6) workingDaysInMonth++;
@@ -544,6 +545,7 @@ export const calculateUnpaidLeaveDeduction = async (
     ? standardMonthlyHours / workingDaysInMonth
     : standardMonthlyHours / 22;
 
+  // Iterate over each unpaid leave and calculate the deduction based on the expected hours for those days
   let totalUnpaidHours = 0;
 
   for (const leave of unpaidLeaves) {
@@ -553,6 +555,7 @@ export const calculateUnpaidLeaveDeduction = async (
       if (date < monthStart || date > monthEnd) continue;
 
       const dayOfWeek = new Date(date).getDay();
+      
       // Skip weekends — no expected hours on Saturday (6) or Sunday (0)
       if (dayOfWeek === 0 || dayOfWeek === 6) continue;
 
@@ -562,8 +565,6 @@ export const calculateUnpaidLeaveDeduction = async (
       // Get the expected hours for the day based on the timetable and special shifts
       let expectedHours = await resolveExpectedHours(timetable, SpecialShift);
 
-      // Step 3 fix: If no timetable entry exists for this working day, fall back to the
-      // average daily hours derived from the standard monthly hours configuration.
       if (!timetable && expectedHours === 0) {
         expectedHours = fallbackDailyHours;
       }

@@ -36,6 +36,7 @@ export const exportStatsCSV = (stats, selectedKPIs, res, fileName) => {
 
   res.header("Content-Type", "text/csv");
   res.attachment(fileName);
+  
   return res.send(csv);
 };
 
@@ -116,5 +117,6 @@ export const exportStatsExcel = async (stats, selectedKPIs, res, fileName) => {
   );
 
   await workbook.xlsx.write(res);
+  
   res.end();
 };

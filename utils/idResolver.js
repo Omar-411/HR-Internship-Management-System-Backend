@@ -1,10 +1,6 @@
 import mongoose from "mongoose";
 
-/**
- * Resolves a public identifier (slug, publicId, or MongoDB _id) into a database query object.
- * @param {string} id - The identifier to resolve.
- * @returns {Object} - A MongoDB query object, e.g., { _id: ... } or { slug: ... } or { publicId: ... }
- */
+// Resolves a public identifier (slug, publicId, or MongoDB _id) into a database query object.
 export const resolveId = (id) => {
   if (!id) return {};
 

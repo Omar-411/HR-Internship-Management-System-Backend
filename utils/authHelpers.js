@@ -21,6 +21,7 @@ export const getUserRoleName = async (roleId) => {
     errors.USER_ROLE_NOT_FOUND.errorCode,
     errors.USER_ROLE_NOT_FOUND.suggestion
   );
+  
   return role.name;
 };
 

@@ -17,6 +17,7 @@ export const getPersonalType = async () => {
       errors.PERSONAL_TYPE_NOT_FOUND.suggestion,
     );
   }
+
   return type;
 };
 
@@ -67,9 +68,11 @@ export const getValidAdminDocument = async (DocumentId) => {
       errors.NOT_ADMINISTRATIVE_DOCUMENT.suggestion,
     );
   }
+
   return document;
 };
 
+// Helper function to fill an HTML template with data
 export const fillTemplate = (html, data) => {
   const getValue = (obj, path) => {
     return path.split(".").reduce((acc, key) => {

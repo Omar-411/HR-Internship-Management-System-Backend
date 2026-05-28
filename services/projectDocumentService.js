@@ -64,7 +64,7 @@ export const uploadDocumentForRequest = async (
     );
   }
 
-  // Authorization check: only the project team members can upload documents to fulfill the document request
+  // Check the project existence
   const project = await Project.findById(request.projectId);
   if (!project) {
     throw new AppError(
@@ -86,6 +86,7 @@ export const uploadDocumentForRequest = async (
     );
   }
 
+  // Authorization check: only the project team members can upload documents to fulfill the document request
   const isMember = await TeamMember.exists({
     teamId: team._id,
     userId: currentUser.id,
@@ -117,6 +118,7 @@ export const uploadDocumentForRequest = async (
   request.uploadedBy = currentUser.id;
   request.uploadedAt = new Date();
   request.rejectionComment = null; // Clear any previous rejection comment if re-uploading after a rejection
+  
   await request.save();
 
   // Get the user who uploaded the document

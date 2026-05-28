@@ -1,4 +1,3 @@
-// Core document service functions that can be used across different document types (personal, company, etc.)
 import Document from "../models/Document.js";
 import { pipeline } from "stream/promises";
 import fetch from "node-fetch";
@@ -154,5 +153,6 @@ export const generateDocumentCore = async (templateName, data) => {
   const pdfBuffer = Buffer.from(pdf);
 
   await browser.close();
+  
   return pdfBuffer;
 };

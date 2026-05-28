@@ -197,6 +197,7 @@ export const verifyUserService = async ({ email, code }) => {
 export const resendOTPService = async ({ email }) => {
   const trimmedEmail = (email || "").trim().toLowerCase();
 
+  // Check the user existence
   const user = await User.findOne({ email: trimmedEmail });
   if (!user)
     throw new AppError(

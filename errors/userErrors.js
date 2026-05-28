@@ -187,4 +187,10 @@ export const errors = {
     errorCode: "INVALID_PASSWORD",
     suggestion: "Please provide a valid password to be reset your face ID.",
   },
+  ADMIN_ONLY_HR: {
+    message: "An admin can only be assigned to the HR department",
+    code: 403,
+    errorCode: "ADMIN_ONLY_HR",
+    suggestion: "Please assign the admin to the HR department.",
+  },
 };

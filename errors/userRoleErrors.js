@@ -1,4 +1,3 @@
-// User Role expected errors
 export const errors = {
   USER_ROLE_NOT_FOUND: {
     message: "User Role not found",

@@ -138,4 +138,10 @@ export const errors = {
     errorCode: "PROJECT_TEAM_REQUIRED",
     suggestion: "Add team members before activating the project.",
   },
+  PROJECT_NOT_ACTIVE: {
+    message: "Project is not active",
+    code: 400,
+    errorCode: "PROJECT_NOT_ACTIVE",
+    suggestion: "Activate the project to perform this action.",
+  },
 };

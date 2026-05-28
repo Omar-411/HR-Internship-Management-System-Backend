@@ -69,6 +69,7 @@ export const getAllResignations = async (queryParams) => {
     limit: 5,
     sort: "createdAt",
   };
+  
   return await getAll(
     Resignation,
     { path: "employeeId", select: "profileImageURL" },

@@ -67,12 +67,8 @@ export const validatePhoneNumber = (code, number) => {
     console.log(`[Phone-Validation-SUCCESS] Result: ${formatted}`);
     return formatted;
   } catch (error) {
-    // if (error instanceof AppError) {
-    //   throw error;
-    // }
-    // console.error("[Phone-Validation-ERROR]", error.message);
-    // return null;
-    // next(error);
+    console.warn(`[Phone-Validation-ERROR] ${error.message}`);
+    return null;
   }
 };
 

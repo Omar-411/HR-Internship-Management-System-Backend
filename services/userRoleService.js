@@ -15,7 +15,7 @@ import { createNotificationForAdminsExcept } from "../utils/notificationHelpers.
 export const getUserRoles = async (queryParams) => {
   const finalQuery = {
     sort: "name",
-    limit: 100,
+    limit: 10,
     ...queryParams,
   };
   return await getAll(UserRole)(finalQuery);

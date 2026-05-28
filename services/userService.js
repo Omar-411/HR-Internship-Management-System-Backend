@@ -209,11 +209,28 @@ export const addUserService = async (data, currentUser, ip) => {
   const roleId = await resolveRoleId(role);
   const departmentId = await resolveDepartmentId(department);
 
+  // Enforce that an Admin can be only assigned to the HR department
+  if (role.toLowerCase() === "admin") {
+    if (department !== "HR") {
+      throw new AppError(
+        errors.ADMIN_ONLY_HR.message,
+        errors.ADMIN_ONLY_HR.code,
+        errors.ADMIN_ONLY_HR.errorCode,
+        errors.ADMIN_ONLY_HR.suggestion,
+      );
+    }
+  }
+
   // Supervisor resolution: prefer ID if provided, otherwise resolve email
   let resolvedSupervisorId = null;
+
+  // If supervisor ID provided
   if (supervisor_id) {
     resolvedSupervisorId = await resolveSupervisorId(supervisor_id);
-  } else if (trimmedSupervisorEmail) {
+  } 
+  
+  // If supervisor email
+  else if (trimmedSupervisorEmail) {
     resolvedSupervisorId = await resolveSupervisorIdByEmail(
       trimmedSupervisorEmail,
     );
@@ -1324,8 +1341,9 @@ export const uploadCvService = async (userId, cvFile, currentUser, ip) => {
   };
 };
 
-// Enroll the face descriptors for face recognition (Custom not generic)
+// Enroll the face descriptors for face recognition
 export const enrollFaceService = async (userId, descriptors) => {
+  // Validate the descriptors input
   if (!descriptors || !Array.isArray(descriptors) || descriptors.length === 0) {
     throw new AppError(
       errors.MISSING_FACE_DESCRIPTORS.message,
@@ -1335,9 +1353,8 @@ export const enrollFaceService = async (userId, descriptors) => {
     );
   }
 
-  // Find the user first to avoid strict Mongoose cast errors on slugs
+  // Check the user existence
   const user = await User.findOne(resolveId(userId));
-
   if (!user) {
     throw new AppError(
       commonErrors.USER_NOT_FOUND.message,
@@ -1361,7 +1378,7 @@ export const enrollFaceService = async (userId, descriptors) => {
   };
 };
 
-// Reset the face descriptors (Custom not generic)
+// Reset the face descriptors
 export const resetFaceService = async (userId, password) => {
   // Check the user existence
   const user = await User.findById(userId);

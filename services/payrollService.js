@@ -594,7 +594,7 @@ export const exportPayrollToExcel = async (payrollId, currentUser, res) => {
 
   // Create the personnalised filename
   const employee = payroll.employeeId;
-  const safeName = `${employee.name}_${employee.lastName}`.replace(/\s+/g, "_");
+  const safeName = `${employee.slug}`;
   const filename = `Payslip_${safeName}_${payroll.month}_${payroll.year}.xlsx`;
 
   // Send file

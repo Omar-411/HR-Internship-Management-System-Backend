@@ -559,7 +559,7 @@ export const cancelMeeting = async (meetingId, currentUser) => {
     );
   }
 
-  // Get project
+  // Check the project existence
   const project = await Project.findById(meeting.projectId);
   if (!project) {
     throw new AppError(

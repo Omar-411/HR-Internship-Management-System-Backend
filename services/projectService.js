@@ -641,6 +641,7 @@ export const archiveProject = async (projectId, normalizedParam, userId) => {
 
 // Restore a project
 export const restoreProject = async (projectId, normalizedParam, userId) => {
+  // Check the project existence
   const project = await Project.findOne({
     $or: [
       { slug: normalizedParam },
@@ -737,6 +738,7 @@ export const deleteProject = async (
 
     // Get active team members to update their projectsCount if the project is active
     const members = await TeamMember.find({ teamId: project.team_id });
+    
     const activeMembers = members
       .filter((m) => m.isActiveInProject !== false)
       .map((m) => m.userId);

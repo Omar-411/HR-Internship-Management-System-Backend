@@ -69,11 +69,13 @@ export const buildProjectMatchFilter = async ({
     and employees/interns can access projects where they are team members
   */
   const normalizedRole = role?.toLowerCase();
+
   if (normalizedRole !== "admin") {
     if (normalizedRole === "supervisor") {
       if (!mongoose.Types.ObjectId.isValid(userId)) {
         throw new AppError(commonErrors.INVALID_ID.message, commonErrors.INVALID_ID.code);
       }
+
       match.productOwnerId = new mongoose.Types.ObjectId(userId);
     } else {
       const teams = await TeamMember.find({ userId }).select("teamId");
@@ -143,8 +145,7 @@ export const buildProjectMatchFilter = async ({
 export const buildProjectAccessMatch = async (projectId, userId, role) => {
   const match = resolveId(projectId);
   
-  // FIX: Robust casting for aggregation match stages. resolveId returns $or query.
-  // Mongoose find() casts automatically, but aggregate() does not.
+  // Handle the case where the match is an $or condition (e.g., for team members or supervisors)
   if (match.$or) {
     match.$or = match.$or.map(clause => {
       if (clause._id && typeof clause._id === 'string' && mongoose.Types.ObjectId.isValid(clause._id)) {
@@ -289,6 +290,7 @@ export const validateCreateProject = async (data, productOwnerId) => {
   }
 };
 
+// Normalize the required technologies and roles
 export const normalizeProjectRequirements = (values = []) => {
   if (
     !Array.isArray(values) ||
@@ -309,6 +311,7 @@ export const normalizeProjectRequirements = (values = []) => {
   )];
 };
 
+// Reset the AI evaluation fields
 export const resetProjectAiEvaluation = (project) => {
   project.aiEvaluationStatus = "Pending";
   project.aiEvaluationResult = null;
