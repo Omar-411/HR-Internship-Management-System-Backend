@@ -1,0 +1,83 @@
+{
+  "3b1bd12942a9a8947becc0a1e18c1c28d3e2385fce7ea0dd8cdd2b23685d5d60": {
+    "name": "Malek Ben Salah",
+    "technicalSkills": [
+      "Node.js",
+      "Express.js",
+      "MongoDB",
+      "React Native",
+      "Flutter",
+      "React",
+      "MySQL",
+      "Python",
+      "Java",
+      "JavaScript"
+    ],
+    "languages": [
+      "Arabe",
+      "Frensh",
+      "English"
+    ],
+    "domains": [
+      "Software Engineering",
+      "Information Systems"
+    ],
+    "softSkills": []
+  },
+  "6ad91a08db31e2e22e619607ff6a82cd01f78a5929e6ef279162587d8c38550a": {
+    "name": "Yasmine Hmida",
+    "technicalSkills": [
+      "Node.js",
+      "Express.js",
+      "MongoDB",
+      "React Native",
+      "Flutter",
+      "HTML",
+      "CSS",
+      "JavaScript",
+      "Git",
+      "GitHub",
+      "React",
+      "MySQL",
+      "Python",
+      "Java"
+    ],
+    "languages": [
+      "Arabe",
+      "Français",
+      "Anglais"
+    ],
+    "domains": [
+      "Génie Logiciel",
+      "Systèmes d'information"
+    ],
+    "softSkills": []
+  },
+  "782ea5c6dace24a16c33c3757b395d514a01f024162b889fd518f7467e260663": {
+    "name": "Mohamed Heni",
+    "technicalSkills": [
+      "Flutter",
+      "MERN Stack",
+      "Node.js",
+      "Express.js",
+      "MongoDB",
+      "React Native",
+      "React",
+      "Java",
+      "JavaScript",
+      "MySQL"
+    ],
+    "languages": [
+      "Arabe",
+      "Frensh",
+      "English"
+    ],
+    "domains": [
+      "Software Engineering",
+      "Information Systems"
+    ],
+    "softSkills": []
+  },
+  "8820ea8d443161bfc6177b69d5502eb87dfc0dfb5e6d4418ff95e7c9327a996c": "```\n{\n  \"summaryText\": \"The top candidates for AgroSmart have a strong foundation in fullstack development, but gaps in required skills like TypeScript and PostgreSQL may impact project readiness. Overall, the team has potential but will need targeted support to fill skill gaps. With the right guidance, they can contribute to the project's success.\",\n  \"ranking\": [\n    {\n      \"name\": \"Mohamed Heni\",\n      \"recommendation\": \"Consider with targeted support — strong fullstack skills but missing key technologies like TypeScript and PostgreSQL.\",\n      \"reasons\": [\n        \"Hands-on experience with MongoDB and MySQL can be leveraged for data management in AgroSmart.\",\n        \"Proficiency in JavaScript and ExpressJS is a good foundation for backend development, but will need to adapt to new technologies.\",\n        \"Lack of TypeScript and PostgreSQL experience may slow down initial project contributions, requiring additional training.\"\n      ]\n    },\n    {\n      \"name\": \"Yasmine Hmida\",\n      \"recommendation\": \"Strong potential with additional training — brings a solid grasp of frontend and backend development, but needs to fill gaps in required skills.\",\n      \"reasons\": [\n        \"Experience with NodeJS and ExpressJS can be applied to building scalable server-side applications for AgroSmart.\",\n        \"Familiarity with Git is essential for collaborative development and version control in the project.\",\n        \"Gaps in TypeScript and PostgreSQL knowledge may hinder ability to work with certain project components, requiring focused upskilling.\"\n      ]\n    },\n    {\n      \"name\": \"Malek Ben Salah\",\n      \"recommendation\": \"Ready to contribute with guidance — possesses a broad range of skills, but needs to deepen expertise in specific areas critical to AgroSmart.\",\n      \"reasons\": [\n        \"Strong foundation in HTML, CSS, and JavaScript can be utilized for developing user interfaces and client-side logic.\",\n        \"Experience with MongoDB can be valuable for NoSQL data storage solutions in the project, but may need to learn PostgreSQL for relational databases.\",\n        \"Limited experience with TypeScript may pose a risk for maintaining large-scale applications, necessitating additional learning and practice.\"\n      ]\n    }\n  ]\n}\n```",
+  "a8c3e76c8ad47c5ff8346bf07d1c67b3deaef3c7b1330b92ef6252c12536b832": "```\n{\n  \"summaryText\": \"The current candidate pool lacks direct experience with Angular and NextJS, posing a significant ramp-up challenge for the project. However, their strong foundation in JavaScript, ExpressJS, and MongoDB can be leveraged with targeted training. Overall, the team's readiness for this specific project is compromised due to the missing required skills.\",\n  \"ranking\": [\n    {\n      \"name\": \"Mohamed Heni\",\n      \"recommendation\": \"Consider with targeted Angular and NextJS training — strong JavaScript background but significant skill gaps.\",\n      \"reasons\": [\n        \"Hands-on experience with MongoDB can be valuable for the project's data management needs.\",\n        \"JavaScript skills are highly relevant, but the lack of Angular and NextJS experience will require additional training.\",\n        \"Experience with ExpressJS can help in developing server-side logic, but integration with required frameworks is a concern.\"\n      ]\n    },\n    {\n      \"name\": \"Yasmine Hmida\",\n      \"recommendation\": \"Develop with close mentorship — solid foundation in NodeJS and JavaScript, but missing critical frontend skills.\",\n      \"reasons\": [\n        \"NodeJS expertise can contribute to backend development, but the absence of Angular and NextJS knowledge is a significant hurdle.\",\n        \"Familiarity with Git is beneficial for version control, yet the project's specific tech stack requires more.\",\n        \"MySQL experience can be adapted for database management, though the primary focus is on MongoDB.\"\n      ]\n    },\n    {\n      \"name\": \"Malek Ben Salah\",\n      \"recommendation\": \"Potential fit with rigorous upskilling — broad technical background, but critical gaps in required frameworks.\",\n      \"reasons\": [\n        \"Experience with Java can bring a structured approach to coding, but its direct application to the project is limited.\",\n        \"HTML and CSS skills are essential for frontend development, yet the lack of Angular and NextJS expertise undermines this strength.\",\n        \"Git proficiency is a plus for collaborative development, but the primary challenge lies in acquiring the missing required skills.\"\n      ]\n    }\n  ]\n}\n```"
+}
