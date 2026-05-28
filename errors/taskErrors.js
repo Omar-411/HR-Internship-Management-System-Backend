@@ -215,4 +215,16 @@ export const errors = {
     errorCode: "TASK_WITHOUT_ACTIVE_SPRINT",
     suggestion: "Please assign the task to an active sprint before moving it from the product backlog.",
   },
+  CANNOT_REVIEW_TASK_INACTIVE_SPRINT: {
+    message: "Cannot review task in an inactive sprint.",
+    code: 400,
+    errorCode: "CANNOT_REVIEW_TASK_INACTIVE_SPRINT",
+    suggestion: "Please review a task within an active sprint.",
+  },
+  CANNOT_REVIEW_TASK_WITHOUT_SPRINT: {
+    message: "Cannot review task without a sprint.",
+    code: 400,
+    errorCode: "CANNOT_REVIEW_TASK_WITHOUT_SPRINT",
+    suggestion: "Please assign the task to a sprint before reviewing it.",
+  },
 };

@@ -12,6 +12,7 @@ let evaluateProjectCandidatesFn;
 async function getEvaluateProjectCandidates() {
   if (!evaluateProjectCandidatesFn) {
     const aiApp = await import("../ai/app.js");
+    console.log(aiApp);
     evaluateProjectCandidatesFn = aiApp.evaluateProjectCandidates;
   }
   return evaluateProjectCandidatesFn;

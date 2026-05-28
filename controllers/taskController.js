@@ -1103,15 +1103,6 @@ export const moveTask = async (req, res, next) => {
 
       // Prevent a task from moving to "To Do" if it's not assigned to an active sprint
       if (status === "To Do") {
-        if (!task.sprintId) {
-          throw new AppError(
-            errors.TASK_WITHOUT_SPRINT.message,
-            errors.TASK_WITHOUT_SPRINT.code,
-            errors.TASK_WITHOUT_SPRINT.errorCode,
-            errors.TASK_WITHOUT_SPRINT.suggestion,
-          );
-        }
-
         const sprint = await Sprint.findById(task.sprintId);
         if (!sprint || sprint.status !== "Active") {
           throw new AppError(
@@ -1603,6 +1594,26 @@ export const reviewTask = async (req, res, next) => {
         errors.CANNOT_REVIEW_TASK_INACTIVE_PROJECT.code,
         errors.CANNOT_REVIEW_TASK_INACTIVE_PROJECT.errorCode,
         errors.CANNOT_REVIEW_TASK_INACTIVE_PROJECT.suggestion,
+      );
+    }
+
+    // Check if the task is in an active sprint, otherwise it cannot be reviewed
+    if (task.sprintId) {
+      const sprint = await Sprint.findById(task.sprintId);
+      if (!sprint || sprint.status !== "Active") {
+        throw new AppError(
+          errors.CANNOT_REVIEW_TASK_INACTIVE_SPRINT.message,
+          errors.CANNOT_REVIEW_TASK_INACTIVE_SPRINT.code,
+          errors.CANNOT_REVIEW_TASK_INACTIVE_SPRINT.errorCode,
+          errors.CANNOT_REVIEW_TASK_INACTIVE_SPRINT.suggestion,
+        );
+      }
+    } else {
+      throw new AppError(
+        errors.CANNOT_REVIEW_TASK_WITHOUT_SPRINT.message,
+        errors.CANNOT_REVIEW_TASK_WITHOUT_SPRINT.code,
+        errors.CANNOT_REVIEW_TASK_WITHOUT_SPRINT.errorCode,
+        errors.CANNOT_REVIEW_TASK_WITHOUT_SPRINT.suggestion,
       );
     }
 
