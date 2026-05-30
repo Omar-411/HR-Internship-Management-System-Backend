@@ -2,6 +2,8 @@ import User from "../models/User.js";
 import UserRole from "../models/UserRole.js";
 import Document from "../models/Document.js";
 import LeaveType from "../models/LeaveType.js";
+import Task from "../models/Task.js";
+import TeamMember from "../models/TeamMember.js";
 import { errors as commonErrors } from "../errors/commonErrors.js";
 import { errors } from "../errors/userErrors.js";
 import AppError from "../utils/AppError.js";
@@ -227,8 +229,8 @@ export const addUserService = async (data, currentUser, ip) => {
   // If supervisor ID provided
   if (supervisor_id) {
     resolvedSupervisorId = await resolveSupervisorId(supervisor_id);
-  } 
-  
+  }
+
   // If supervisor email
   else if (trimmedSupervisorEmail) {
     resolvedSupervisorId = await resolveSupervisorIdByEmail(
@@ -664,6 +666,41 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     }
   }
 
+  if (updateData.status === "Inactive" && existingUser.status !== "Inactive") {
+    // Unassign unfinished tasks
+    await Task.updateMany(
+      {
+        assignedTo: existingUser._id,
+        status: { $ne: "Done" },
+      },
+      {
+        $set: {
+          assignedTo: null,
+        },
+      },
+    );
+
+    // Remove the user from all project teams
+    await TeamMember.deleteMany({
+      userId: existingUser._id,
+    });
+
+    // Remove the user's own supervisor
+    updateData.supervisor_id = null;
+
+    // Remove this supervisor from all supervised users
+    await User.updateMany(
+      {
+        supervisor_id: existingUser._id,
+      },
+      {
+        $set: {
+          supervisor_id: null,
+        },
+      },
+    );
+  }
+
   // Update the user
   const user = await User.findOneAndUpdate({ _id: actualId }, updateData, {
     returnDocument: "after",
@@ -896,6 +933,42 @@ export const toggleUserStatusService = async (id, currentUser, ip) => {
   const oldStatus = user.status;
 
   user.status = user.status === "Active" ? "Inactive" : "Active";
+
+  // If the user is being inactivated, we need to unassign him from all his tasks and remove him from all teams/projects
+  if (user.status === "Inactive") {
+    // Unassign unfinished tasks
+    await Task.updateMany(
+      {
+        assignedTo: user._id,
+        status: { $ne: "Done" },
+      },
+      {
+        $set: {
+          assignedTo: null,
+        },
+      },
+    );
+
+    // Remove user from all teams/projects
+    await TeamMember.deleteMany({
+      userId: user._id,
+    });
+
+    // Remove the user's own supervisor
+    user.supervisor_id = null;
+
+    // If this user is a supervisor, detach all supervised employees/interns
+    await User.updateMany(
+      {
+        supervisor_id: user._id,
+      },
+      {
+        $set: {
+          supervisor_id: null,
+        },
+      },
+    );
+  }
 
   if (oldStatus !== "Active" && user.status === "Active") {
     // Send the account re-activation email to the user

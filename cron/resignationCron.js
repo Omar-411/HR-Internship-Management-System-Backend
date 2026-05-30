@@ -2,6 +2,7 @@ import cron from "node-cron";
 import Resignation from "../models/Resignation.js";
 import User from "../models/User.js";
 import Task from "../models/Task.js";
+import TeamMember from "../models/TeamMember.js";
 
 // Runs every day at midnight: 00:00
 cron.schedule("0 0 * * *", async () => {
@@ -25,6 +26,7 @@ cron.schedule("0 0 * * *", async () => {
       // Deactivate the user automatically
       await User.findByIdAndUpdate(resignation.employeeId, {
         status: "Inactive",
+        supervisor_id: null, // Remove the supervisor reference when deactivating the user
       });
 
       // Unassign unfinished tasks of the employee
@@ -49,6 +51,11 @@ cron.schedule("0 0 * * *", async () => {
           },
         },
       );
+
+      // Remove user from all teams/projects
+      await TeamMember.deleteMany({
+        userId: resignation.employeeId,
+      });
     }
 
     console.log(`[RESIGNATION-CRON] Moved to inactive: ${toDeactivate.length}`);

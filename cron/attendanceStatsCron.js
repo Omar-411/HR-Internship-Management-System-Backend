@@ -7,8 +7,7 @@ import {
 } from "../utils/generateStatsHelpers.js";
 
 // DAILY Stats -> Run Every day at 23:59
-// cron.schedule("59 23 * * *", async () => {
-cron.schedule("*/15 * * * *", async () => {
+cron.schedule("59 23 * * *", async () => {
   console.log("Running daily attendance stats cron job...");
 
   try {

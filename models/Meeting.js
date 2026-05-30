@@ -62,6 +62,10 @@ const meetingSchema = mongoose.Schema(
       enum: [5, 10, 15, 30, 60],
       default: 15,
     },
+    reminderSent: {
+      type: Boolean,
+      default: false,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -95,8 +99,8 @@ const meetingSchema = mongoose.Schema(
       default: "Scheduled",
     },
   },
-  { 
-    timestamps: true 
+  {
+    timestamps: true,
   },
 );
 

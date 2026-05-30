@@ -32,8 +32,11 @@ export const getAllMeetingsOfProject = async (
   // Build the base filter
   let filter = { projectId: project._id };
 
-  // If NOT the Product Owner, restrict displaying the meetings to the attendees only
-  if (project.productOwnerId?.toString() !== currentUser.id) {
+  // If the user is not the Product Owner, restrict the meetings to those where the user is an attendee
+  if (
+    project.productOwnerId?.toString() !== currentUser.id &&
+    currentUser.role !== "Admin"
+  ) {
     filter["attendees.userId"] = currentUser.id;
   }
 
@@ -239,7 +242,7 @@ export const createMeeting = async (data, currentUser) => {
     // The product owner automatically accepts the meeting invitation
     attendees: uniqueAttendees.map((userId) => ({
       userId,
-      status: userId === currentUser.id.toString() ? "Accepted" : "Pending", 
+      status: userId === currentUser.id.toString() ? "Accepted" : "Pending",
       respondedAt: userId === currentUser.id.toString() ? new Date() : null,
       responseReason: null,
     })),
@@ -458,7 +461,12 @@ export const updateMeeting = async (meetingId, data, currentUser) => {
   if (endTime) meeting.endTime = endTime;
   if (locationType) meeting.locationType = locationType;
   if (priority) meeting.priority = priority;
-  if (reminder) meeting.reminder = reminder;
+  if (reminder) {
+    meeting.reminderMinutesBefore = reminder;
+
+    // Reset reminder status if reminder changed
+    meeting.reminderSent = false;
+  }
 
   await meeting.save();
 

@@ -267,20 +267,6 @@ export const validatePayroll = async (payrollId, user, ip) => {
 
     const employee = payroll.employeeId;
 
-    // Prepare the data for the payslip generation
-    const payslipData = buildPayslipData(payroll, employee);
-
-    // Generate the pdf payslip automatically
-    await generateDocumentService({
-      templateName: "monthly_payslip",
-      data: {
-        userId: employee._id,
-        ...payslipData,
-      },
-      uploadedBy: user.id,
-      ip,
-    });
-
     // Create the audit log for this action
     await logAuditAction({
       adminId: user.id,

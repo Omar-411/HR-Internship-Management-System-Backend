@@ -9,6 +9,7 @@ import "./cron/attendanceCron.js"; // To automatically create day-off attendance
 import "./cron/attendanceStatsCron.js"; // To calculate the attendance stats automatically
 import "./cron/resignationCron.js"; // To automatically update resignation statuses and deactivate users
 import "./cron/payrollCron.js"; // To automatically generate payrolls every month for the previous month
+import "./cron/meetingReminderCron.js"; // To send meeting reminders to attendees
 
 // Creation of an express app
 const app = express();

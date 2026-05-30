@@ -79,5 +79,71 @@
     "softSkills": []
   },
   "8820ea8d443161bfc6177b69d5502eb87dfc0dfb5e6d4418ff95e7c9327a996c": "```\n{\n  \"summaryText\": \"The top candidates for AgroSmart have a strong foundation in fullstack development, but gaps in required skills like TypeScript and PostgreSQL may impact project readiness. Overall, the team has potential but will need targeted support to fill skill gaps. With the right guidance, they can contribute to the project's success.\",\n  \"ranking\": [\n    {\n      \"name\": \"Mohamed Heni\",\n      \"recommendation\": \"Consider with targeted support — strong fullstack skills but missing key technologies like TypeScript and PostgreSQL.\",\n      \"reasons\": [\n        \"Hands-on experience with MongoDB and MySQL can be leveraged for data management in AgroSmart.\",\n        \"Proficiency in JavaScript and ExpressJS is a good foundation for backend development, but will need to adapt to new technologies.\",\n        \"Lack of TypeScript and PostgreSQL experience may slow down initial project contributions, requiring additional training.\"\n      ]\n    },\n    {\n      \"name\": \"Yasmine Hmida\",\n      \"recommendation\": \"Strong potential with additional training — brings a solid grasp of frontend and backend development, but needs to fill gaps in required skills.\",\n      \"reasons\": [\n        \"Experience with NodeJS and ExpressJS can be applied to building scalable server-side applications for AgroSmart.\",\n        \"Familiarity with Git is essential for collaborative development and version control in the project.\",\n        \"Gaps in TypeScript and PostgreSQL knowledge may hinder ability to work with certain project components, requiring focused upskilling.\"\n      ]\n    },\n    {\n      \"name\": \"Malek Ben Salah\",\n      \"recommendation\": \"Ready to contribute with guidance — possesses a broad range of skills, but needs to deepen expertise in specific areas critical to AgroSmart.\",\n      \"reasons\": [\n        \"Strong foundation in HTML, CSS, and JavaScript can be utilized for developing user interfaces and client-side logic.\",\n        \"Experience with MongoDB can be valuable for NoSQL data storage solutions in the project, but may need to learn PostgreSQL for relational databases.\",\n        \"Limited experience with TypeScript may pose a risk for maintaining large-scale applications, necessitating additional learning and practice.\"\n      ]\n    }\n  ]\n}\n```",
-  "a8c3e76c8ad47c5ff8346bf07d1c67b3deaef3c7b1330b92ef6252c12536b832": "```\n{\n  \"summaryText\": \"The current candidate pool lacks direct experience with Angular and NextJS, posing a significant ramp-up challenge for the project. However, their strong foundation in JavaScript, ExpressJS, and MongoDB can be leveraged with targeted training. Overall, the team's readiness for this specific project is compromised due to the missing required skills.\",\n  \"ranking\": [\n    {\n      \"name\": \"Mohamed Heni\",\n      \"recommendation\": \"Consider with targeted Angular and NextJS training — strong JavaScript background but significant skill gaps.\",\n      \"reasons\": [\n        \"Hands-on experience with MongoDB can be valuable for the project's data management needs.\",\n        \"JavaScript skills are highly relevant, but the lack of Angular and NextJS experience will require additional training.\",\n        \"Experience with ExpressJS can help in developing server-side logic, but integration with required frameworks is a concern.\"\n      ]\n    },\n    {\n      \"name\": \"Yasmine Hmida\",\n      \"recommendation\": \"Develop with close mentorship — solid foundation in NodeJS and JavaScript, but missing critical frontend skills.\",\n      \"reasons\": [\n        \"NodeJS expertise can contribute to backend development, but the absence of Angular and NextJS knowledge is a significant hurdle.\",\n        \"Familiarity with Git is beneficial for version control, yet the project's specific tech stack requires more.\",\n        \"MySQL experience can be adapted for database management, though the primary focus is on MongoDB.\"\n      ]\n    },\n    {\n      \"name\": \"Malek Ben Salah\",\n      \"recommendation\": \"Potential fit with rigorous upskilling — broad technical background, but critical gaps in required frameworks.\",\n      \"reasons\": [\n        \"Experience with Java can bring a structured approach to coding, but its direct application to the project is limited.\",\n        \"HTML and CSS skills are essential for frontend development, yet the lack of Angular and NextJS expertise undermines this strength.\",\n        \"Git proficiency is a plus for collaborative development, but the primary challenge lies in acquiring the missing required skills.\"\n      ]\n    }\n  ]\n}\n```"
+  "a8c3e76c8ad47c5ff8346bf07d1c67b3deaef3c7b1330b92ef6252c12536b832": "```\n{\n  \"summaryText\": \"The current candidate pool lacks direct experience with Angular and NextJS, posing a significant ramp-up challenge for the project. However, their strong foundation in JavaScript, ExpressJS, and MongoDB can be leveraged with targeted training. Overall, the team's readiness for this specific project is compromised due to the missing required skills.\",\n  \"ranking\": [\n    {\n      \"name\": \"Mohamed Heni\",\n      \"recommendation\": \"Consider with targeted Angular and NextJS training — strong JavaScript background but significant skill gaps.\",\n      \"reasons\": [\n        \"Hands-on experience with MongoDB can be valuable for the project's data management needs.\",\n        \"JavaScript skills are highly relevant, but the lack of Angular and NextJS experience will require additional training.\",\n        \"Experience with ExpressJS can help in developing server-side logic, but integration with required frameworks is a concern.\"\n      ]\n    },\n    {\n      \"name\": \"Yasmine Hmida\",\n      \"recommendation\": \"Develop with close mentorship — solid foundation in NodeJS and JavaScript, but missing critical frontend skills.\",\n      \"reasons\": [\n        \"NodeJS expertise can contribute to backend development, but the absence of Angular and NextJS knowledge is a significant hurdle.\",\n        \"Familiarity with Git is beneficial for version control, yet the project's specific tech stack requires more.\",\n        \"MySQL experience can be adapted for database management, though the primary focus is on MongoDB.\"\n      ]\n    },\n    {\n      \"name\": \"Malek Ben Salah\",\n      \"recommendation\": \"Potential fit with rigorous upskilling — broad technical background, but critical gaps in required frameworks.\",\n      \"reasons\": [\n        \"Experience with Java can bring a structured approach to coding, but its direct application to the project is limited.\",\n        \"HTML and CSS skills are essential for frontend development, yet the lack of Angular and NextJS expertise undermines this strength.\",\n        \"Git proficiency is a plus for collaborative development, but the primary challenge lies in acquiring the missing required skills.\"\n      ]\n    }\n  ]\n}\n```",
+  "84abc0199fe332c63a8cec8a10c81b73805d1ccd47f6db7e6fd08257513ebe07": {
+    "name": "Taha Ben Hsin",
+    "technicalSkills": [
+      "Node.js",
+      "Express.js",
+      "MongoDB",
+      "React Native",
+      "Flutter",
+      "React",
+      "Python",
+      "Java",
+      "JavaScript",
+      "MySQL",
+      "Git",
+      "GitHub",
+      "Flutter",
+      "MERN Stack"
+    ],
+    "languages": [
+      "Arabe",
+      "Frensh",
+      "English"
+    ],
+    "domains": [
+      "Software Engineering",
+      "Information Systems",
+      "Mobile Development",
+      "Web Development"
+    ],
+    "softSkills": []
+  },
+  "e5578b7818a03048253c81c296fa81e122398e4b4c6c9a41b2dcd9ca7fd0feb4": {
+    "name": "Maram Zagar",
+    "technicalSkills": [
+      "Java",
+      "Python",
+      "C",
+      "PHP",
+      "Spring Boot",
+      "Flask",
+      "HTML",
+      "CSS",
+      "JavaScript",
+      "MySQL Workbench",
+      "Prometheus",
+      "Grafana",
+      "Docker",
+      "Linux/Ubuntu"
+    ],
+    "languages": [
+      "Arabe",
+      "Français",
+      "Anglais"
+    ],
+    "domains": [
+      "Développement Backend",
+      "Cybersécurité et administration système",
+      "Web et Frameworks",
+      "Outils et Technologies",
+      "Stages",
+      "Projets"
+    ],
+    "softSkills": []
+  },
+  "94230b00899137fd719abef023d53f7108d1ed25b5b15306bfdb3706787f0462": "```json\n{\n  \"summaryText\": \"The team has a strong fullstack developer but lacks a suitable AI engineer, posing a risk to the project's analytics integration. Overall readiness is compromised due to the significant skill gaps in one of the candidates. With targeted support and training, the team can still deliver the healthcare management platform.\",\n  \"ranking\": [\n    {\n      \"name\": \"Taha Ben Hsin\",\n      \"recommendation\": \"Strong fullstack developer fit — ready to contribute to the frontend and backend development from day one.\",\n      \"reasons\": [\n        \"Hands-on experience with ExpressJS and MongoDB maps directly to the project's backend needs.\",\n        \"Proficiency in JavaScript and HTML/CSS will enable effective collaboration on the web-based platform's UI/UX.\",\n        \"Familiarity with the MERN stack will facilitate the development of the platform's core features.\"\n      ]\n    },\n    {\n      \"name\": \"Maram Zagar\",\n      \"recommendation\": \"Consider with significant validation and training — lacks required skills in ExpressJS, MongoDB, NodeJS, and ReactJS, posing a high risk to the project's success.\",\n      \"reasons\": [\n        \"Missing required skills in ExpressJS, MongoDB, NodeJS, and ReactJS will require substantial ramp-up time and training.\",\n        \"Experience with Docker and Linux can be leveraged for infrastructure automation, but will not compensate for the lack of core skills.\",\n        \"The significant skill gaps pose a risk to the project's AI-powered analytics integration and overall delivery timeline.\"\n      ]\n    }\n  ]\n}\n```",
+  "9891cfc17bdcfd48ad542f3b0327ce8cff1dfb5efdc6fc61b7b56b4a9b3fdc16": "```json\n{\n  \"summaryText\": \"The top candidates show promise, but gaps in required skills may impact project timelines. Maram Zagar's strong backend skills and experience with MySQL make them a contender, while Taha Ben Hsin's diverse skill set requires more evaluation. Overall, the team's readiness for this project is moderate, with some candidates needing additional support or training.\",\n  \"ranking\": [\n    {\n      \"name\": \"Maram Zagar\",\n      \"recommendation\": \"Strong backend candidate, but will need to quickly learn Angular to contribute fully to the project.\",\n      \"reasons\": [\n        \"Hands-on experience with MySQL maps directly to the project's database management needs.\",\n        \"Familiarity with Java and JavaScript will help with integrating AI-powered analytics.\",\n        \"Lack of Angular experience may slow down initial contributions to the frontend development.\"\n      ]\n    },\n    {\n      \"name\": \"Taha Ben Hsin\",\n      \"recommendation\": \"Consider with additional evaluation — diverse skill set, but significant gaps in required technologies.\",\n      \"reasons\": [\n        \"Experience with ExpressJS and MongoDB could be adapted to the project's backend needs, but will require additional learning.\",\n        \"Familiarity with JavaScript and HTML will be beneficial for frontend development, but Angular expertise is lacking.\",\n        \"Unfamiliarity with Springboot may hinder contributions to the project's core architecture.\"\n      ]\n    }\n  ]\n}\n```"
 }

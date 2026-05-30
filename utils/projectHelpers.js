@@ -245,49 +245,6 @@ export const validateCreateProject = async (data, productOwnerId) => {
       errors.INVALID_DUE_DATE.suggestion,
     );
   }
-
-  if (scrumMasterId) {
-    // Check the scrum master existence
-    const scrumMaster = await User.findById(scrumMasterId).populate("role_id");
-    if (!scrumMaster) {
-      throw new AppError(
-        commonErrors.USER_NOT_FOUND.message,
-        commonErrors.USER_NOT_FOUND.code,
-        commonErrors.USER_NOT_FOUND.errorCode,
-        commonErrors.USER_NOT_FOUND.suggestion,
-      );
-    }
-
-    // Check the scrum master is under the same supervisor as the product owner
-    if (scrumMaster.supervisor_id.toString() !== productOwnerId.toString()) {
-      throw new AppError(
-        errors.UNAUTHORIZED_TO_ASSIGN_SCRUM_MASTER.message,
-        errors.UNAUTHORIZED_TO_ASSIGN_SCRUM_MASTER.code,
-        errors.UNAUTHORIZED_TO_ASSIGN_SCRUM_MASTER.errorCode,
-        errors.UNAUTHORIZED_TO_ASSIGN_SCRUM_MASTER.suggestion,
-      );
-    }
-
-    // Check the scrum master is not an intern
-    if (scrumMaster.role_id.name === "Intern") {
-      throw new AppError(
-        errors.INVALID_SCRUM_MASTER.message,
-        errors.INVALID_SCRUM_MASTER.code,
-        errors.INVALID_SCRUM_MASTER.errorCode,
-        errors.INVALID_SCRUM_MASTER.suggestion,
-      );
-    }
-
-    // Check the scrum master is available to take on a new project
-    if (!isUserAvailable(scrumMaster)) {
-      throw new AppError(
-        commonErrors.USER_UNAVAILABLE.message,
-        commonErrors.USER_UNAVAILABLE.code,
-        commonErrors.USER_UNAVAILABLE.errorCode,
-        commonErrors.USER_UNAVAILABLE.suggestion,
-      );
-    }
-  }
 };
 
 // Normalize the required technologies and roles

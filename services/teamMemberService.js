@@ -237,6 +237,7 @@ export const addTeamMember = async (teamId, userId, role, currentUser) => {
     );
   }
 
+  // Check the team existence (If not found, create on the fly and link it to the project)
   let team = await Team.findOne({ projectId: projectExists._id }).populate(
     "projectId",
   );
@@ -322,7 +323,7 @@ export const addTeamMember = async (teamId, userId, role, currentUser) => {
       );
     }
 
-    // Check if the new team member has the "Employee" role, since only an employee can be a scrum master
+    // Check if the new team member has the "Employee" role, since only an employee can be a scrum master, not an intern
     if (teamMember.role_id.name !== "Employee") {
       throw new AppError(
         projectErrors.INVALID_SCRUM_MASTER.message,
@@ -407,10 +408,21 @@ export const updateTeamMember = async (
   currentUser,
 ) => {
   // Check the team member existence
-  const member = await TeamMember.findById(teamMemberId).populate({
-    path: "teamId",
-    populate: { path: "projectId" },
-  });
+  const member = await TeamMember.findById(teamMemberId)
+    .populate({
+      path: "teamId",
+      populate: {
+        path: "projectId",
+      },
+    })
+    .populate({
+      path: "userId",
+      select: "role_id",
+      populate: {
+        path: "role_id",
+        select: "name",
+      },
+    });
   if (!member) {
     throw new AppError(
       commonErrors.USER_NOT_FOUND.message,
@@ -448,6 +460,7 @@ export const updateTeamMember = async (
 
     // Scrum Master uniqueness
     if (role === "Scrum Master") {
+      // Check if there is already another scrum master in the team
       const existingScrumMaster = await TeamMember.findOne({
         teamId: member.teamId,
         role: "Scrum Master",
@@ -455,6 +468,16 @@ export const updateTeamMember = async (
       });
 
       if (existingScrumMaster) {
+        throw new AppError(
+          projectErrors.INVALID_SCRUM_MASTER.message,
+          projectErrors.INVALID_SCRUM_MASTER.code,
+          projectErrors.INVALID_SCRUM_MASTER.errorCode,
+          projectErrors.INVALID_SCRUM_MASTER.suggestion,
+        );
+      }
+
+      // Check if the team member is an employee
+      if (member.userId.role_id.name === "Intern") {
         throw new AppError(
           projectErrors.INVALID_SCRUM_MASTER.message,
           projectErrors.INVALID_SCRUM_MASTER.code,
