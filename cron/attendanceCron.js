@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import Attendance from "../models/Attendance.js";
 import Timetable from "../models/Timetable.js";
+import { markPayrollDirty } from "../utils/payrollHelpers.js";
 
 // Day-off cron job (Runs daily at 00:00)
 cron.schedule("0 0 * * *", async () => {
@@ -37,6 +38,11 @@ cron.schedule("0 0 * * *", async () => {
           upsert: true,
           returnDocument: "after",
         },
+      );
+      await markPayrollDirty(
+        timetable.userId,
+        today,
+        "Day-off attendance generated",
       );
     }
 
@@ -161,6 +167,11 @@ cron.schedule("*/15 * * * *", async () => {
           date: today,
           status: "absent",
         });
+        await markPayrollDirty(
+          timetable.userId,
+          today,
+          "Absence attendance generated",
+        );
 
         console.log(
           `[ABSENCE-CRON-JOB] Marked absent: ${timetable.userId}`,

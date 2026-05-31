@@ -2,7 +2,17 @@
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.test" });
 
-jest.mock("cloudinary");
+jest.mock("../utils/cloudinaryHelper.js", () => ({
+  uploadImageToCloudinary: jest.fn().mockResolvedValue({
+    secure_url: "http://mock-url.com/image.png",
+    public_id: "mock-image-id",
+  }),
+  uploadDocToCloudinary: jest.fn().mockResolvedValue({
+    secure_url: "http://mock-url.com/cv.pdf",
+    public_id: "mock-cv-id",
+  }),
+  deleteFromCloudinary: jest.fn().mockResolvedValue({}),
+}));
 
 import request from "supertest";
 import app from "../server.js";
@@ -51,10 +61,15 @@ const createEmployee = async () => {
     name: "New",
     lastName: "Employee",
     email: "employee@example.com",
+    gender: "Male",
+    dateOfBirth: new Date("1995-01-01"),
+    placeOfBirth: "Tunis",
     idType: "CIN",
     idNumber: {
       number: "12345678",
       countryCode: "TN",
+      issueDate: new Date("2020-01-01"),
+      issuePlace: "Tunis",
     },
     address: "Sousse",
     joinDate: Date.now(),
@@ -73,6 +88,10 @@ const createEmployee = async () => {
     verificationCode: null,
     verificationCodeExpires: null,
     mustResetPassword: false,
+    employment: {
+      contractType: "CDI",
+      contractJoinDate: new Date("2024-01-01"),
+    },
   });
 
   return user;
@@ -103,10 +122,15 @@ describe("Audit Logging Tests", () => {
       name: "Admin",
       lastName: "User",
       email: "admin@test.com",
+      gender: "Male",
+      dateOfBirth: new Date("1995-01-01"),
+      placeOfBirth: "Tunis",
       idType: "CIN",
       idNumber: {
         number: "012365478",
         countryCode: "TN",
+        issueDate: new Date("2020-01-01"),
+        issuePlace: "Tunis",
       },
       address: "Test City",
       joinDate: Date.now(),
@@ -125,6 +149,10 @@ describe("Audit Logging Tests", () => {
       verificationCode: null,
       verificationCodeExpires: null,
       mustResetPassword: false,
+      employment: {
+        contractType: "CDI",
+        contractJoinDate: new Date("2024-01-01"),
+      },
     });
 
     // Generate JWT
@@ -146,25 +174,30 @@ describe("Audit Logging Tests", () => {
       description: "Information Technology Department",
     });
 
-    const newUser = {
-      name: "New",
-      lastName: "Employee",
-      email: "employee@test.com",
-      idType: "CIN",
-      idCountryCode: "TN",
-      idNumber: "12145678",
-      address: "Work City",
-      countryCode: "TN",
-      phoneNumber: "97123456",
-      position: "Developer",
-      role: "Employee",
-      department: "IT",
-    };
-
+    const cvBuffer = Buffer.from("%PDF-1.4 dummy pdf content");
     const res = await request(app)
       .post("/api/users")
       .set("Authorization", `Bearer ${adminToken}`)
-      .send(newUser);
+      .field("name", "New")
+      .field("lastName", "Employee")
+      .field("email", "employee@test.com")
+      .field("gender", "Male")
+      .field("dateOfBirth", "1995-01-01")
+      .field("placeOfBirth", "Tunis")
+      .field("idType", "CIN")
+      .field("idCountryCode", "TN")
+      .field("idNumber", "12145678")
+      .field("issueDate", "2020-01-01")
+      .field("issuePlace", "Tunis")
+      .field("address", "Work City")
+      .field("countryCode", "TN")
+      .field("phoneNumber", "97123456")
+      .field("position", "Developer")
+      .field("role", "Employee")
+      .field("department", "IT")
+      .field("contractType", "CDI")
+      .field("contractJoinDate", "2024-01-01")
+      .attach("cv", cvBuffer, { filename: "cv.pdf", contentType: "application/pdf" });
 
     if (res.statusCode !== 201) {
       console.log("Create User Error:", res.body);
@@ -257,10 +290,11 @@ describe("Audit Logging Tests", () => {
     // Create Employee
     const user = await createEmployee();
 
+    const imageBuffer = Buffer.from("fake image content");
     const res = await request(app)
       .post(`/api/users/${user._id}/profile-image`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .attach("profileImage", "tests/Me2.png");
+      .attach("profileImage", imageBuffer, { filename: "Me2.png", contentType: "image/png" });
 
     if (res.statusCode !== 200) {
       console.log("Upload Image Error:", res.body);
@@ -280,10 +314,11 @@ describe("Audit Logging Tests", () => {
     const user = await createEmployee();
 
     // Upload an image to the user
+    const imageBuffer = Buffer.from("fake image content");
     await request(app)
       .post(`/api/users/${user._id}/profile-image`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .attach("profileImage", "tests/Me2.png");
+      .attach("profileImage", imageBuffer, { filename: "Me2.png", contentType: "image/png" });
 
     // Remove the image
     const res = await request(app)

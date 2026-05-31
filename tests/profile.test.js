@@ -43,10 +43,15 @@ describe("Profile Viewing Tests (GET /api/users/:id)", () => {
       name: "Admin",
       lastName: "User",
       email: "admin@example.com",
+      gender: "Male",
+      dateOfBirth: new Date("1995-01-01"),
+      placeOfBirth: "Tunis",
       idType: "CIN",
       idNumber: {
         number: "12145678",
         countryCode: "TN",
+        issueDate: new Date("2020-01-01"),
+        issuePlace: "Tunis",
       },
       password: hashedPassword,
       address: "Admin Address",
@@ -54,6 +59,10 @@ describe("Profile Viewing Tests (GET /api/users/:id)", () => {
       position: "Admin",
       role_id: adminRole._id,
       status: "Active",
+      employment: {
+        contractType: "CDI",
+        contractJoinDate: new Date("2024-01-01"),
+      },
     });
     adminToken = jwt.sign(
       { id: adminUser._id.toString(), role: "Admin" },
@@ -65,10 +74,15 @@ describe("Profile Viewing Tests (GET /api/users/:id)", () => {
       name: "Supervisor",
       lastName: "User",
       email: "supervisor@example.com",
+      gender: "Female",
+      dateOfBirth: new Date("1992-01-01"),
+      placeOfBirth: "Sousse",
       idType: "CIN",
       idNumber: {
         number: "12245678",
         countryCode: "TN",
+        issueDate: new Date("2020-01-01"),
+        issuePlace: "Sousse",
       },
       password: hashedPassword,
       address: "Supervisor Address",
@@ -76,6 +90,10 @@ describe("Profile Viewing Tests (GET /api/users/:id)", () => {
       position: "Supervisor",
       role_id: supervisorRole._id,
       status: "Active",
+      employment: {
+        contractType: "CDI",
+        contractJoinDate: new Date("2024-01-01"),
+      },
     });
     supervisorToken = jwt.sign(
       { id: supervisorUser._id.toString(), role: "Supervisor" },
@@ -87,10 +105,15 @@ describe("Profile Viewing Tests (GET /api/users/:id)", () => {
       name: "User",
       lastName: "One",
       email: "user1@example.com",
+      gender: "Male",
+      dateOfBirth: new Date("1997-01-01"),
+      placeOfBirth: "Monastir",
       idType: "Passport",
       idNumber: {
         number: "A1249568",
         countryCode: "TN",
+        issueDate: new Date("2021-01-01"),
+        issuePlace: "Monastir",
       },
       password: hashedPassword,
       address: "User 1 Address",
@@ -99,6 +122,11 @@ describe("Profile Viewing Tests (GET /api/users/:id)", () => {
       role_id: employeeRole._id,
       supervisor_id: supervisorUser._id,
       status: "Active",
+      employment: {
+        contractType: "CDD",
+        contractJoinDate: new Date("2024-01-01"),
+        contractEndDate: new Date("2025-01-01"),
+      },
     });
     user1Token = jwt.sign(
       { id: regularUser1._id.toString(), role: "Employee" },
@@ -110,10 +138,15 @@ describe("Profile Viewing Tests (GET /api/users/:id)", () => {
       name: "User",
       lastName: "Two",
       email: "user2@example.com",
+      gender: "Female",
+      dateOfBirth: new Date("1998-01-01"),
+      placeOfBirth: "Sfax",
       idType: "Passport",
       idNumber: {
         number: "C9876543",
         countryCode: "TN",
+        issueDate: new Date("2022-01-01"),
+        issuePlace: "Sfax",
       },
       password: hashedPassword,
       address: "User 2 Address",
@@ -121,6 +154,10 @@ describe("Profile Viewing Tests (GET /api/users/:id)", () => {
       position: "Employee",
       role_id: employeeRole._id,
       status: "Active",
+      employment: {
+        contractType: "CDI",
+        contractJoinDate: new Date("2024-01-01"),
+      },
     });
   });
 

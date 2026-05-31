@@ -1,5 +1,7 @@
 import * as authService from "../services/authService.js";
 import dotenv from "dotenv";
+import jwt from "jsonwebtoken";
+import TokenBlacklist from "../models/TokenBlacklist.js";
 dotenv.config();
 
 // Login Functionality
@@ -81,5 +83,35 @@ export const forgetPassword = async (req, res, next) => {
     res.status(result.code).json(result);
   } catch (err) {
     next(err);
+  }
+};
+
+export const logout = async (req, res, next) => {
+  try {
+    const authHeader = req.headers["authorization"];
+    const token = authHeader?.startsWith("Bearer ")
+      ? authHeader.split(" ")[1]
+      : null;
+
+    if (token) {
+      const decoded = jwt.decode(token);
+      const expiresAt = decoded?.exp
+        ? new Date(decoded.exp * 1000)
+        : new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      await TokenBlacklist.findOneAndUpdate(
+        { token },
+        { token, expiresAt },
+        { upsert: true },
+      );
+    }
+
+    res.status(200).json({
+      status: "Success",
+      code: 200,
+      message: "Logged out successfully.",
+    });
+  } catch (error) {
+    next(error);
   }
 };

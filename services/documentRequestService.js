@@ -50,10 +50,10 @@ export const getAllDocumentRequests = async (projectId, queryParams, user) => {
   return await getAll(
     DocumentRequest,
     [
-      { path: "requestedBy", select: "name email" },
+      { path: "requestedBy", select: "name lastName email" },
+      { path: "uploadedBy", select: "name lastName email" },
       { path: "sprintId", select: "name number" },
-      { path: "taskId", select: "title status" },
-      { path: "fulfilledBy", select: "name email" },
+      { path: "taskId", select: "title status" }
     ],
     null,
     ["title", "description"],
@@ -92,10 +92,10 @@ export const getDocumentRequestById = async (requestId, user) => {
   );
 
   return await getOne(DocumentRequest, errors.DOCUMENT_REQUEST_NOT_FOUND, [
-    { path: "requestedBy", select: "name email" },
+    { path: "requestedBy", select: "name lastName email" },
+    { path: "uploadedBy", select: "name lastName email" },
     { path: "sprintId", select: "name number" },
-    { path: "taskId", select: "title status" },
-    { path: "fulfilledBy", select: "name email" },
+    { path: "taskId", select: "title status" }
   ])(requestId);
 };
 
@@ -161,7 +161,8 @@ export const createDocumentRequest = async (data, currentUser) => {
 
   // Populate for real-time frontend display
   await request.populate([
-    { path: "requestedBy", select: "name email" },
+    { path: "requestedBy", select: "name lastName email" },
+    { path: "uploadedBy", select: "name lastName email" },
     { path: "sprintId", select: "name" },
     { path: "taskId", select: "title" },
   ]);
@@ -387,14 +388,12 @@ export const markDocumentRequestAsFulfilled = async (
   request.rejectionComment = null; // Clear any previous rejection comment
   request.fulfilledAt = new Date();
 
-  console.log(
-    `[DocumentRequestService] Approving request ${requestId}. Setting fulfilledBy to: ${user.id}`,
-  );
   await request.save();
 
   // Populate for real-time frontend display
   await request.populate([
-    { path: "requestedBy", select: "name email" },
+    { path: "requestedBy", select: "name lastName email" },
+    { path: "uploadedBy", select: "name lastName email" },
     { path: "sprintId", select: "name" },
     { path: "taskId", select: "title" },
   ]);
@@ -509,14 +508,14 @@ export const rejectDocumentRequest = async (requestId, comment, user) => {
   request.fileURL = null;
   request.fileName = null;
   request.public_id = null;
-  request.uploadedBy = null;
   request.uploadedAt = null;
 
   await request.save();
 
   // Populate for real-time frontend display
   await request.populate([
-    { path: "requestedBy", select: "name email" },
+    { path: "requestedBy", select: "name lastName email" },
+    { path: "uploadedBy", select: "name lastName email" },
     { path: "sprintId", select: "name" },
     { path: "taskId", select: "title" },
   ]);

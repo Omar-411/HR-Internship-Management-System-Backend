@@ -50,7 +50,7 @@ export const getAllMeetingsOfProject = async (
     Meeting,
     [
       { path: "projectId", select: "name" },
-      { path: "attendees.userId", select: "name email" },
+      { path: "attendees.userId", select: "name lastName email" },
     ],
     null,
     ["title", "description"],
@@ -101,7 +101,7 @@ export const getMeetingById = async (meetingId, currentUser) => {
 
   return await getOne(Meeting, errors.MEETING_NOT_FOUND, [
     { path: "projectId", select: "name" },
-    { path: "attendees.userId", select: "name email" },
+    { path: "attendees.userId", select: "name lastName email" },
   ])(meeting._id);
 };
 

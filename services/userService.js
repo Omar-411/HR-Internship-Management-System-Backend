@@ -104,7 +104,7 @@ export const getUsers = async (queryParams) => {
 };
 
 // Create a new user
-export const addUserService = async (data, currentUser, ip) => {
+export const addUserService = async (data, currentUser, ip, cvFile) => {
   const {
     name,
     lastName,
@@ -134,7 +134,6 @@ export const addUserService = async (data, currentUser, ip) => {
     supervisor_email, // Pass the supervisor email instead of the full name for avoiding duplicate issues
     supervisor_id,
     profileImageURL,
-    cvURL,
     contractJoinDate,
     contractEndDate,
     contractType,
@@ -249,7 +248,7 @@ export const addUserService = async (data, currentUser, ip) => {
     typeof profileImageURL === "string" ? profileImageURL : "";
 
   // Enforce the cv
-  if (!cvURL || typeof cvURL !== "string") {
+  if (!cvFile) {
     throw new AppError(
       errors.CV_REQUIRED.message,
       errors.CV_REQUIRED.code,
@@ -257,6 +256,23 @@ export const addUserService = async (data, currentUser, ip) => {
       errors.CV_REQUIRED.suggestion,
     );
   }
+
+  // Enforce the PDF mime type for CV uploads
+  if (cvFile.mimetype !== "application/pdf") {
+    throw new AppError(
+      "Not a PDF file. Please upload a valid PDF document.",
+      errors.INVALID_FILE_TYPE.code,
+      errors.INVALID_FILE_TYPE.errorCode,
+      errors.INVALID_FILE_TYPE.suggestion,
+    );
+  }
+
+  // Upload the CV to Cloudinary
+  const resultCv = await uploadDocToCloudinary(
+    cvFile.buffer,
+    cvFile.originalname,
+    "hrcom/cvs",
+  );
 
   // Handle salary defaults
   const roleLower = (role || "").toLowerCase();
@@ -301,7 +317,8 @@ export const addUserService = async (data, currentUser, ip) => {
     department_id: departmentId,
     supervisor_id: resolvedSupervisorId,
     profileImageURL: finalProfileImageURL,
-    cvURL,
+    cvURL: resultCv.secure_url,
+    cvPublicId: resultCv.public_id,
     employment: {
       contractType: contractType,
       contractJoinDate,

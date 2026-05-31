@@ -121,6 +121,32 @@ export const uploadDocumentForRequest = async (
   
   await request.save();
 
+  // Populate for real-time frontend display
+  await request.populate([
+    { path: "requestedBy", select: "name lastName email" },
+    { path: "uploadedBy", select: "name lastName email" },
+    { path: "sprintId", select: "name" },
+    { path: "taskId", select: "title" },
+  ]);
+
+  // Emit socket event for real-time update
+  try {
+    const { getIO } = await import("../socket.js");
+    const io = getIO();
+    if (io) {
+      const projectRoom = `project:${request.projectId}`;
+      io.to(projectRoom).emit("documentRequestUpdated", {
+        projectId: String(request.projectId),
+        document: request,
+      });
+    }
+  } catch (socketErr) {
+    console.error(
+      "[Socket] Failed to emit documentRequestUpdated (Upload):",
+      socketErr,
+    );
+  }
+
   // Get the user who uploaded the document
   const user = await User.findById(currentUser.id);
 

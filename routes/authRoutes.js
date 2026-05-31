@@ -6,7 +6,9 @@ import {
   resetPassword,
   requestPasswordReset,
   forgetPassword,
+  logout,
 } from "../controllers/authController.js";
+import authenticate from "../middleware/authenticate.js";
 
 const router = express.Router();
 
@@ -45,6 +47,8 @@ const router = express.Router();
  *         description: Server error
  */
 router.post("/login", login);
+
+router.post("/logout", authenticate, logout);
 
 // Route to verify user's OTP code
 /**

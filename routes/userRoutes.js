@@ -94,6 +94,7 @@ router.post(
   "/users", 
   authenticate, 
   authorize(["Admin"]), 
+  upload("doc").single("cv"),
   addUser
 );
 

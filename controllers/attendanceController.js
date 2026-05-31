@@ -160,6 +160,7 @@ export const getAttendance = async (req, res, next) => {
       }).select("_id");
 
       allowedUserIds = teamUsers.map((u) => u._id);
+      allowedUserIds.push(currentUserId);
 
       if (targetUserId) {
         // Check if the user is allowed
@@ -620,7 +621,8 @@ export const updateAttendance = async (req, res, next) => {
     const updates = req.body;
 
     const attendance = await Attendance.findByIdAndUpdate(id, updates, {
-      returnDocument: "after",
+      new: true,
+      runValidators: true,
     });
 
     if (!attendance) {

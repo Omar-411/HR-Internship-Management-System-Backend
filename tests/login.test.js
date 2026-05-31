@@ -44,10 +44,15 @@ const createTestUser = async () => {
     name: "Admin",
     lastName: "User",
     email: "admin@example.com",
+    gender: "Male",
+    dateOfBirth: new Date("1995-01-01"),
+    placeOfBirth: "Tunis",
     idType: "CIN",
     idNumber: {
       number: "12145678",
       countryCode: "TN",
+      issueDate: new Date("2020-01-01"),
+      issuePlace: "Tunis",
     },
     address: "Sousse",
     joinDate: Date.now(),
@@ -66,6 +71,10 @@ const createTestUser = async () => {
     verificationCode: null,
     verificationCodeExpires: null,
     mustResetPassword: false,
+    employment: {
+      contractType: "CDI",
+      contractJoinDate: new Date("2024-01-01"),
+    },
   });
 
   return { user, role, password };

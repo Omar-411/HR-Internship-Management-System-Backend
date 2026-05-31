@@ -6,4 +6,8 @@ module.exports = {
   transformIgnorePatterns: [
     "/node_modules/(?!node-fetch)/" // Allow node-fetch through Babel
   ],
+  testPathIgnorePatterns: [
+    "/node_modules/",
+    "/ai/"
+  ],
 };

@@ -696,7 +696,7 @@ export const markLeaveRequestUnderReview = async (req, res, next) => {
             reviewedBy: user.id,
             reviewedAt: new Date(),
           },
-          { returnDocument: "after" },
+          { new: true },
         );
       }
 

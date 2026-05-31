@@ -244,7 +244,7 @@ export const validateUserData = (data) => {
   }
 
   // Validate the place of birth
-  if (isEmpty(placeOfBirth))
+  if (placeOfBirth !== undefined && isEmpty(placeOfBirth))
     throw new AppError(
       errors.PLACE_OF_BIRTH_REQUIRED.message,
       errors.PLACE_OF_BIRTH_REQUIRED.code,

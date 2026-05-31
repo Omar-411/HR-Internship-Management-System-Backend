@@ -103,7 +103,50 @@ export const getPublicInterns = async (req, res, next) => {
 // Add a new user (Admin only)
 export const addUser = async (req, res, next) => {
   try {
-    const result = await userService.addUserService(req.body, req.user, req.ip);
+    if (req.body) {
+      if (req.body.bonus !== undefined) {
+        req.body.bonus = req.body.bonus === "" ? 0 : Number(req.body.bonus);
+      }
+      if (req.body.nbOfChildren !== undefined) {
+        req.body.nbOfChildren = req.body.nbOfChildren === "" ? 0 : Number(req.body.nbOfChildren);
+      }
+      if (req.body.hasChildren !== undefined) {
+        req.body.hasChildren = req.body.hasChildren === "true" || req.body.hasChildren === true;
+      }
+      if (req.body.isAvailable !== undefined) {
+        req.body.isAvailable = req.body.isAvailable === "true" || req.body.isAvailable === true;
+      }
+      if (typeof req.body.salary === "string") {
+        try {
+          req.body.salary = JSON.parse(req.body.salary);
+        } catch (e) {
+          // ignore parsing error
+        }
+      }
+      if (typeof req.body.employment === "string") {
+        try {
+          req.body.employment = JSON.parse(req.body.employment);
+          if (req.body.employment.contractJoinDate) {
+            req.body.contractJoinDate = req.body.employment.contractJoinDate;
+          }
+          if (req.body.employment.contractEndDate) {
+            req.body.contractEndDate = req.body.employment.contractEndDate;
+          }
+          if (req.body.employment.contractType) {
+            req.body.contractType = req.body.employment.contractType;
+          }
+        } catch (e) {
+          // ignore parsing error
+        }
+      }
+    }
+
+    const result = await userService.addUserService(
+      req.body,
+      req.user,
+      req.ip,
+      req.file
+    );
 
     res.status(result.code).json(result);
   } catch (err) {

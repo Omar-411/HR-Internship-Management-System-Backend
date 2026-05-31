@@ -2,11 +2,12 @@ import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { errors } from "../errors/middlewareTokenErrors.js";
 import AppError from "../utils/AppError.js";
+import TokenBlacklist from "../models/TokenBlacklist.js";
 
 dotenv.config();
 
 // Middleware to authenticate users based on JWT token
-const authenticate = (req, res, next) => {
+const authenticate = async (req, res, next) => {
   const token =
     (req.headers["authorization"]?.startsWith("Bearer ")
       ? req.headers["authorization"].split(" ")[1]
@@ -26,6 +27,19 @@ const authenticate = (req, res, next) => {
   try {
     // Decode the token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const isBlacklisted = await TokenBlacklist.exists({ token });
+    if (isBlacklisted) {
+      return next(
+        new AppError(
+          errors.INVALID_OR_EXPIRED_TOKEN.message,
+          errors.INVALID_OR_EXPIRED_TOKEN.code,
+          errors.INVALID_OR_EXPIRED_TOKEN.errorCode,
+          errors.INVALID_OR_EXPIRED_TOKEN.suggestion,
+        ),
+      );
+    }
+
     req.user = decoded;
 
     next();
