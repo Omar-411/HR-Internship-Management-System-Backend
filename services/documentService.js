@@ -24,7 +24,7 @@ import {
 } from "../utils/documentHelper.js";
 import { getIO } from "../socket.js";
 import { uploadDocToCloudinary } from "../utils/cloudinaryHelper.js";
-import { TEMPLATE_DOCUMENT_TYPES } from "../constants/documentConstants.js";
+import { TEMPLATE_DOCUMENT_TYPES, TEMPLATE_ROLE_ALLOWLIST } from "../constants/documentConstants.js";
 import { slugify } from "../utils/slugify.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { logAuditAction } from "../utils/logger.js";
@@ -558,13 +558,29 @@ export const generateDocumentService = async ({
     );
   }
 
-  const user = await User.findById(data.userId);
+  const user = await User.findById(data.userId)
+    .populate("role_id");
   if (!user) {
     throw new AppError(
       commonErrors.USER_NOT_FOUND.message,
       commonErrors.USER_NOT_FOUND.code,
       commonErrors.USER_NOT_FOUND.errorCode,
       commonErrors.USER_NOT_FOUND.suggestion,
+    );
+  }
+
+  // Validate the user's role is allowed for this template
+  const userRole = (user.role_id?.name || user.role || "")
+    .toString().trim().toLowerCase();
+  const normalizedRole = userRole === "hr" ? "admin" : userRole;
+  const allowedRoles = TEMPLATE_ROLE_ALLOWLIST[templateName];
+
+  if (allowedRoles && !allowedRoles.includes(normalizedRole)) {
+    throw new AppError(
+      errors.UNAUTHORIZED_ACCESS.message,
+      errors.UNAUTHORIZED_ACCESS.code,
+      errors.UNAUTHORIZED_ACCESS.errorCode,
+      errors.UNAUTHORIZED_ACCESS.suggestion,
     );
   }
 
@@ -670,7 +686,7 @@ export const generateDocumentService = async ({
     status: "Success",
     code: 201,
     message: "Document generated successfully!",
-    data: document.fileURL,
+    data: { _id: document._id, fileURL: document.fileURL },
   };
 };
 

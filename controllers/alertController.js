@@ -121,3 +121,18 @@ export const getAlertKPIs = async (req, res, next) => {
     next(err);
   }
 };
+
+// Get admin dashboard alert stats (today's breakdown by type and status)
+export const getAdminDashboardAlertStats = async (req, res, next) => {
+  try {
+    const result = await alertStatsService.getAdminDashboardAlertStats();
+    res.status(200).json({
+      status: "Success",
+      code: 200,
+      message: "Admin dashboard alert stats retrieved successfully",
+      data: result,
+    });
+  } catch (err) {
+    next(err);
+  }
+};

@@ -268,8 +268,8 @@ export const addTeamMember = async (teamId, userId, role, currentUser) => {
   }
 
   // Check if the new team member has as supervisor (supervisor_id) = the project product owner
-  const userMatch = resolveId(userId).populate("role_id", "name");
-  const teamMember = await User.findOne(userMatch);
+  const userMatch = resolveId(userId);
+  const teamMember = await User.findOne(userMatch).populate("role_id", "name");
   if (
     !teamMember ||
     teamMember.supervisor_id.toString() !==
