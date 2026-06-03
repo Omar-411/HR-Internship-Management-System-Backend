@@ -1,0 +1,482 @@
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Monthly Payslip - DOTJCOM LTD</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Work+Sans:wght@400;500;600;700&amp;family=Noto+Serif:ital,wght@0,400;0,700;1,400&amp;family=Cormorant+Garamond:wght@400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      .font-cormorant {
+        font-family: "Cormorant Garamond", serif;
+      }
+      .font-work-sans {
+        font-family: "Work Sans", sans-serif;
+      }
+
+      @page {
+        size: A4;
+        margin: 0;
+      }
+
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      /* A4 Container */
+      .a4-container {
+        width: 210mm;
+        min-height: 297mm;
+        padding: 15mm;
+        margin: 0;
+        position: relative;
+        background: white;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+      }
+
+      @media print {
+        body {
+          margin: 0;
+          padding: 0;
+          background: white;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
+        .a4-container {
+          margin: 0;
+          box-shadow: none;
+        }
+      }
+
+      .divider-thin {
+        border-bottom: 0.66px solid #e5e7eb;
+      }
+    </style>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#4B2C5E",
+              "on-primary": "#ffffff",
+              secondary: "#885200",
+              surface: "#ffffff",
+              "surface-container": "#f8fafc",
+              "outline-variant": "#e2e8f0",
+              "on-surface": "#1e293b",
+              "on-surface-variant": "#64748b",
+            },
+            fontFamily: {
+              "document-title": ["Work Sans"],
+              "meta-label": ["Work Sans"],
+              "body-text": ["Work Sans"],
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body class="m-0 p-0 bg-white">
+    <main class="a4-container font-work-sans">
+      <!-- Header -->
+      <header
+        class="flex justify-between items-end mb-6 pb-4 border-b border-primary/10"
+      >
+        <div class="flex items-center gap-4">
+          <img
+            alt="DOTJCOM Logo"
+            class="h-10 w-10 object-contain"
+            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGoXdvZHbjfKhgmmEbHJNvj0dAPiJz84KPhGzK8WuFKArabISB3-ApoCCVP9ON0hkTTNEBwtlLgxIvY72WZK_gXKFO02FK-FYLeR1CwEtaPSx6a1xUHkWMp6xnSVk87JJA8ZJ12RaOtkDoo_QsQqbJTidYb9k0o3UifWb7nd8yMAqmcvoPKRq-GgtC_J5-4qUhqYHoAEMhL83Xc0ukRjDU7cfym6R7VEAQsBu3VV-zJ3LJwxUjIwr8JHES18bE9XVeqJ9gSeTN5XU"
+          />
+          <div>
+            <h1
+              class="text-lg font-bold tracking-tight text-on-surface uppercase leading-tight"
+            >
+              DOTJCOM LTD
+            </h1>
+            <p
+              class="text-[8px] font-medium text-on-surface-variant uppercase tracking-[0.15em]"
+            >
+              Smart Code. Real Impact.
+            </p>
+          </div>
+        </div>
+        <div class="text-right">
+          <h2
+            class="font-cormorant text-4xl font-light text-primary italic leading-none mb-1"
+          >
+            Payslip
+          </h2>
+          <p
+            class="text-[9px] font-medium text-on-surface-variant tracking-[0.2em] uppercase"
+          >
+            {{monthName}} {{year}}
+          </p>
+        </div>
+      </header>
+      <!-- Info Grid -->
+      <div class="grid grid-cols-12 gap-8 mb-4 pb-3 border-b border-primary/10">
+        <!-- Employee Details -->
+        <section class="col-span-8">
+          <h3
+            class="text-[9px] text-primary uppercase tracking-[0.2em] mb-3 font-extrabold"
+          >
+            Employee Information
+          </h3>
+          <div class="grid grid-cols-2 gap-y-4 gap-x-8">
+            <div>
+              <p
+                class="text-[8px] text-on-surface-variant uppercase font-semibold mb-0.5"
+              >
+                Full Name
+              </p>
+              <p class="text-xs font-medium text-on-surface">
+                {{employee.name}} {{employee.lastName}}
+              </p>
+            </div>
+            <div>
+              <p
+                class="text-[8px] text-on-surface-variant uppercase font-semibold mb-0.5"
+              >
+                Email
+              </p>
+              <p class="text-xs text-on-surface">{{employee.email}}</p>
+            </div>
+            <div>
+              <p
+                class="text-[8px] text-on-surface-variant uppercase font-semibold mb-0.5"
+              >
+                Position
+              </p>
+              <p class="text-xs text-on-surface">{{employee.position}}</p>
+            </div>
+            <div>
+              <p
+                class="text-[8px] text-on-surface-variant uppercase font-semibold mb-0.5"
+              >
+                Department
+              </p>
+              <p class="text-xs text-on-surface">{{employee.department}}</p>
+            </div>
+            <div>
+              <p
+                class="text-[8px] text-on-surface-variant uppercase font-semibold mb-0.5"
+              >
+                Contract Type
+              </p>
+              <p class="text-xs text-on-surface">
+                {{employee.employment.contractType}}
+              </p>
+            </div>
+            <div>
+              <p
+                class="text-[8px] text-on-surface-variant uppercase font-semibold mb-0.5"
+              >
+                Join Date
+              </p>
+              <p class="text-xs text-on-surface">{{employee.joinDate}}</p>
+            </div>
+          </div>
+        </section>
+        <!-- Work Summary -->
+        <section class="col-span-4 pl-6 border-l border-slate-100">
+          <h3
+            class="text-[9px] text-primary uppercase tracking-[0.2em] mb-4 font-extrabold"
+          >
+            Work Summary
+          </h3>
+          <div class="space-y-3">
+            <div class="flex justify-between items-baseline">
+              <span
+                class="text-[8px] text-on-surface-variant uppercase font-semibold"
+                >Worked Days</span
+              >
+              <span class="text-[11px] font-medium">{{workedDays}}</span>
+            </div>
+            <div class="flex justify-between items-baseline">
+              <span
+                class="text-[8px] text-on-surface-variant uppercase font-semibold"
+                >Hourly Rate</span
+              >
+              <span class="text-[11px] font-medium"
+                >{{hourlyRate}} {{currency}}</span
+              >
+            </div>
+            <div class="flex justify-between items-center">
+              <span
+                class="text-[8px] text-on-surface-variant uppercase font-semibold"
+                >Status</span
+              >
+              <span
+                class="text-[8px] font-bold text-primary uppercase tracking-wider"
+                >{{status}}</span
+              >
+            </div>
+            <div class="pt-3 mt-3 border-t border-slate-100">
+              <p
+                class="text-[8px] text-on-surface-variant uppercase font-semibold mb-0.5"
+              >
+                Validated At
+              </p>
+              <p class="text-[9px] text-on-surface font-medium">
+                {{validatedAt}}
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+      <!-- Financial Tables -->
+      <div class="grid grid-cols-2 gap-8 items-start">
+        <!-- Earnings -->
+        <section>
+          <h3
+            class="text-[9px] text-primary uppercase tracking-[0.2em] mb-3 pb-1 border-b-2 border-primary w-fit font-extrabold"
+          >
+            Earnings
+          </h3>
+          <table class="w-full text-[11px] text-on-surface">
+            <thead>
+              <tr class="divider-thin">
+                <th
+                  class="text-left py-2 px-1 font-semibold uppercase text-[8px] text-on-surface-variant"
+                >
+                  Description
+                </th>
+                <th
+                  class="text-right py-2 px-1 font-semibold uppercase text-[8px] text-on-surface-variant"
+                >
+                  Amount
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr>
+                <td class="py-2 px-1">Base Salary</td>
+                <td class="py-2 px-1 text-right font-medium">
+                  {{baseSalary}} {{currency}}
+                </td>
+              </tr>
+              <tr>
+                <td class="py-2 px-1">Overtime</td>
+                <td class="py-2 px-1 text-right font-medium">
+                  {{earnings.overtime.amount}} {{currency}}
+                </td>
+              </tr>
+              <tr>
+                <td class="py-2 px-1">Bonuses</td>
+                <td class="py-2 px-1 text-right font-medium">
+                  {{earnings.totals.bonuses}} {{currency}}
+                </td>
+              </tr>
+              <tr>
+                <td class="py-2 px-1">Taxable Allowances</td>
+                <td class="py-2 px-1 text-right font-medium">
+                  {{allowancesTaxable}} {{currency}}
+                </td>
+              </tr>
+              <tr>
+                <td class="py-2 px-1">Non-Taxable Allowances</td>
+                <td class="py-2 px-1 text-right font-medium">
+                  {{allowancesNonTaxable}} {{currency}}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="border-t-2 border-slate-100">
+                <td
+                  class="py-3 px-1 font-bold uppercase text-[8px] text-primary"
+                >
+                  Total Earnings
+                </td>
+                <td class="py-3 px-1 text-right font-bold text-primary text-xs">
+                  {{earnings.total}} {{currency}}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </section>
+        <!-- Deductions -->
+        <section>
+          <h3
+            class="text-[9px] text-on-surface uppercase tracking-[0.2em] mb-3 pb-1 border-b-2 border-slate-200 w-fit font-extrabold"
+          >
+            Deductions
+          </h3>
+          <table class="w-full text-[11px] text-on-surface">
+            <thead>
+              <tr class="divider-thin">
+                <th
+                  class="text-left py-2 px-1 font-semibold uppercase text-[8px] text-on-surface-variant"
+                >
+                  Description
+                </th>
+                <th
+                  class="text-right py-2 px-1 font-semibold uppercase text-[8px] text-on-surface-variant"
+                >
+                  Amount
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr>
+                <td class="py-2 px-1">CNSS Contribution</td>
+                <td class="py-2 px-1 text-right font-medium">
+                  {{deductions.cnss}} {{currency}}
+                </td>
+              </tr>
+              <tr>
+                <td class="py-2 px-1">CSS Contribution</td>
+                <td class="py-2 px-1 text-right font-medium">
+                  {{deductions.css}} {{currency}}
+                </td>
+              </tr>
+              <tr>
+                <td class="py-2 px-1">IRPP (Income Tax)</td>
+                <td class="py-2 px-1 text-right font-medium">
+                  {{deductions.irpp}} {{currency}}
+                </td>
+              </tr>
+              <tr>
+                <td class="py-2 px-1">Absences</td>
+                <td class="py-2 px-1 text-right font-medium">
+                  {{deductions.absences}} {{currency}}
+                </td>
+              </tr>
+              <tr>
+                <td class="py-2 px-1">Late Arrivals</td>
+                <td class="py-2 px-1 text-right font-medium">
+                  {{deductions.lateArrivals}} {{currency}}
+                </td>
+              </tr>
+              <tr>
+                <td class="py-2 px-1">Unpaid Leave</td>
+                <td class="py-2 px-1 text-right font-medium">
+                  {{deductions.unpaidLeave}} {{currency}}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="border-t-2 border-slate-100">
+                <td class="py-3 px-1 font-bold uppercase text-[8px]">
+                  Total Deductions
+                </td>
+                <td
+                  class="py-3 px-1 text-right font-bold text-on-surface text-xs"
+                >
+                  {{deductions.total}} {{currency}}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </section>
+      </div>
+
+      <!-- Final Net -->
+      <div class="mt-6 pt-4 border-t border-primary/20">
+        <div class="grid grid-cols-12 items-end">
+          <div class="col-span-5 space-y-2 pr-8">
+            <div
+              class="flex justify-between items-baseline border-b border-primary/5 pb-1"
+            >
+              <span
+                class="text-[8px] font-semibold uppercase text-on-surface-variant tracking-wider"
+                >Gross Salary</span
+              >
+              <span class="text-xs font-medium"
+                >{{grossSalary}} {{currency}}</span
+              >
+            </div>
+            <div
+              class="flex justify-between items-baseline border-b border-primary/5 pb-1"
+            >
+              <span
+                class="text-[8px] font-semibold uppercase text-on-surface-variant tracking-wider"
+                >Taxable Income</span
+              >
+              <span class="text-xs font-medium"
+                >{{taxableIncome}} {{currency}}</span
+              >
+            </div>
+            <div
+              class="flex justify-between items-baseline border-b border-primary/5 pb-1"
+            >
+              <span
+                class="text-[8px] font-semibold uppercase text-on-surface-variant tracking-wider"
+                >Net Taxable Income</span
+              >
+              <span class="text-xs font-medium"
+                >{{netTaxableIncome}} {{currency}}</span
+              >
+            </div>
+          </div>
+          <div class="col-span-7 text-right flex flex-col justify-end">
+            <p
+              class="text-[9px] font-bold text-primary uppercase tracking-[0.3em] mb-2"
+            >
+              Net Salary Payable
+            </p>
+            <p
+              class="font-cormorant text-5xl font-medium text-primary leading-none"
+            >
+              {{netSalary}}
+              <span class="text-2xl italic ml-1">{{currency}}</span>
+            </p>
+            <p
+              class="mt-3 text-[8px] font-medium text-on-surface-variant uppercase tracking-[0.2em]"
+            >
+              Authorized Electronic Document
+            </p>
+          </div>
+        </div>
+      </div>
+      <!-- Footer Signatures -->
+      <footer
+        class="mt-8 pt-8 grid grid-cols-3 gap-8 items-end border-t border-primary/10"
+      >
+        <div class="text-center">
+          <div class="divider-thin mb-3 h-8"></div>
+          <p
+            class="text-[8px] font-bold uppercase text-primary tracking-widest"
+          >
+            Employer Representative
+          </p>
+          <p class="text-[8px] text-on-surface-variant mt-0.5 uppercase">
+            Corporate Administration
+          </p>
+        </div>
+        <div class="text-center pb-1">
+          <p
+            class="text-[8px] text-on-surface-variant leading-tight font-medium uppercase tracking-tight opacity-60 px-4"
+          >
+            Confidential corporate record. Unauthorized disclosure is strictly
+            prohibited.
+          </p>
+        </div>
+        <div class="text-center">
+          <div class="divider-thin mb-3 h-8"></div>
+          <p
+            class="text-[8px] font-bold uppercase text-primary tracking-widest"
+          >
+            Employee Signature
+          </p>
+          <p class="text-[8px] text-on-surface-variant mt-0.5 uppercase">
+            Acknowledgement of Receipt
+          </p>
+        </div>
+      </footer>
+    </main>
+  </body>
+</html>

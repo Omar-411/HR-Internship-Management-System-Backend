@@ -1,0 +1,1091 @@
+import Payroll from "../models/Payroll.js";
+import Resignation from "../models/Resignation.js";
+import Attendance from "../models/Attendance.js";
+import Timetable from "../models/Timetable.js";
+import SpecialShift from "../models/SpecialShift.js";
+import LeaveRequest from "../models/LeaveRequest.js";
+import EmployeeAllowance from "../models/EmployeeAllowance.js";
+import EmployeeBonus from "../models/EmployeeBonus.js";
+import AppError from "./AppError.js";
+import { errors as commonErrors } from "../errors/commonErrors.js";
+import { errors } from "../errors/payrollErrors.js";
+import {
+  getMonthRange,
+  getHoursDifference,
+  getWeekNumber,
+  getDatesBetween,
+  normalizeTime,
+} from "./timeHelpers.js";
+import ExcelJS from "exceljs";
+
+// Get the hourly rate based on the base salary
+export const getHourlyRate = (baseSalary, standardMonthlyHours) => {
+  if (!standardMonthlyHours || standardMonthlyHours <= 0) {
+    throw new AppError(
+      errors.INVALID_MONTHLY_HOURS.message,
+      errors.INVALID_MONTHLY_HOURS.code,
+      errors.INVALID_MONTHLY_HOURS.errorCode,
+      errors.INVALID_MONTHLY_HOURS.suggestion,
+    );
+  }
+
+  return round(baseSalary / standardMonthlyHours);
+};
+
+// Helper function to build a map of timetables by date
+const buildTimetableMap = (timetables) => {
+  const map = new Map();
+
+  timetables.forEach((t) => {
+    map.set(new Date(t.date).toDateString(), t);
+  });
+
+  return map;
+};
+
+// Helper function to build a weekly structure of worked hours and expected hours
+const buildWeeklyStructure = async (attendances, timetableMap) => {
+  const weeks = new Map();
+
+  for (const record of attendances) {
+    if (
+      !["present", "late"].includes(record.status) ||
+      !record.checkInTime ||
+      !record.checkOutTime
+    )
+      continue;
+
+    const date = new Date(record.date);
+    const weekKey = `${date.getFullYear()}-${getWeekNumber(date)}`;
+
+    const workedHours = getHoursDifference(
+      record.checkInTime,
+      record.checkOutTime,
+    );
+
+    const timetable = timetableMap.get(date.toDateString());
+
+    const expectedHours = await resolveExpectedHours(timetable, SpecialShift);
+
+    if (!weeks.has(weekKey)) {
+      weeks.set(weekKey, []);
+    }
+
+    weeks.get(weekKey).push({
+      date,
+      workedHours,
+      expectedHours,
+      timetable,
+    });
+  }
+
+  return weeks;
+};
+
+// Helper function to resolve expected hours for a given timetable entry
+const resolveExpectedHours = async (timetable, SpecialShift) => {
+  // Case 1: Holiday, day off, or no timetable entry: 0 expected hours
+  if (!timetable || timetable.type === "Day Off" || timetable.isPublicHoliday) {
+    return 0;
+  }
+
+  // Case 2: Special Shift
+  let shift = null;
+  if (timetable.specialShiftData) {
+    shift = timetable.specialShiftData;
+  } else if (timetable.specialShiftId) {
+    shift = await SpecialShift.findById(timetable.specialShiftId);
+  }
+
+  if (shift) {
+    return shift.periods.reduce((sum, p) => {
+      return sum + getHoursDifference(p.startTime, p.endTime);
+    }, 0);
+  }
+
+  // Case 3: Regular shift
+  return getHoursDifference(timetable.startTime, timetable.endTime);
+};
+
+// Helper function to calculate the total overtime pay based on the weekly structure
+const calculateWeeklyOvertime = (weeks, baseSalary, config, hourlyRate) => {
+  let totalOvertimePay = 0;
+  let totalOvertimeHours = 0;
+
+  for (const week of weeks.values()) {
+    let weeklyWorked = week.reduce((sum, d) => sum + d.workedHours, 0);
+    let remainingExcess = Math.max(0, weeklyWorked - 48);
+
+    for (const day of week) {
+      const overtimeHours = Math.max(0, day.workedHours - day.expectedHours);
+      if (overtimeHours <= 0) continue;
+
+      totalOvertimeHours += overtimeHours;
+
+      let rateMultiplier = 1.25;
+
+      if (day.timetable?.isPublicHoliday) rateMultiplier = 2.0;
+      else if (!day.timetable || day.timetable.type === "Day Off")
+        rateMultiplier = 1.5;
+
+      if (remainingExcess > 0) {
+        const excessUsed = Math.min(overtimeHours, remainingExcess);
+
+        totalOvertimePay += excessUsed * hourlyRate * 1.75;
+        remainingExcess -= excessUsed;
+
+        const normalPart = overtimeHours - excessUsed;
+
+        if (normalPart > 0) {
+          totalOvertimePay += normalPart * hourlyRate * rateMultiplier;
+        }
+      } else {
+        totalOvertimePay += overtimeHours * hourlyRate * rateMultiplier;
+      }
+    }
+  }
+
+  return {
+    amount: round(totalOvertimePay),
+    hours: round(totalOvertimeHours),
+  };
+};
+
+// Calculate the total deduction for late arrivals in a given month
+const calculateLateHours = (
+  checkInTime,
+  expectedStartTime,
+  gracePeriod = 5,
+) => {
+  if (!checkInTime || !expectedStartTime) return 0;
+
+  const inT = normalizeTime(checkInTime);
+  const startT = normalizeTime(expectedStartTime);
+
+  if (!inT || !startT) return 0;
+
+  const checkInMinutes = inT.h * 60 + inT.m;
+  const startMinutes = startT.h * 60 + startT.m;
+
+  const lateMinutes = checkInMinutes - startMinutes - gracePeriod;
+
+  return lateMinutes > 0 ? lateMinutes / 60 : 0;
+};
+
+// Helper function to calculate the family deduction snapshot for IRPP calculation
+const calculateFamilySnapshot = (user, config) => {
+  let spouse = { eligible: false, amount: 0 };
+  let children = [];
+  let total = 0;
+
+  const now = new Date();
+
+  // Spouse deduction (Only for married employees)
+  if (user.socialStatus === "Married" && user.isHeadOfFamily === true) {
+    const amount = config.irpp.family?.spouse || 300;
+
+    spouse = {
+      eligible: true,
+      amount,
+    };
+
+    total += amount;
+  }
+
+  // Children
+  const childrenData = user.children || [];
+  
+  if (childrenData.length === 0 && user.nbOfChildren > 0) {
+    // Fallback to nbOfChildren if detailed array is empty (assume normal children)
+    const amount = config.irpp.family?.perChild || 100;
+    for (let i = 0; i < user.nbOfChildren; i++) {
+      children.push({ category: "normal", amount });
+      total += amount;
+      if (children.length >= (config.irpp.family?.maxChildren || 4)) break;
+    }
+  } else {
+    for (const child of childrenData) {
+      const birthDate = new Date(child.dateOfBirth);
+      let age = now.getFullYear() - birthDate.getFullYear();
+
+      const m = now.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) {
+        age--;
+      }
+
+      let category = "normal";
+      let amount = config.irpp.family?.perChild || 100;
+
+      // Disabled (priority)
+      if (child.isDisabled) {
+        category = "disabled";
+        amount = config.irpp.family?.disabledChild || 1200;
+      }
+      // Student
+      else if (child.isStudent && !child.hasScholarship && age < 25) {
+        category = "student";
+        amount = config.irpp.family?.studentChild || 1000;
+      }
+
+      children.push({ category, amount });
+      total += amount;
+
+      // Capped at maxChildren (default 4)
+      if (children.length >= (config.irpp.family?.maxChildren || 4)) break;
+    }
+  }
+
+  return { spouse, children, total };
+};
+
+// Function to round numbers to 3 decimal places (For currency calculations in Tunisia - millimes)
+export const round = (value) => {
+  return Math.round(value * 1000) / 1000; // Round to 3 decimal places
+};
+
+// Calculate the prorated salary for an employee
+export const calculateProratedSalary = async (
+  employeeId,
+  month,
+  year,
+  user,
+) => {
+  // Get the month start and end dates
+  const { monthStart, monthEnd } = getMonthRange(year, month);
+
+  // Check if the employee has an approved or scheduled resignation that affects the payroll for the month
+  const resignation = await Resignation.findOne({
+    employeeId,
+    status: { $in: ["approved", "scheduled_exit", "inactive"] },
+    "payrollImpact.to": {
+      $gte: monthStart,
+      $lte: monthEnd,
+    },
+  });
+
+  // The start date for payroll calculation is the month start or the employee's contract join date (If mid-month joiner)
+  const startDate = new Date(
+    Math.max(
+      monthStart,
+      user.employment.contractJoinDate
+        ? user.employment.contractJoinDate
+        : monthStart,
+    ),
+  );
+
+  // The end date for payroll calculation is the month end, the resignation last working date (if there is one), or the contract end date
+  const endDate = new Date(
+    Math.min(monthEnd, resignation?.payrollImpact?.to || monthEnd),
+  );
+
+  // If the start date is after the end date, it means the employee did not work at all during the month, so the prorated salary is 0
+  if (startDate > endDate) {
+    return {
+      proratedSalary: 0,
+      workedDays: 0,
+    };
+  }
+
+  const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+  // Calculate the number of days worked in the month
+  const workedDays = Math.floor((endDate - startDate) / MS_PER_DAY) + 1;
+  const totalDaysInMonth = monthEnd.getDate();
+  console.log("Worked days", workedDays);
+  console.log("Total days in month", totalDaysInMonth);
+
+  // Calculate the prorated salary
+  const proratedSalary = (user.salary.base / totalDaysInMonth) * workedDays;
+
+  console.log("Prorated salary", proratedSalary);
+
+  return {
+    proratedSalary,
+    workedDays,
+  };
+};
+
+// Build the allowances snapshot for the payroll record
+export const buildAllowancesSnapshot = async (userId, month, year) => {
+  const payrollDate = new Date(Date.UTC(year, month - 1, 1));
+
+  // Get active allowances for that period
+  const employeeAllowances = await EmployeeAllowance.find({
+    userId,
+    isActive: true,
+    effectiveFrom: { $lte: payrollDate },
+    $or: [{ effectiveTo: null }, { effectiveTo: { $gte: payrollDate } }],
+  }).populate("allowanceTypeId");
+
+  let snapshot = [];
+  let taxable = 0;
+  let nonTaxable = 0;
+
+  for (const ea of employeeAllowances) {
+    const type = ea.allowanceTypeId;
+    if (!type || !type.active) continue;
+
+    const amount = ea.amount ?? type.defaultAmount;
+
+    snapshot.push({
+      code: type.code,
+      name: type.name,
+      amount,
+      isTaxable: type.isTaxable,
+    });
+
+    if (type.isTaxable) taxable += amount;
+    else nonTaxable += amount;
+  }
+
+  return {
+    snapshot,
+    taxable,
+    nonTaxable,
+  };
+};
+
+// Build the bonuses snapshot for the payroll record
+export const buildBonusesSnapshot = async (userId, month, year) => {
+  const payrollDate = new Date(Date.UTC(year, month - 1, 1));
+
+  const employeeBonuses = await EmployeeBonus.find({
+    userId,
+    isActive: true,
+    effectiveFrom: { $lte: payrollDate },
+    $or: [{ effectiveTo: null }, { effectiveTo: { $gte: payrollDate } }],
+  }).populate("bonusTypeId");
+
+  let snapshot = [];
+  let total = 0;
+
+  for (const eb of employeeBonuses) {
+    const type = eb.bonusTypeId;
+    if (!type || !type.active) continue;
+
+    const amount = eb.amount ?? type.defaultAmount;
+
+    snapshot.push({
+      code: type.code,
+      name: type.name,
+      amount,
+      isTaxable: type.isTaxable,
+    });
+
+    total += amount;
+  }
+
+  return {
+    snapshot,
+    total,
+  };
+};
+
+// Calculate the total overtime compensation for an employee based on their attendances and timetables in a given month
+export const calculateOvertime = async (
+  employeeId,
+  month,
+  year,
+  baseSalary,
+  config,
+  hourlyRate,
+) => {
+  const { monthStart, monthEnd } = getMonthRange(year, month);
+
+  // Fetch attendances and timetables for the month
+  const [attendances, timetables] = await Promise.all([
+    Attendance.find({
+      userId: employeeId,
+      status: { $in: ["present", "late"] },
+      date: { $gte: monthStart, $lte: monthEnd },
+    }),
+    Timetable.find({
+      userId: employeeId,
+      date: { $gte: monthStart, $lte: monthEnd },
+    }),
+  ]);
+
+  const timetableMap = buildTimetableMap(timetables);
+
+  const weeks = await buildWeeklyStructure(attendances, timetableMap);
+
+  return calculateWeeklyOvertime(weeks, baseSalary, config, hourlyRate);
+};
+
+// Calculate the total deduction for absences in a given month
+export const calculateAbsences = async (
+  employeeId,
+  month,
+  year,
+  baseSalary,
+  config,
+  hourlyRate,
+) => {
+  const { monthStart, monthEnd } = getMonthRange(year, month);
+
+  const [absences, timetables] = await Promise.all([
+    Attendance.find({
+      userId: employeeId,
+      status: "absent",
+      date: { $gte: monthStart, $lte: monthEnd },
+    }),
+    Timetable.find({
+      userId: employeeId,
+      date: { $gte: monthStart, $lte: monthEnd },
+    }),
+  ]);
+
+  const timetableMap = buildTimetableMap(timetables);
+
+  let totalDeduction = 0;
+  for (const absence of absences) {
+    const dateKey = new Date(absence.date).toDateString();
+    const timetable = timetableMap.get(dateKey);
+
+    // Get the expected hours for the day based on the timetable and special shifts
+    const expectedHours = await resolveExpectedHours(timetable, SpecialShift);
+
+    // Deduct based on expected hours for the day
+    totalDeduction += expectedHours * hourlyRate;
+  }
+
+  return round(totalDeduction);
+};
+
+// Calculate late arrivals deduction based on the number of late hours
+export const calculateLateDeduction = async (
+  employeeId,
+  month,
+  year,
+  baseSalary,
+  config,
+  hourlyRate,
+) => {
+  const { monthStart, monthEnd } = getMonthRange(year, month);
+
+  // Fetch late attendances and timetables for the month to calculate late hours
+  const [attendances, timetables] = await Promise.all([
+    Attendance.find({
+      userId: employeeId,
+      status: "late",
+      date: { $gte: monthStart, $lte: monthEnd },
+    }),
+    Timetable.find({
+      userId: employeeId,
+      date: { $gte: monthStart, $lte: monthEnd },
+    }),
+  ]);
+
+  // Map timetable by day for quick access
+  const timetableMap = buildTimetableMap(timetables);
+
+  let totalLateHours = 0;
+  for (const record of attendances) {
+    if (record.checkInTime) {
+      const timetable = timetableMap.get(new Date(record.date).toDateString());
+
+      const gracePeriod = timetable?.gracePeriod || 5;
+
+      const expectedStartTime = timetable?.startTime;
+
+      totalLateHours += calculateLateHours(
+        record.checkInTime,
+        expectedStartTime,
+        gracePeriod,
+      );
+    }
+  }
+
+  return round(totalLateHours * hourlyRate || 0);
+};
+
+// Calculate the unpaid leave deduction for an employee based on the number of leave days taken in a month
+export const calculateUnpaidLeaveDeduction = async (
+  employeeId,
+  month,
+  year,
+  baseSalary,
+  config,
+  hourlyRate,
+) => {
+  const { monthStart, monthEnd } = getMonthRange(year, month);
+
+  // Get approved leave requests
+  const leaveRequests = await LeaveRequest.find({
+    employeeId,
+    status: "Approved",
+    $or: [{ startDate: { $lte: monthEnd }, endDate: { $gte: monthStart } }],
+  }).populate("typeId");
+
+  // Keep only the unpaid leaves: either isPaid is false, or the type is explicitly named "Unpaid"
+  const unpaidLeaves = leaveRequests.filter(
+    (lr) => lr.typeId && (!lr.typeId.isPaid || lr.typeId.name === "Unpaid"),
+  );
+
+  // Fetch the employee's timetable for the month to determine expected working hours on leave days
+  const timetables = await Timetable.find({
+    userId: employeeId,
+    date: { $gte: monthStart, $lte: monthEnd },
+  });
+
+  const timetableMap = buildTimetableMap(timetables);
+
+  // Calculate a fallback daily hours value in case no timetable entry exists for a day
+  const standardMonthlyHours = config?.payroll?.standardMonthlyHours || 173;
+  let workingDaysInMonth = 0;
+
+  const tempCursor = new Date(monthStart);
+
+  while (tempCursor <= monthEnd) {
+    const day = tempCursor.getDay();
+    if (day !== 0 && day !== 6) workingDaysInMonth++;
+    tempCursor.setDate(tempCursor.getDate() + 1);
+  }
+  const fallbackDailyHours = workingDaysInMonth > 0
+    ? standardMonthlyHours / workingDaysInMonth
+    : standardMonthlyHours / 22;
+
+  // Iterate over each unpaid leave and calculate the deduction based on the expected hours for those days
+  let totalUnpaidHours = 0;
+
+  for (const leave of unpaidLeaves) {
+    const dates = getDatesBetween(leave.startDate, leave.endDate);
+
+    for (const date of dates) {
+      if (date < monthStart || date > monthEnd) continue;
+
+      const dayOfWeek = new Date(date).getDay();
+      
+      // Skip weekends — no expected hours on Saturday (6) or Sunday (0)
+      if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+
+      const key = new Date(date).toDateString();
+      const timetable = timetableMap.get(key);
+
+      // Get the expected hours for the day based on the timetable and special shifts
+      let expectedHours = await resolveExpectedHours(timetable, SpecialShift);
+
+      if (!timetable && expectedHours === 0) {
+        expectedHours = fallbackDailyHours;
+      }
+
+      totalUnpaidHours += expectedHours;
+    }
+  }
+
+  return round(totalUnpaidHours * hourlyRate);
+};
+
+// Calculate the IRPP tax based on the gross salary using the "Loi de finances 2026" rules
+export const calculateIRPPMonthly = (monthlyTaxableIncome, config, user) => {
+  // Annualize the taxable income to apply the annual tax brackets
+  const annualIncome = monthlyTaxableIncome * 12;
+
+  // Calculate the frais professionnels deduction based on the annual income
+  const fraisPro = Math.min(
+    annualIncome * config.irpp.fraisPro.rate,
+    config.irpp.fraisPro.ceiling,
+  );
+
+  // Get the family snapshot to determine the total family deduction
+  const family = calculateFamilySnapshot(user, config);
+
+  // Calculate the net annual taxable income after deductions
+  const netAnnualTaxable = Math.max(0, annualIncome - fraisPro - family.total);
+  if (netAnnualTaxable <= 0) {
+    return {
+      monthlyTax: 0,
+      annualTax: 0,
+      fraisPro: round(fraisPro),
+      family,
+      netAnnualTaxable: 0,
+    };
+  }
+
+  let tax = 0;
+  let previousLimit = 0;
+
+  const sortedBrackets = [...config.irpp.brackets].sort(
+    (a, b) => (a.limit ?? Infinity) - (b.limit ?? Infinity),
+  );
+
+  for (const bracket of sortedBrackets) {
+    if (netAnnualTaxable > previousLimit) {
+      const currentLimit = bracket.limit ?? Infinity;
+      const taxableAmount =
+        Math.min(netAnnualTaxable, currentLimit) - previousLimit;
+
+      tax += taxableAmount * bracket.rate;
+      previousLimit = currentLimit;
+    } else break;
+  }
+
+  const annualTax = tax;
+  const monthlyTax = annualTax / 12;
+
+  return {
+    monthlyTax: round(monthlyTax),
+    annualTax: round(annualTax),
+    fraisPro: round(fraisPro),
+    family,
+    netAnnualTaxable: round(netAnnualTaxable),
+  };
+};
+
+// Calculate the CSS contribution based on the gross salary and CNSS contribution
+export const calculateCSS = (netTaxableMonthly, config) => {
+  const annualNetTaxable = netTaxableMonthly * 12;
+
+  if (annualNetTaxable <= config.css.threshold) return 0;
+
+  const annualCSS = annualNetTaxable * config.css.rate;
+
+  return annualCSS / 12;
+};
+
+// Check if it's an admin or owner of the payroll record
+export const canAccessPayroll = (user, employeeId) => {
+  const isAdmin = user.role === "Admin";
+  const isOwner = employeeId.toString() === user.id.toString();
+
+  if (!isAdmin && !isOwner) {
+    throw new AppError(
+      errors.UNAUTHORIZED_PAYROLL_ACCESS.message,
+      errors.UNAUTHORIZED_PAYROLL_ACCESS.code,
+      errors.UNAUTHORIZED_PAYROLL_ACCESS.errorCode,
+      errors.UNAUTHORIZED_PAYROLL_ACCESS.suggestion,
+    );
+  }
+};
+
+// Mark payroll as dirty for recalculation when there are changes that affect the payroll (e.g., attendance changes)
+export const markPayrollDirty = async (
+  employeeId,
+  date = new Date(),
+  message = "Changes require payroll recalculation",
+) => {
+  const month = date.getMonth() + 1;
+  const year = date.getFullYear();
+
+  await Payroll.updateMany(
+    { employeeId, month, year, status: { $in: ["draft", "validated"] } },
+    {
+      $set: {
+        recalculationRequired: true,
+        recalculationMessage: message,
+      },
+    },
+  );
+};
+
+// Compute the payroll: Engine of the payroll calculation
+export const computePayroll = async (user, month, year, config) => {
+  // Calculate the prorated salary and get the number of worked days in the month
+  const { proratedSalary: baseSalary, workedDays } =
+    await calculateProratedSalary(user._id, month, year, user);
+
+  console.log("baseSalary:", baseSalary);
+
+  if (workedDays <= 0) {
+    throw new AppError(
+      errors.INVALID_WORKED_DAYS.message,
+      errors.INVALID_WORKED_DAYS.code,
+      errors.INVALID_WORKED_DAYS.errorCode,
+      errors.INVALID_WORKED_DAYS.suggestion,
+    );
+  }
+
+  if (baseSalary <= 0) {
+    throw new AppError(
+      errors.INVALID_BASE_SALARY.message,
+      errors.INVALID_BASE_SALARY.code,
+      errors.INVALID_BASE_SALARY.errorCode,
+      errors.INVALID_BASE_SALARY.suggestion,
+    );
+  }
+
+  // Calculate the hourly rate
+  const hourlyRate = getHourlyRate(
+    baseSalary,
+    config.payroll.standardMonthlyHours,
+  );
+
+  console.log("hourlyRate:", hourlyRate);
+
+  // Calculate allowances snapshot and totals
+  const {
+    snapshot: allowancesSnapshot,
+    taxable: taxableAllowances,
+    nonTaxable: nonTaxableAllowances,
+  } = await buildAllowancesSnapshot(user._id, month, year);
+
+  console.log("taxableAllowances:", taxableAllowances);
+  console.log("nonTaxableAllowances:", nonTaxableAllowances);
+
+  const { snapshot: bonusesSnapshot, total: totalBonuses } =
+    await buildBonusesSnapshot(user._id, month, year);
+
+  console.log("totalBonuses:", totalBonuses);
+
+  // Calculate overtime compensation based on attendances and timetables
+  const { amount: overtimeAmount, hours: overtimeHours } =
+    await calculateOvertime(
+      user._id,
+      month,
+      year,
+      baseSalary,
+      config,
+      hourlyRate,
+    );
+  console.log("overtimeAmount:", overtimeAmount);
+  console.log("overtimeHours:", overtimeHours);
+
+  // Calculate deductions for absences, late arrivals, and unpaid leaves
+  const absences = await calculateAbsences(
+    user._id,
+    month,
+    year,
+    baseSalary,
+    config,
+    hourlyRate,
+  );
+
+  console.log("absences:", absences);
+
+  const lateArrivals = await calculateLateDeduction(
+    user._id,
+    month,
+    year,
+    baseSalary,
+    config,
+    hourlyRate,
+  );
+  console.log("lateArrivals:", lateArrivals);
+
+  const unpaidLeave = await calculateUnpaidLeaveDeduction(
+    user._id,
+    month,
+    year,
+    baseSalary,
+    config,
+    hourlyRate,
+  );
+
+  console.log("unpaidLeave:", unpaidLeave);
+
+  // Calculate the gross salary
+  const grossSalary = round(
+    baseSalary + totalBonuses + overtimeAmount + taxableAllowances,
+  );
+
+  console.log("grossSalary:", grossSalary);
+
+  // Calculate the CNSS contribution based on the gross salary (capped at the CNSS ceiling)
+  const cnssBase = Math.min(grossSalary, config.cnss.ceiling);
+  const cnss = round(cnssBase * config.cnss.rate);
+
+  // Calculate the taxable income for IRPP
+  const taxableIncome = grossSalary - cnss;
+
+  // Calculate the IRPP tax based on the taxable income and get the family deductions and frais professionnels
+  const irpp = calculateIRPPMonthly(taxableIncome, config, user);
+
+  const netTaxableIncome = taxableIncome - irpp.monthlyTax;
+
+  // Calculate the CSS contribution based on the net taxable income
+  const css = round(calculateCSS(netTaxableIncome, config));
+
+  // Calculate the total deductions
+  const totalDeductions = round(
+    cnss + irpp.monthlyTax + css + absences + lateArrivals + unpaidLeave,
+  );
+
+  // Calculate the net salary
+  const netSalary = round(grossSalary - totalDeductions + nonTaxableAllowances);
+
+  return {
+    baseSalary: round(baseSalary),
+    hourlyRate: round(hourlyRate),
+    workedDays,
+
+    earnings: {
+      bonuses: bonusesSnapshot,
+      allowances: allowancesSnapshot,
+      overtime: {
+        amount: overtimeAmount,
+        hours: overtimeHours,
+      },
+      totals: {
+        bonuses: totalBonuses,
+        taxableAllowances,
+        nonTaxableAllowances,
+      },
+      total: totalBonuses + taxableAllowances + overtimeAmount,
+    },
+
+    family: irpp.family,
+
+    cnssBase,
+    taxableIncome,
+    netTaxableIncome,
+    fraisProfessionnels: irpp.fraisPro,
+
+    deductions: {
+      cnss,
+      css,
+      irpp: irpp.monthlyTax,
+      absences,
+      lateArrivals,
+      unpaidLeave,
+      total: totalDeductions,
+    },
+
+    grossSalary,
+    netSalary,
+  };
+};
+
+// Export payroll to excel
+export const generatePayrollExcel = async (payroll) => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Payslip");
+
+  // Formatting helpers
+  const addSectionTitle = (title) => {
+    const row = worksheet.addRow([title]);
+    row.getCell(1).font = { bold: true, size: 14 };
+    row.getCell(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "89D2DC" },
+    };
+    row.getCell(2).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "89D2DC" },
+    };
+    worksheet.mergeCells(`A${row.number}:C${row.number}`);
+    row.getCell(1).alignment = { horizontal: "center" };
+    worksheet.addRow([]);
+  };
+
+  const addKeyValue = (label, value) => {
+    const row = worksheet.addRow([label, value]);
+    row.getCell(1).font = { bold: true };
+  };
+
+  const addBorders = () => {
+    const borderStyle = {
+      top: { style: "thin" },
+      left: { style: "thin" },
+      bottom: { style: "thin" },
+      right: { style: "thin" },
+    };
+
+    worksheet.eachRow({ includeEmpty: true }, (row) => {
+      [1, 2, 3].forEach((colNumber) => {
+        row.getCell(colNumber).border = borderStyle;
+      });
+    });
+  };
+
+  const round = (value) => Number((value || 0).toFixed(3));
+
+  // Add the Header
+  addSectionTitle("General Information");
+
+  const employee = payroll.employeeId;
+
+  addKeyValue("Employee", `${employee.name} ${employee.lastName}`);
+  addKeyValue("Email", employee.email);
+  addKeyValue("Position", employee.position);
+  addKeyValue("Period", `${payroll.month}/${payroll.year}`);
+  addKeyValue("Status", payroll.status);
+  addKeyValue("Currency", payroll.currency || "DT");
+
+  worksheet.addRow([]);
+
+  // Add Salary Information
+  addSectionTitle("Salary Information");
+
+  addKeyValue("Base Salary", round(payroll.baseSalary));
+  addKeyValue("Hourly Rate", round(payroll.hourlyRate));
+  addKeyValue("Worked Days", payroll.workedDays || 0);
+  addKeyValue("Gross Salary", round(payroll.grossSalary));
+  addKeyValue("Net Salary", round(payroll.netSalary));
+
+  worksheet.addRow([]);
+
+  // Add Earnings
+  addSectionTitle("Earnings");
+
+  addKeyValue("Bonuses Total", round(payroll.earnings?.totals?.bonuses));
+  addKeyValue(
+    "Taxable Allowances",
+    round(payroll.earnings?.totals?.allowancesTaxable),
+  );
+  addKeyValue(
+    "Non-Taxable Allowances",
+    round(payroll.earnings?.totals?.allowancesNonTaxable),
+  );
+  addKeyValue("Overtime Hours", round(payroll.earnings?.overtime?.hours));
+  addKeyValue("Overtime Amount", round(payroll.earnings?.overtime?.amount));
+  addKeyValue("Total Earnings", round(payroll.earnings?.total));
+
+  // Add Detailed Bonuses
+  if (payroll.earnings?.bonuses?.length) {
+    worksheet.addRow([]);
+    const bonusHeaderRow = worksheet.addRow([
+      "Bonus Name",
+      "Amount",
+      "Taxable",
+    ]);
+    bonusHeaderRow.font = { bold: true };
+
+    payroll.earnings.bonuses.forEach((bonus) => {
+      worksheet.addRow([
+        bonus.name,
+        round(bonus.amount),
+        bonus.isTaxable ? "Yes" : "No",
+      ]);
+    });
+  }
+
+  // Add Detailed Allowances
+  if (payroll.earnings?.allowances?.length) {
+    worksheet.addRow([]);
+    const allowanceHeaderRow = worksheet.addRow([
+      "Allowance Name",
+      "Amount",
+      "Taxable",
+    ]);
+    allowanceHeaderRow.font = { bold: true };
+
+    payroll.earnings.allowances.forEach((allowance) => {
+      worksheet.addRow([
+        allowance.name,
+        round(allowance.amount),
+        allowance.isTaxable ? "Yes" : "No",
+      ]);
+    });
+  }
+
+  worksheet.addRow([]);
+
+  // Add Family Deductions
+  addSectionTitle("Family Deductions");
+
+  addKeyValue("Spouse Deduction", round(payroll.family?.spouse?.amount));
+  addKeyValue("Children Deduction", round(payroll.family?.total));
+
+  worksheet.addRow([]);
+
+  // Add Tax Information
+  addSectionTitle("Tax Information");
+
+  addKeyValue("CNSS Base", round(payroll.cnssBase));
+  addKeyValue("Taxable Income", round(payroll.taxableIncome));
+  addKeyValue("Net Taxable Income", round(payroll.netTaxableIncome));
+  addKeyValue("Frais Professionnels", round(payroll.fraisProfessionnels));
+
+  worksheet.addRow([]);
+
+  // Add Deductions
+  addSectionTitle("Deductions");
+
+  addKeyValue("CNSS", round(payroll.deductions?.cnss));
+  addKeyValue("CSS", round(payroll.deductions?.css));
+  addKeyValue("IRPP", round(payroll.deductions?.irpp));
+  addKeyValue("Absences", round(payroll.deductions?.absences));
+  addKeyValue("Late Arrivals", round(payroll.deductions?.lateArrivals));
+  addKeyValue("Unpaid Leave", round(payroll.deductions?.unpaidLeave));
+  addKeyValue("Total Deductions", round(payroll.deductions?.total));
+
+  worksheet.addRow([]);
+
+  // Add Audit Information
+  addSectionTitle("Payroll Audit Information and status");
+
+  addKeyValue("Validated At", payroll.validatedAt || "-");
+  addKeyValue("Paid At", payroll.paidAt || "-");
+  addKeyValue("Recomputed At", payroll.recomputedAt || "-");
+
+  // Auto-size the columns
+  worksheet.columns.forEach((column) => {
+    let maxLength = 10;
+
+    column.eachCell({ includeEmpty: true }, (cell) => {
+      const value = cell.value ? cell.value.toString() : "";
+      maxLength = Math.max(maxLength, value.length + 2);
+    });
+
+    column.width = maxLength;
+  });
+  worksheet.addRow([]);
+
+  addBorders();
+
+  return await workbook.xlsx.writeBuffer();
+};
+
+// Build the data structure for the payslip generation based on the payroll record and employee information
+export const buildPayslipData = (payroll, employee) => {
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  return {
+    employee: {
+      name: employee.name,
+      lastName: employee.lastName,
+      email: employee.email,
+      position: employee.position,
+      department: employee.department_id?.name || "N/A",
+      employment: {
+        contractType: employee.employment?.contractType || "N/A",
+      },
+      joinDate: employee.joinDate
+        ? new Date(employee.joinDate).toLocaleDateString("en-GB")
+        : "N/A",
+    },
+
+    monthName: monthNames[payroll.month - 1],
+    year: payroll.year,
+
+    workedDays: payroll.workedDays,
+    hourlyRate: round(payroll.hourlyRate),
+    status: payroll.status,
+    validatedAt: payroll.validatedAt
+      ? new Date(payroll.validatedAt).toLocaleDateString("en-GB")
+      : "N/A",
+
+    baseSalary: payroll.baseSalary,
+    grossSalary: payroll.grossSalary,
+    netSalary: payroll.netSalary,
+    currency: payroll.currency,
+
+    earnings: payroll.earnings,
+
+    allowancesTaxable: payroll.earnings?.totals?.allowancesTaxable || 0,
+
+    allowancesNonTaxable: payroll.earnings?.totals?.allowancesNonTaxable || 0,
+
+    family: payroll.family,
+
+    deductions: payroll.deductions,
+
+    taxableIncome: payroll.taxableIncome,
+    netTaxableIncome: payroll.netTaxableIncome,
+  };
+};

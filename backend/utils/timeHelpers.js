@@ -1,0 +1,202 @@
+import { errors as attendanceErrors } from "../errors/attendanceErrors.js";
+import AppError from "../utils/AppError.js";
+
+// ------------------------------------------------------------------- //
+// ----------- Helper functions related to Time and Dates ------------ //
+// ------------------------------------------------------------------- //
+ 
+// Get the start and end dates of a given month and year
+export const getMonthRange = (year, month) => ({
+  monthStart: new Date(year, month - 1, 1),
+  monthEnd: new Date(year, month, 0),
+});
+
+// Get the difference in hours between two time strings (HH:MM)
+export const getHoursDifference = (start, end) => {
+  // 1. Validate input
+  if (!start || !end || typeof start !== "string" || typeof end !== "string") {
+    return 0;
+  }
+
+  const startParts = start.split(":");
+  const endParts = end.split(":");
+
+  // 2. Validate format
+  if (startParts.length !== 2 || endParts.length !== 2) {
+    return 0;
+  }
+
+  const [sh, sm] = startParts.map(Number);
+  const [eh, em] = endParts.map(Number);
+
+  // 3. Validate numbers
+  if ([sh, sm, eh, em].some((v) => isNaN(v))) {
+    return 0;
+  }
+
+  const startMinutes = sh * 60 + sm;
+  const endMinutes = eh * 60 + em;
+
+  const diff = endMinutes - startMinutes;
+
+  // 4. Prevent negative values
+  return diff > 0 ? diff / 60 : 0;
+};
+
+// Transform a time string in 12-hour format (e.g., "02:30 PM") to an object with hours and minutes in 24-hour format
+export const normalizeTime = (timeStr) => {
+  if (!timeStr) return null;
+
+  const [time, modifier] = timeStr.split(" ");
+  let [hours, minutes] = time.split(":").map(Number);
+
+  if (modifier === "PM" && hours !== 12) hours += 12;
+  if (modifier === "AM" && hours === 12) hours = 0;
+
+  return { h: hours, m: minutes };
+};
+
+// Get the week number of the year for a given date 
+export const getWeekNumber = (date) => {
+  const temp = new Date(date.getTime());
+  temp.setHours(0, 0, 0, 0);
+
+  // Set to nearest Thursday (Because the week number is based on the week containing the first Thursday of the year)
+  temp.setDate(temp.getDate() + 3 - ((temp.getDay() + 6) % 7));
+  
+  // January 4th is always in the first week of the year
+  const week1 = new Date(temp.getFullYear(), 0, 4);
+
+  // 86400000 = number of ms in a day
+  return (
+    1 +
+    Math.round(((temp - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7)
+  );
+};
+
+// Return all the days between two dates (Inclusive)
+export const getDatesBetween = (start, end) => {
+  const dates = [];
+
+  let current = new Date(start);
+  current.setHours(0, 0, 0, 0);
+
+  const endDate = new Date(end);
+  endDate.setHours(0, 0, 0, 0);
+
+  while (current <= endDate) {
+    dates.push(new Date(current));
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
+};
+
+// Parse a date string and return a Date object, or null if invalid
+export const parseDate = (value) => {
+  if (!value) return null; // Handles null, undefined, ""
+
+  const date = new Date(value);
+  return isNaN(date.getTime()) ? null : date;
+};
+
+// Get the start of today
+export const getStartAndEndOfToday = () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  return { start: today, end: tomorrow };
+};
+
+// Helper to get start of day in UTC (used as the canonical key for "today")
+export const getStartOfDay = (date) => {
+  const d = new Date(date);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+};
+
+// Helper to get end of day in UTC
+export const getEndOfDay = (date) => {
+  const d = new Date(date);
+  d.setUTCHours(23, 59, 59, 999);
+  return d;
+};
+
+// Helper to get an inclusive-exclusive UTC day range [start, end)
+export const getUtcDayRange = (date = new Date()) => {
+  const start = getStartOfDay(date);
+  const end = new Date(start);
+ 
+  end.setUTCDate(end.getUTCDate() + 1);
+  
+  return { start, end };
+};
+
+export const getUtcMonthRange = (year, month) => ({
+  start: new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)), // Month - 1 because JS months start at 0
+  end: new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)),  // Last day of month
+});
+
+export const getUtcTrimesterRange = (year, trimester) => {
+  const startMonth = (trimester - 1) * 3;
+  return {
+    start: new Date(Date.UTC(year, startMonth, 1, 0, 0, 0, 0)),
+    end: new Date(Date.UTC(year, startMonth + 3, 0, 23, 59, 59, 999)),
+  };
+};
+
+export const getUtcYearRange = (year) => ({
+  start: new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0)),
+  end: new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999)),
+});
+
+// Helper function to parse time strings like "09:17 AM" into minutes from midnight
+export const parseTimeToMinutes = (timeStr) => {
+  if (!timeStr || typeof timeStr !== "string") return NaN;
+  // Match HH:MM AM/PM
+  const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return NaN;
+
+  let [_, hoursStr, minutesStr, ampm] = match;
+  let hours = parseInt(hoursStr, 10);
+  const minutes = parseInt(minutesStr, 10);
+
+  if (ampm.toUpperCase() === "PM" && hours < 12) hours += 12;
+  if (ampm.toUpperCase() === "AM" && hours === 12) hours = 0;
+
+  return hours * 60 + minutes;
+};
+
+// Date filter utility for attendance records
+export const buildDateFilter = ({ type, year, month, trimester, startDate, endDate }) => {
+  let start, end;
+
+  if (type === "month") {
+    const start = new Date(Date.UTC(year, month - 1, 1)); // month-1 because JS months are 0-based
+    const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+
+    return { $gte: start, $lte: end };
+  }
+
+  else if (type === "trimester") {  // The Admin chose By trimester as a filter type
+    const startMonth = (trimester - 1) * 3;
+    start = new Date(Date.UTC(year, startMonth, 1));
+    end = new Date(Date.UTC(year, startMonth + 3, 0, 23, 59, 59, 999));
+  }
+
+  else if (type === "year") {  // The Admin chose By year as a filter type
+    start = new Date(Date.UTC(year, 0, 1));
+    end = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+  }
+
+  else if (type === "custom") { // The Admin chose Custom range (Flexible date range) as a filter type
+    start = new Date(startDate);
+    end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+  }
+
+  return { $gte: start, $lte: end };
+}; 

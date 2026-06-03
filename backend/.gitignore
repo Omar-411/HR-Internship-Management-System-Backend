@@ -1,0 +1,11 @@
+.env
+.env.test
+node_modules/
+# AI Benchmarks and Testing Datasets (Heavy Files)
+ai/validation/dataset/*.csv
+ai/validation/dataset/*.json
+ai/validation/baseline/*.json
+ai/validation/*.json
+
+# Local HuggingFace/Transformers model cache (if any gets generated)
+ai/.cache/
