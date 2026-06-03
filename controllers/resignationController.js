@@ -138,11 +138,10 @@ export const respondToClarification = async (req, res, next) => {
 export const approveResignation = async (req, res, next) => {
   try {
     const resignationId = req.params.id;
-    const { weeksNotice } = req.body; // Allow the admin to specify a custom notice period (in days)
+    // const { weeksNotice } = req.body; // For now, we'll use a fixed 14-day notice period
 
     const result = await resignationService.approveResignation(
       resignationId,
-      weeksNotice || 14,
       req.user,
       req.ip,
     );

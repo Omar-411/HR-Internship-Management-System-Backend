@@ -451,10 +451,10 @@ export const respondToClarification = async (
 };
 
 // Approve a resignation request (Admin Only)
-export const approveResignation = async (resignationId, weeksNotice, currentUser, ip) => {
+export const approveResignation = async (resignationId, currentUser, ip) => {
   // Calculate exit date first
   const exitDate = new Date();
-  exitDate.setDate(exitDate.getDate() + weeksNotice);
+  exitDate.setDate(exitDate.getDate() + 14);
 
   // update the resignation request
   let updated = await Resignation.findOneAndUpdate(
