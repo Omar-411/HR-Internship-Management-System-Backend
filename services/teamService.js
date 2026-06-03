@@ -20,7 +20,7 @@ export const getTeamById = async (teamId, currentUser) => {
   }
 
   // Get the project product owner Id to check the user's access to the team details (In case of Product owner access)
-  await team.populate("projectId", "productOwnerId");
+  await team.populate("projectId", "productOwnerId team_id");
   const project = team.projectId;
 
   // Authorize access to the team details (Admin, Product Owner, and the project team members can access the team details)
