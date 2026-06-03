@@ -10,6 +10,7 @@ import {
   resolveAlert,
   dismissAlert,
   getAlertKPIs,
+  getAdminDashboardAlertStats,
 } from "../controllers/alertController.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
@@ -23,6 +24,14 @@ router.get(
   authenticate,
   authorize(["Admin"]),
   getAlertKPIs,
+);
+
+// Route to get admin dashboard alert stats (today's breakdown by type and status)
+router.get(
+  "/alerts/dashboard-stats",
+  authenticate,
+  authorize(["Admin"]),
+  getAdminDashboardAlertStats,
 );
 
 // Route to create a new alert

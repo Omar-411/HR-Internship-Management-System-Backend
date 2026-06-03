@@ -11,6 +11,14 @@ export const TEMPLATE_DOCUMENT_TYPES = {
   "monthly_payslip": "Report",
 };
 
+// Template role allowlist — defines which roles can use each template
+export const TEMPLATE_ROLE_ALLOWLIST = {
+  intern_certificate: ["intern"],
+  employment_certificate: ["employee", "supervisor"],
+  recommandation_letter: ["intern", "employee", "supervisor", "admin"],
+  monthly_payslip: ["employee", "supervisor"],
+};
+
 // The path to the Chrome executable for Puppeteer (used for document generation)
 export const CHROME_PATH =
   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";

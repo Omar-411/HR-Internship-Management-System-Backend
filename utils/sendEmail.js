@@ -89,23 +89,22 @@ export const sendEmail = async ({
 
   try {
     const transporter = nodemailer.createTransport({
-      host: "smtp.ethereal.email",
-      port: 587,
+      service: "gmail",
       auth: {
-        user: process.env.ETHEREAL_USER,
-        pass: process.env.ETHEREAL_PASS,
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
       },
     });
 
     await transporter.sendMail({
-      from: `"HRcoM" <${process.env.ETHEREAL_USER}>`,
+      from: `"HRcoM" <${process.env.GMAIL_USER}>`,
       to,
       subject,
       html: htmlContent,
       attachments,
     });
 
-    console.log("Onboarding email sent to:", to);
+    console.log("Email sent to:", to);
   } catch (err) {
     console.error("Email sending failed:", err.message);
   }
