@@ -1,7 +1,0 @@
-*.pdf
-node_modules/
-api-cache/
-.api-cache/
-.env
-*.csv
-*.txt
