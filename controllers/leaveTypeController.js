@@ -21,7 +21,18 @@ import {
 // Get all leave types
 export const getAllLeaveTypes = async (req, res, next) => {
   try {
-    let queryParams = req.query;
+    let queryParams = { ...req.query };
+
+    const includeArchived = queryParams.includeArchived === "true";
+
+    // Remove frontend-only parameter so buildQuery doesn't use it
+    delete queryParams.includeArchived;
+
+    // Default behavior: only active leave types
+    if (!includeArchived) {
+      queryParams.status = "Active";
+    }
+
     queryParams = {
       ...queryParams,
       limit: queryParams.limit || 20,
