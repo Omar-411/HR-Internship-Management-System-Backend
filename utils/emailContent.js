@@ -11,9 +11,9 @@ export const getAddUserContent = ({ name, password, code }) => {
     </p>
 
     <p> 
-      Your account has been created successfully! Please use the following credentials to login: </br>
-      <strong> Password: </strong> ${password} </br>
-      <strong> OTP Code: </strong> ${code} </br>
+      Your account has been created successfully! Please use the following credentials to login: <br /> <br />
+      <strong> Password: </strong> ${password} <br />
+      <strong> OTP Code: </strong> ${code} <br />
       <strong>Platform URL:</strong> 
       <a href=${process.env.PLATFORM_URL} target="_blank" style="color: #232ED1; text-decoration: underline; text-align: center; font-weight: bold;">
         HRcoM Platform
@@ -24,15 +24,15 @@ export const getAddUserContent = ({ name, password, code }) => {
   
     <p> <strong> Next Steps: </strong> </p>
     <p> 
-      1. Go to the HRcoM platform via the link above. </br>
-      2. Log in using your email and the temporary password provided above. </br>
-      3. Enter the verification code when prompted to activate your account. </br>
-      4. Reset your password. </br>
+      1. Go to the HRcoM platform via the link above. <br />
+      2. Log in using your email and the temporary password provided above. <br />
+      3. Enter the verification code when prompted to activate your account. <br />
+      4. Reset your password. <br />
     </p>
 
     <p> <strong> Important Notes: </strong> </p>
     <p>
-      - Do not share this email or your credentials with anyone. </br>
+      - Do not share this email or your credentials with anyone. <br />
     </p>
 
     <p> <strong> We are glad to have you on board and look forward to achieving great things together! </strong> </p>
@@ -53,7 +53,7 @@ export const getUpdateUserContent = ({ name, newRole }) => {
       Congratulations on this achievement! This reflects your hard work and contributions to our team.
     </p>
     <p>We are truly excited to see you grow further with us!</p>
-    </br>
+    <br />
   `;
 };
 
