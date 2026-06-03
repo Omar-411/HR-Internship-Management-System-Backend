@@ -724,7 +724,7 @@ export const sendGeneratedDocumentByEmailService = async ({
   // Send email with attachment
   await sendEmail({
     to: user.email,
-    subject: `Generated Document Sent`,
+    subject: `HRcoM - Generated Document Sent`,
     type: "document",
     name: `${user.name}`,
     documentTitle: document.title,
