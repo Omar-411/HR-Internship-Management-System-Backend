@@ -127,6 +127,7 @@ export const addUserService = async (data, currentUser, ip, cvFile) => {
     socialStatus,
     hasChildren,
     nbOfChildren,
+    children, // The children array
     status, // Select List (Pending, Active, Inactive, Blocked)
     isAvailable,
     role,
@@ -177,6 +178,35 @@ export const addUserService = async (data, currentUser, ip, cvFile) => {
     contractEndDate,
     salary,
   });
+
+  // Validate the children array if provided
+  let parsedChildren = children;
+
+  if (typeof children === "string") {
+    try {
+      parsedChildren = JSON.parse(children);
+    } catch (e) {
+      parsedChildren = [];
+    }
+  }
+
+  const safeChildren = Array.isArray(parsedChildren) ? parsedChildren : [];
+  if (hasChildren && safeChildren && safeChildren.length === 0) {
+    throw new AppError(
+      errors.INVALID_CHILDREN.message,
+      errors.INVALID_CHILDREN.code,
+      errors.INVALID_CHILDREN.errorCode,
+      errors.INVALID_CHILDREN.suggestion,
+    );
+  }
+
+  // Normalize the children data
+  const normalizedChildren = safeChildren.map((child) => ({
+    dateOfBirth: child.dateOfBirth ? new Date(child.dateOfBirth) : null,
+    isStudent: Boolean(child.isStudent),
+    hasScholarship: Boolean(child.hasScholarship),
+    isDisabled: Boolean(child.isDisabled),
+  }));
 
   // Check the phone number validity
   const validatedPhoneNumber = fullPhoneNumberValidation(
@@ -310,7 +340,8 @@ export const addUserService = async (data, currentUser, ip, cvFile) => {
     bio,
     socialStatus,
     hasChildren,
-    nbOfChildren,
+    nbOfChildren: normalizedChildren.length,
+    children: normalizedChildren,
     status: status || "Pending",
     isAvailable,
     role_id: roleId,
@@ -479,6 +510,33 @@ export const updateUserService = async (id, updateData, currentUser, ip) => {
     contractEndDate: updateData.employment?.contractEndDate,
     salary: updateData.salary,
   });
+
+  // Validate the children array if provided
+  let parsedChildren = updateData.children;
+  if (typeof parsedChildren === "string") {
+    try {
+      parsedChildren = JSON.parse(parsedChildren);
+    } catch {
+      parsedChildren = [];
+    }
+  }
+
+  const safeChildren = Array.isArray(parsedChildren) ? parsedChildren : [];
+
+  const cleanedChildren = safeChildren
+    .filter((c) => c && c.dateOfBirth)
+    .map((c) => ({
+      dateOfBirth: c.dateOfBirth ? new Date(c.dateOfBirth) : null,
+      isStudent: !!c.isStudent,
+      hasScholarship: !!c.hasScholarship,
+      isDisabled: !!c.isDisabled,
+    }));
+
+  if ("children" in updateData) {
+    updateData.children = cleanedChildren;
+    updateData.nbOfChildren = cleanedChildren.length;
+    updateData.hasChildren = cleanedChildren.length > 0;
+  }
 
   if (updateData.employment?.contractType) {
     updateData.employment.contractEndDate =

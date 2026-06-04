@@ -60,6 +60,12 @@ export const errors = {
     errorCode: "INVALID_NUMBER_OF_CHILDREN",
     suggestion: "Please specify a valid number of children.",
   },
+  INVALID_CHILDREN: {
+    message: "Invalid children data",
+    code: 400,
+    errorCode: "INVALID_CHILDREN_DATA",
+    suggestion: "Please provide valid children array data.",
+  },
   INVALID_BONUS: {
     message: "Invalid bonus value",
     code: 400,

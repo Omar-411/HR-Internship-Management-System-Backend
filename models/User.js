@@ -191,6 +191,14 @@ const userSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    hasChildren: {
+      type: Boolean,
+      default: false,
+    },
+    nbOfChildren: {
+      type: Number,
+      default: 0,
+    },
     children: [
       {
         dateOfBirth: {
@@ -263,20 +271,6 @@ const userSchema = mongoose.Schema(
     isAvailable: {
       type: Boolean,
       default: true,
-    },
-    hasChildren: {
-      type: Boolean,
-      default: false,
-    },
-    // To be removed later: Replaced by the children array and the nbOfChildren field
-    nbOfChildren: {
-      type: Number,
-      default: 0,
-    },
-    // To be removed later: Replaced by the leaveBalances array
-    leaveBalance: {
-      type: Number,
-      default: 21,
     },
   },
   { timestamps: true },

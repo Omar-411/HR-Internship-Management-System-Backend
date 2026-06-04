@@ -173,7 +173,7 @@ export const validateUserData = (data) => {
       errors.BIO_TOO_LONG.suggestion,
     );
 
-  if (hasChildren && nbOfChildren <= 0)
+  if (hasChildren && (!nbOfChildren || nbOfChildren <= 0)) 
     throw new AppError(
       errors.INVALID_NUMBER_OF_CHILDREN.message,
       errors.INVALID_NUMBER_OF_CHILDREN.code,
