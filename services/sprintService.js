@@ -246,6 +246,7 @@ export const updateSprint = async (sprintId, updates, user) => {
   if (updates.startDate !== undefined) sprint.startDate = updates.startDate;
   if (updates.durationInWeeks !== undefined)
     sprint.durationInWeeks = updates.durationInWeeks;
+  if (updates.status !== undefined) sprint.status = updates.status;
 
   // Recompute the end date in case of an update
   const start = new Date(sprint.startDate);
