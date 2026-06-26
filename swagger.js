@@ -1,5 +1,15 @@
 import swaggerJsdoc from "swagger-jsdoc";
 
+// Base URL used by Swagger for curl and "Try it out".
+// - In development → http://localhost:3000
+// - In production  → https://hr-internship-management-system-backend.onrender.com
+// Can be overridden with SWAGGER_SERVER_URL if needed.
+const swaggerServerUrl =
+  process.env.SWAGGER_SERVER_URL ||
+  (process.env.NODE_ENV === "production"
+    ? "https://hr-internship-management-system-backend.onrender.com"
+    : "http://localhost:3000");
+
 const options = {
   definition: {
     openapi: "3.0.0",
@@ -11,12 +21,8 @@ const options = {
     },
     servers: [
       {
-        url: "http://localhost:3000",
-        description: "Development server",
-      },
-      {
-        url: "http://localhost:5000",
-        description: "Production server",
+        url: swaggerServerUrl,
+        description: "API server",
       },
     ],
     components: {
@@ -276,12 +282,19 @@ const options = {
           },
         },
 
+
         LoginRequest: {
           type: "object",
           required: ["email", "password"],
           properties: {
             email: {
               type: "string",
+              description: "User email",
+            },
+            password: {
+              type: "string",
+              description: "User password",
+
               description: "Email address of the user.",
             },
             password: {

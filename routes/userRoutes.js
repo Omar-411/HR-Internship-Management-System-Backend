@@ -19,7 +19,7 @@ import {
 import { upload } from "../middleware/upload.js";
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
-
+ 
 const router = express.Router();
 
 /**
@@ -92,7 +92,7 @@ router.get(
 // Route to Add user (Admin Only)
 /**
  * @swagger
- * /api/users:
+ * /api/v0/users:
  *   post:
  *     tags:
  *       - Users
@@ -105,12 +105,16 @@ router.get(
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/CreateUserRequest'
+  *             $ref: '#/components/schemas/User'
  *     responses:
  *       201:
  *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
  *       400:
- *         description: Failed Input validation
+ *         description: Invalid input
  *       401:
  *         description: Invalid/missing token
  *       403:
@@ -132,7 +136,7 @@ router.post(
 // Route to Update user (Edit Profile) (Admin Only and the user himself)
 /**
  * @swagger
- * /api/users/{id}:
+ * /api/v0/users/{id}:
  *   put:
  *     tags:
  *       - Users
@@ -179,7 +183,7 @@ router.put(
 // Route to Delete user (Admin Only)
 /**
  * @swagger
- * /api/users/{id}:
+ * /api/v0/users/{id}:
  *   delete:
  *     tags:
  *       - Users
@@ -212,7 +216,7 @@ router.delete(
 // Route to get active supervisors (Admin Only)
 /**
  * @swagger
- * /api/users/active-supervisors:
+ * /api/v0/users/active-supervisors:
  *  get:
  *    summary: Get all active supervisors (Admin only)
  *    description: Allows an admin to retrieve the list of all active supervisors in the system.
@@ -517,20 +521,13 @@ router.post(
  *             schema:
  *               type: object
  *               properties:
- *                 status:
+  *                 token:
  *                   type: string
- *                   example: Success
- *                 message:
- *                   type: string
- *                   example: Face ID reset successfully!
+ *                   description: JWT token
  *       401:
- *         description: Missing/Invalid token
- *       403:
- *         description: Unauthorized 
- *       404:
- *         description: User not found
+ *         description: Invalid credentials
  *       500:
- *         description: Server Error
+ *         description: Server error
  */
 router.post(
   "/users/:id/reset-face",

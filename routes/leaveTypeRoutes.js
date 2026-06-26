@@ -21,7 +21,7 @@ const route = express.Router();
 // Route to add a new Leave Type (Admin only)
 /**
  * @swagger
- * /api/leaveType:
+ * /api/v0/leaveType:
  *   post:
  *     tags:
  *       - Leave Types
@@ -63,8 +63,8 @@ const route = express.Router();
  *       500:
  *         description: Server error
  */
-route.post( 
-  "/leaveType", 
+route.post(
+  "/leaveType",
   authenticate, 
   authorize(["Admin"]), 
   addLeaveType
@@ -73,7 +73,7 @@ route.post(
 // Route to update a Leave Type (Admin only)
 /**
  * @swagger
- * /api/leaveType/{id}:
+ * /api/v0/leaveType/{id}:
  *   patch:
  *     tags:
  *       - Leave Types
@@ -130,7 +130,7 @@ route.patch(
 // Route to archive a Leave Type (Admin only)
 /**
  * @swagger
- * /api/leaveType/archive/{id}:
+ * /api/v0/leaveType/archive/{id}:
  *   patch:
  *     tags:
  *       - Leave Types
@@ -169,7 +169,7 @@ route.patch(
 // Route to restore an archived Leave Type (Admin only)
 /**
  * @swagger
- * /api/leaveType/restore/{id}:
+ * /api/v0/leaveType/restore/{id}:
  *   patch:
  *     tags:
  *       - Leave Types

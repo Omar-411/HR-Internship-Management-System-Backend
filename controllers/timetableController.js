@@ -2,7 +2,7 @@ import User from "../models/User.js";
 import Timetable from "../models/Timetable.js";
 import AppError from "../utils/AppError.js";
 import mongoose from "mongoose";
-import { io } from "../server.js";
+import { io } from "../socketServer.js";
 
 // -------------------------------------------------------------------- //
 // --------------------- TIMETABLE SHIFT RULES ------------------------ //

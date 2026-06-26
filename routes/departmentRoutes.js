@@ -21,7 +21,7 @@ const router = express.Router();
 // Route to add new department
 /**
  * @swagger
- * /api/departments:
+ * /api/v0/departments:
  *   post:
  *     summary: Add a new department (Admin Only)
  *     tags:
@@ -59,7 +59,7 @@ router.post("/departments", authenticate, authorize(["Admin"]), addDepartment);
 // Route to get all the departments
 /**
  * @swagger
- * /api/departments:
+ * /api/v0/departments:
  *   get:
  *     summary: Get all departments (Admin Only)
  *     tags:
@@ -80,7 +80,7 @@ router.get("/departments", authenticate, getAllDepartments);
 // Route to get a department by Id
 /**
  * @swagger
- * /api/departments/{id}:
+ * /api/v0/departments/{id}:
  *   get:
  *     summary: Get a single department by ID (Admin Only)
  *     tags:
@@ -111,7 +111,7 @@ router.get("/departments/:id", authenticate, authorize(["Admin"]), getDepartment
 // Route to delete a department
 /**
  * @swagger
- * /api/departments/{id}:
+ * /api/v0/departments/{id}:
  *   delete:
  *     summary: Delete a department (Admin only)
  *     tags:
@@ -142,7 +142,7 @@ router.delete("/departments/:id", authenticate, authorize(["Admin"]), deleteDepa
 // Route to update a department
 /**
  * @swagger
- * /api/departments/{id}:
+ * /api/v0/departments/{id}:
  *   put:
  *     summary: Update a department (Admin only)
  *     tags:

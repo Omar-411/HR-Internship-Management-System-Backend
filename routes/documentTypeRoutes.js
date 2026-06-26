@@ -20,7 +20,7 @@ const router = express.Router();
 // Route to add a new document type (Admin only)
 /**
  * @swagger
- * /api/document-types:
+ * /api/v0/document-types:
  *   post:
  *     summary: Add a new document type
  *     tags: 
@@ -67,7 +67,7 @@ router.post(
 // Route to get all document types (Admin only)
 /**
  * @swagger
- * /api/document-types:
+ * /api/v0/document-types:
  *   get:
  *     summary: Get all document types
  *     tags: 
@@ -110,7 +110,7 @@ router.get(
 // Route to get a specific document type by ID (Admin only)
 /**
  * @swagger
- * /api/document-types/{id}:
+ * /api/v0/document-types/{id}:
  *   get:
  *     summary: Get a document type by ID
  *     tags: 

@@ -860,9 +860,18 @@ export const enrollFaceService = async (userId, descriptors) => {
 
 // Reset the face descriptors (Custom not generic)
 export const resetFaceService = async (userId) => {
-  const user = await User.findById(userId);
+  const result = await User.updateOne(
+    { _id: userId },
+    {
+      $set: {
+        faceDescriptors: [],
+        faceEnrolled: false,
+        faceEnrollmentPromptRequired: true,
+      },
+    },
+  );
 
-  if (!user) {
+  if (result.matchedCount === 0) {
     throw new AppError(
       commonErrors.USER_NOT_FOUND.message,
       commonErrors.USER_NOT_FOUND.code,
@@ -870,12 +879,6 @@ export const resetFaceService = async (userId) => {
       commonErrors.USER_NOT_FOUND.suggestion,
     );
   }
-
-  user.faceDescriptors = [];
-  user.faceEnrolled = false;
-  user.faceEnrollmentPromptRequired = true;
-
-  await user.save();
 
   return {
     status: "Success",

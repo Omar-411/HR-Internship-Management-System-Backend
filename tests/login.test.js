@@ -19,7 +19,6 @@ beforeEach(async () => {
   await UserRole.deleteMany({});
   await Department.deleteMany({});
 });
-
 // Close DB connection after all tests
 afterAll(async () => {
   await mongoose.connection.close();

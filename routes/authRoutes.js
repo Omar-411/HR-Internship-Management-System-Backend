@@ -7,6 +7,7 @@ import {
   requestPasswordReset,
   forgetPassword,
 } from "../controllers/authController.js";
+import { authLimiter } from "../middleware/rateLimiter.js";
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ const router = express.Router();
 // Route to log the user
 /**
  * @swagger
- * /api/login:
+ * /api/users/login:
  *   post:
  *     summary: User Login
  *     tags:
@@ -44,7 +45,7 @@ const router = express.Router();
  *       500:
  *         description: Server error
  */
-router.post("/login", login);
+router.post("/users/login", authLimiter, login);
 
 // Route to verify user's OTP code
 /**

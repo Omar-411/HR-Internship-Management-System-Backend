@@ -42,7 +42,7 @@ export const loginService = async ({ email, password }) => {
 
     if (user.loginAttempts >= 3) {
       user.status = "Blocked";
-      await user.save();
+      await user.save({ validateBeforeSave: false });
       throw new AppError(
         errors.ACCOUNT_BLOCKED.message,
         errors.ACCOUNT_BLOCKED.code,
@@ -51,7 +51,7 @@ export const loginService = async ({ email, password }) => {
       );
     }
 
-    await user.save();
+    await user.save({ validateBeforeSave: false });
     throw new AppError(
       errors.INVALID_CREDENTIALS.message,
       errors.INVALID_CREDENTIALS.code,
@@ -73,7 +73,7 @@ export const loginService = async ({ email, password }) => {
   const requiresFaceEnrollment = consumeFaceEnrollmentPrompt(user);
 
   user.loginAttempts = 0;
-  await user.save();
+  await user.save({ validateBeforeSave: false });
 
   return {
     status: "Success",
@@ -137,7 +137,7 @@ export const verifyUserService = async ({ email, code }) => {
   const token = generateToken(user._id, roleName);
   const requiresFaceEnrollment = consumeFaceEnrollmentPrompt(user);
 
-  await user.save();
+  await user.save({ validateBeforeSave: false });
 
   return {
     status: "Success",
@@ -199,7 +199,7 @@ export const resendOTPService = async ({ email }) => {
   user.verificationCodeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
   user.resendCount += 1;
 
-  await user.save();
+  await user.save({ validateBeforeSave: false });
 
   await sendEmail({
     to: user.email,
@@ -263,7 +263,7 @@ export const resetPasswordService = async ({ email, newPassword }) => {
   const token = generateToken(user._id, roleName);
   const requiresFaceEnrollment = consumeFaceEnrollmentPrompt(user);
 
-  await user.save();
+  await user.save({ validateBeforeSave: false });
 
   return {
     status: "Success",
@@ -300,7 +300,7 @@ export const requestPasswordResetService = async ({ email }) => {
 
   user.resetPasswordExpires = Date.now() + 60 * 60 * 1000;
 
-  await user.save();
+  await user.save({ validateBeforeSave: false });
 
   const resetURL = `${process.env.PLATFORM_URL}/reset-password?token=${rawToken}&email=${user.email}`;
 
@@ -366,7 +366,7 @@ export const forgetPasswordService = async ({ email, token, newPassword }) => {
   const tokenGen = generateToken(user._id, roleName);
   const requiresFaceEnrollment = consumeFaceEnrollmentPrompt(user);
 
-  await user.save();
+  await user.save({ validateBeforeSave: false });
 
   return {
     status: "Success",

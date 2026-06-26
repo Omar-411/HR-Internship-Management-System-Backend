@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const userRoleSchema = mongoose.Schema(
+const userRoleSchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -8,12 +8,11 @@ const userRoleSchema = mongoose.Schema(
     },
     description: {
       type: String,
-    }
+    },
   },
   {
     timestamps: true,
-  },
+  }
 );
 
 export default mongoose.model("UserRole", userRoleSchema);
- 

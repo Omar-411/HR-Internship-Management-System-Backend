@@ -1,27 +1,24 @@
 import express from "express";
 import {
-  addUserRole,
-  getAllUserRoles,
-  getUserRoleById,
-  updateUserRole,
-  deleteUserRole,
+ 
+    addUserRole,
+    getAllUserRoles,
+    getUserRoleById,
+    deleteUserRole,
+    updateUserRole
 } from "../controllers/userRoleController.js";
+import authorizeRole from "../middleware/rolePermission.js";
+ 
 import authenticate from "../middleware/authenticate.js";
 import authorize from "../middleware/authorize.js";
 
-const router = express.Router();
 
-/**
- * @swagger
- * tags:
- *   - name: UserRoles
- *     description: Endpoints for the user roles CRUDs
- */
+const router = express.Router();
 
 // Add new role
 /**
  * @swagger
- * /api/roles:
+ * /api/v0/roles:
  *   post:
  *     summary: Create a new user role (Admin Only)
  *     tags:
@@ -34,14 +31,8 @@ const router = express.Router();
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - name
- *             properties:
- *               name:
- *                 type: string
- *               description:
- *                 type: string
+ 
+ *             $ref: '#/components/schemas/UserRole'
  *     responses:
  *       201:
  *         description: User Role created successfully
@@ -54,74 +45,117 @@ const router = express.Router();
  *       409:
  *         description: User Role already exists
  *       500:
- *         description: Server Error
+ *         description: Server error
  */
+router.post("/roles", authorizeRole("Admin"), addUserRole);
+
+
+  
 router.post("/roles", authenticate, authorize(["Admin"]), addUserRole);
 
 // Get all roles
+
 /**
  * @swagger
- * /api/roles:
+ * /api/v0/roles:
  *   get:
- *     summary: Get all user roles (Admin only)
+ 
+ *     summary: Get all user roles
+ *     description: Retrieve a list of all roles
  *     tags:
- *       - UserRoles
- *     description: Allows an Admin to get the list of all user roles.
- *     security:
- *       - bearerAuth: []
+ *       - Roles
  *     responses:
  *       200:
- *         description: Returns list of roles
- *       401:
- *         description: Missing Token
- *       403:
- *         description: Unauthorized
+ *         description: List of roles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/UserRole'
  *       500:
- *         description: Server Error
+ *         description: Server error
  */
 router.get("/roles", authenticate, authorize(["Admin"]), getAllUserRoles);
 
 // Get a role by ID
+
 /**
  * @swagger
- * /api/roles/{id}:
+ * /api/v0/roles/{id}:
  *   get:
- *     summary: Get a user role by ID (Admin only)
+ 
+ *     summary: Get role by ID
+ *     description: Retrieve a specific role by its ID
  *     tags:
- *       - UserRoles
- *     description: Allows an Admin to get the details of a user role.
+ *       - Roles
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Role ID
+ *     responses:
+ *       200:
+ *         description: Role found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserRole'
+ *       404:
+ *         description: Role not found
+ *       500:
+ *         description: Server error
+ */
+router.get("/roles/:id", getUserRoleById);
+
+/**
+ * @swagger
+ * /api/v0/roles/{id}:
+ *   delete:
+ *     summary: Delete a user role
+ *     description: Delete a role by ID (Admin only)
+ *     tags:
+ *       - Roles
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         description: ID of the role to retrieve
+ 
  *         schema:
  *           type: string
+ *         description: Role ID
  *     responses:
  *       200:
- *         description: Returns the user role details
+ *         description: Role deleted successfully
  *       401:
  *         description: Invalid/missing token
  *       403:
- *         description: Unauthorized
+ *         description: Forbidden - Admin only
  *       404:
  *         description: User Role not found
  *       500:
- *         description: Server Error
+ *         description: Server error
  */
+router.delete("/roles/:id", authorizeRole("Admin"), deleteUserRole);
+
+
+  
 router.get("/roles/:id", authenticate, authorize(["Admin"]), getUserRoleById);
 
 // Update a role
+
 /**
  * @swagger
  * /api/roles/{id}:
  *   put:
  *     summary: Update a user role (Admin only)
+ *     description: Allows an Admin to update the details of a user role.
  *     tags:
  *       - UserRoles
- *     description: Allows an Admin to update the details of a user role.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -136,12 +170,7 @@ router.get("/roles/:id", authenticate, authorize(["Admin"]), getUserRoleById);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *               description:
- *                 type: string
+ *             $ref: '#/components/schemas/UserRole'
  *     responses:
  *       200:
  *         description: Role updated successfully
@@ -150,13 +179,13 @@ router.get("/roles/:id", authenticate, authorize(["Admin"]), getUserRoleById);
  *       401:
  *         description: Invalid/missing token
  *       403:
- *         description: Unauthorized
+ *         description: Forbidden - Admin only
  *       404:
  *         description: User Role not found
  *       409:
  *         description: User Role already exists
  *       500:
- *         description: Server Error
+ *         description: Server error
  */
 router.put("/roles/:id", authenticate, authorize(["Admin"]), updateUserRole);
 
@@ -193,3 +222,4 @@ router.put("/roles/:id", authenticate, authorize(["Admin"]), updateUserRole);
 router.delete("/roles/:id", authenticate, authorize(["Admin"]), deleteUserRole);
 
 export default router;
+

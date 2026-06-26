@@ -23,7 +23,7 @@ const router = express.Router();
 // Route to add a timetable entry (Admin Only)
 /**
  * @swagger
- * /timetable:
+ * /api/v0/timetable:
  *   post:
  *     summary: Add a timetable entry (Admin only)
  *     tags: 
@@ -87,7 +87,7 @@ router.post(
 // Route to update a timetable entry (Admin Only)
 /**
  * @swagger
- * /timetable:
+ * /api/v0/timetable:
  *   put:
  *     summary: Update a timetable entry (Admin only)
  *     tags: 
@@ -155,7 +155,7 @@ router.get(
 // Route to get a user's timetable: All users can see their own timetable, Admin can see all timetables, Supervisor can see the timetable of the users they supervise
 /**
  * @swagger
- * /timetable/{userId}:
+ * /api/v0/timetable/{userId}:
  *   get:
  *     summary: Get a timetable for a specific user
  *     tags: 
@@ -215,7 +215,7 @@ router.get(
 // Route to bulk update timetable entries
 /**
  * @swagger
- * /timetable/bulk:
+ * /api/v0/timetable/bulk:
  *   put:
  *     summary: Bulk update or create timetable entries (Admin only)
  *     tags: 

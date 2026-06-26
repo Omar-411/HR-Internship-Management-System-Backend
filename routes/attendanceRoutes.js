@@ -32,7 +32,7 @@ router.post("/attendance/face-challenge", authenticate, createFaceChallenge);
 
 /**
  * @swagger
- * /attendance/check-in:
+ * /api/v0/attendance/check-in:
  *   post:
  *     summary: Check in for today (All authenticated users)
  *     tags: 
@@ -71,7 +71,7 @@ router.post("/attendance/check-in", authenticate, checkIn);
 // Check-out
 /**
  * @swagger
- * /attendance/check-out:
+ * /api/v0/attendance/check-out:
  *   post:
  *     summary: Check out for today (All authenticated users)
  *     tags: 
@@ -98,7 +98,7 @@ router.post("/attendance/check-out", authenticate, checkOut);
 // Get the user's attendance status for today
 /**
  * @swagger
- * /attendance/me:
+ * /api/v0/attendance/me:
  *   get:
  *     summary: Get the current user's attendance status for today
  *     tags: 
@@ -129,7 +129,7 @@ router.get("/attendance/me", authenticate, getMyStatus);
 // Get attendance records (Admin/Supervisor)
 /**
  * @swagger
- * /attendance:
+ * /api/v0/attendance:
  *   get:
  *     summary: Get attendance records (Admin/Supervisor)
  *     tags: 
@@ -192,7 +192,7 @@ router.get(
 // Get statuses of Attendance (Admin/Supervisor)
 /**
  * @swagger
- * /attendance/statuses:
+ * /api/v0/attendance/statuses:
  *   get:
  *     summary: Get the list of attendance statuses
  *     tags: 
@@ -226,7 +226,7 @@ router.get(
 // Update attendance record (Admin only)
 /**
  * @swagger
- * /attendance/{id}:
+ * /api/v0/attendance/{id}:
  *   patch:
  *     summary: update an attendance record (Admin only)
  *     tags: 

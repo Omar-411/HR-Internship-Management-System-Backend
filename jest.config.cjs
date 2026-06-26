@@ -4,6 +4,6 @@ module.exports = {
     "^.+\\.js$": "babel-jest",
   },
   transformIgnorePatterns: [
-    "/node_modules/(?!node-fetch)/" // Allow node-fetch through Babel
+    "/node_modules/(?!node-fetch)/", // Allow node-fetch through Babel
   ],
 };

@@ -42,6 +42,7 @@ const INTERN_USERS = [
     email: "hiba.intern@dotjcom.com",
     position: "Mobile & AI Intern",
   },
+  
  
 ];
 

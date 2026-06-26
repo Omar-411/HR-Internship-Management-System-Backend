@@ -9,7 +9,13 @@
     "test": "cross-env NODE_ENV=test jest",
     "seed": "node seed/seed.js",
     "seed:admin": "node scripts/seedAdmin.js",
-    "seed:interns": "node scripts/seedInterns.js"
+    "seed:interns": "node scripts/seedInterns.js",
+    "seed:supervisors": "node scripts/seedSupervisors.js",
+    "seed:employees": "node scripts/seedEmployees.js",
+    "seed:projects": "node scripts/seedProjects.js",
+    "seed:all": "npm run seed && npm run seed:admin && npm run seed:interns && npm run seed:supervisors && npm run seed:employees && npm run seed:projects"
+    ,
+    "resetdb": "node scripts/resetDatabase.js"
   },
   "keywords": [],
   "author": "",
@@ -24,6 +30,7 @@
     "dotenv": "^17.3.1",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.3.2",
     "google-libphonenumber": "^3.2.44",
     "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.3",

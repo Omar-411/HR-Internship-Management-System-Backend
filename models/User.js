@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { countries } from "../constants/countries.js";
 
-const userSchema = mongoose.Schema(
+const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -44,7 +44,7 @@ const userSchema = mongoose.Schema(
         uppercase: true,
         minlength: 2,
         maxlength: 2,
-        enum: countries.map((c) => c.code), // Ensure It's a valid country code from the list of countries
+        enum: countries.map((c) => c.code), // Must be a valid country code
       },
       issueDate: {
         type: Date,
@@ -60,11 +60,11 @@ const userSchema = mongoose.Schema(
       required: true,
     },
     verificationCode: {
-      // OTP Code
+      // OTP code
       type: String,
     },
     verificationCodeExpires: {
-      // OTP Code expiration
+      // OTP code expiration
       type: Date,
     },
     status: {
@@ -79,7 +79,7 @@ const userSchema = mongoose.Schema(
       default: 0,
     },
     resendDate: {
-      // Date of the last OTP code resend request to control: 3 resends per day
+      // Date of the last OTP resend request
       type: Date,
       default: Date.now,
     },
@@ -102,8 +102,9 @@ const userSchema = mongoose.Schema(
       required: true,
     },
     joinDate: {
-      // UTC Join Date to the platform (No timezone issues)
-      type: Date,
+       // UTC Join Date to the platform (No timezone issues)
+       // UTC join date
+       type: Date,
       required: true,
       default: Date.now,
     },
@@ -135,14 +136,14 @@ const userSchema = mongoose.Schema(
       default: "",
     },
     profileImagePublicId: {
-      // Cloudinary public ID of each profileimage used for deletion
+      // Cloudinary public ID used for deletion
       type: String,
       default: "",
     },
     bio: {
       type: String,
     },
-    leaveBalances: [
+     leaveBalances: [
       {
         typeId: mongoose.Schema.Types.ObjectId,
         remainingDays: {
@@ -153,7 +154,15 @@ const userSchema = mongoose.Schema(
         },
       },
     ],
-    socialStatus: {
+     leaveBalance: {
+      type: Number,
+      default: 21,
+    },
+    faceData: {
+      type: String,
+      default: "",
+    },
+     socialStatus: {
       type: String,
       enum: ["Married", "Not Married"],
       default: "Not Married",
@@ -166,12 +175,21 @@ const userSchema = mongoose.Schema(
       type: Number,
       default: 0,
     },
-    projectsCount: {
+     projectsCount: {
       // Number of active projects the user is currently involved in
       type: Number,
       default: 0,
       min: 0,
       max: 2,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    isAvailable: {
+      // Availability to take more projects
+      type: Boolean,
+      default: true,
     },
     role_id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -198,10 +216,12 @@ const userSchema = mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true }
+  
+  
+  
 );
 
 // Index for the ID number uniqueness
