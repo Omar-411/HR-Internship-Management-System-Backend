@@ -410,15 +410,6 @@ export const applyProjectUpdates = async (project, data, isLocked) => {
 
     // Active status case
     if (newStatus === "Active") {
-      if (!project.scrumMasterId) {
-        throw new AppError(
-          errors.SCRUM_MASTER_REQUIRED.message,
-          errors.SCRUM_MASTER_REQUIRED.code,
-          errors.SCRUM_MASTER_REQUIRED.errorCode,
-          errors.SCRUM_MASTER_REQUIRED.suggestion,
-        );
-      }
-
       if (members.length < 1) {
         throw new AppError(
           errors.TEAM_MEMBERS_REQUIRED.message,
