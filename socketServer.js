@@ -11,7 +11,8 @@ export const io = new Server(socketServer, {
   cors: {
     origin: [
       "http://localhost:5173",
-      "https://hr-internship-management-system.vercel.app"
+      "https://hr-internship-management-system.vercel.app",
+      "https://hr.dotjcom.tech"
     ],
     methods: ["GET", "POST"],
   },

@@ -1,13 +1,14 @@
 /**
- * Seed script: creates an "Admin" role and four admin users for testing.
+ * Seed script: creates an "Admin" role and five admin users for testing.
  * Run from server folder: node scripts/seedAdmin.js
  * Reset existing admin passwords: node scripts/seedAdmin.js --force-reset-password
  *
  * Default test admins (all share the same password):
- *   - admin@example.com
- *   - hr.admin@dotjcom.com
- *   - it.admin@dotjcom.com
- *   - finance.admin@dotjcom.com
+ *   - omar@dotjcom.com
+ *   - yassine.admin@dotjcom.com
+ *   - siwar.it@dotjcom.com
+ *   - siwar.finance@dotjcom.com
+ *   - ghayth.khezami@dotjcom.com
  *   Password: Admin123!
  *
  * Safe to run multiple times: it will create missing admins and optionally reset passwords.
@@ -32,6 +33,7 @@ const ADMIN_USERS = [
     position: "Administrator",
     idNumber: "00000000",
     phoneNumber: "+1234567890",
+    gender: "Male",
   },
   {
     name: "Yassine",
@@ -40,6 +42,7 @@ const ADMIN_USERS = [
     position: "HR Administrator",
     idNumber: "00000001",
     phoneNumber: "+1234567891",
+    gender: "Male",
   },
   {
     name: "Siwar",
@@ -48,6 +51,7 @@ const ADMIN_USERS = [
     position: "IT Administrator",
     idNumber: "00000002",
     phoneNumber: "+1234567892",
+    gender: "Female",
   },
   {
     name: "Siwar",
@@ -56,6 +60,16 @@ const ADMIN_USERS = [
     position: "Finance Administrator",
     idNumber: "00000003",
     phoneNumber: "+1234567893",
+    gender: "Female",
+  },
+  {
+    name: "Ghayth",
+    lastName: "Khezami",
+    email: "ghayth.khezami@dotjcom.com",
+    position: "Administrator",
+    idNumber: "00000004",
+    phoneNumber: "+1234567894",
+    gender: "Male",
   },
 ];
 
@@ -120,18 +134,31 @@ async function seedAdmin() {
         continue;
       }
 
+      const now = new Date();
+      const contractEnd = new Date(now);
+      contractEnd.setFullYear(contractEnd.getFullYear() + 2);
+
       await User.create({
         name: admin.name,
         lastName: admin.lastName,
         email,
+        gender: admin.gender,
+        dateOfBirth: new Date("1995-01-01"),
+        placeOfBirth: "Tunis",
         idType: "CIN",
         idNumber: {
           number: admin.idNumber,
           countryCode: "TN",
+          issueDate: new Date("2015-01-01"),
+          issuePlace: "Tunis",
         },
         password: hashedPassword,
         address: "Seed Address",
-        joinDate: new Date(),
+        joinDate: now,
+        employment: {
+          contractJoinDate: now,
+          contractEndDate: contractEnd,
+        },
         phoneNumber: admin.phoneNumber,
         position: admin.position,
         status: "Active",

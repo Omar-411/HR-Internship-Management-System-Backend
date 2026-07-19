@@ -72,10 +72,15 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // CORS configuration for browser clients
-// Relaxed to allow any origin (no cookies used, only Authorization headers)
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://hr-internship-management-system.vercel.app",
+  "https://hr.dotjcom.tech",
+];
+
 app.use(
   cors({
-    origin: true, // reflect request origin
+    origin: allowedOrigins,
   }),
 );
 
